@@ -9,23 +9,25 @@ One GitHub repo, satisfying the hackathon's single-public-repo requirement direc
 ```
 quickbite/
 ├── apps/
-│   ├── web/                 # QuickBite web app (Next.js) — Person A owns this
-│   │   ├── app/
-│   │   │   ├── (disguise)/  # home, checkout, silent-tap screens
-│   │   │   └── call/        # live-call UI (waveform, controls)
-│   │   ├── lib/
-│   │   │   └── gemini-live/ # Gemini Live client wrapper
+│   ├── web/                 # QuickBite web app (React, Vite) — Person A owns this
+│   │   ├── src/
+│   │   │   ├── pages/
+│   │   │   │   ├── disguise/ # home, checkout, silent-tap screens
+│   │   │   │   └── call/     # live-call UI (waveform, controls)
+│   │   │   └── lib/
+│   │   │       └── gemini-live/ # Gemini Live client wrapper
 │   │   └── ...
 │   │
 │   ├── native/               # QuickBite React Native app — Person A owns this, built Week 4
 │   │   └── (ports apps/web's mechanism once proven — see plan §5 build order)
 │   │
-│   └── dashboard/            # Monitoring Dashboard (Next.js) — Person B owns this
-│       ├── app/
-│       │   ├── queue/        # live incident queue
-│       │   ├── incident/[id]/# incident detail
-│       │   ├── history/      # resolved cases
-│       │   └── video/        # stretch: live video page
+│   └── dashboard/            # Monitoring Dashboard (React, Vite) — Person B owns this
+│       ├── src/
+│       │   └── pages/
+│       │       ├── queue/          # live incident queue
+│       │       ├── incident/:id/   # incident detail
+│       │       ├── history/        # resolved cases
+│       │       └── video/          # stretch: live video page
 │       └── ...
 │
 ├── services/
