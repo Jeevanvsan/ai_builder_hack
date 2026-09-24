@@ -1,0 +1,978 @@
+<title>QuickBite Diagrams</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#f3f1ec; --surface:#ffffff; --surface-2:#eae7df; --line:#cfc9bc; --line-strong:#a89f8c;
+    --ink:#1c1a16; --muted:#736b5c; --accent:#e0631f; --accent-soft:#f6d9c4;
+    --signal:#1f6fb2; --signal-soft:#cfe4f4; --danger:#c0392b; --danger-soft:#f7dbd6;
+    --ok:#3f7d4d; --warn:#b9770e;
+    --mono:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;
+    --sans:'Inter',system-ui,-apple-system,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14171c; --surface:#1a1e25; --surface-2:#20252d; --line:#333a45; --line-strong:#4a5261;
+      --ink:#e9ebef; --muted:#8f97a5; --accent:#ff8a44; --accent-soft:#3a2418;
+      --signal:#5cb2ff; --signal-soft:#132534; --danger:#ff5c4d; --danger-soft:#3a1a17;
+      --ok:#5fd087; --warn:#e0a83f;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14171c; --surface:#1a1e25; --surface-2:#20252d; --line:#333a45; --line-strong:#4a5261;
+    --ink:#e9ebef; --muted:#8f97a5; --accent:#ff8a44; --accent-soft:#3a2418;
+    --signal:#5cb2ff; --signal-soft:#132534; --danger:#ff5c4d; --danger-soft:#3a1a17;
+    --ok:#5fd087; --warn:#e0a83f;
+  }
+
+  /* Product decision: the Monitoring Dashboard is light-themed by design (see quickbite_plan.md).
+     Pin its tokens to the light palette regardless of the viewer's system theme or the rest of
+     this reference page, which otherwise follows the normal light/dark rules. */
+  .dash-forced-light{
+    --bg:#f3f1ec; --surface:#ffffff; --surface-2:#eae7df; --line:#cfc9bc; --line-strong:#a89f8c;
+    --ink:#1c1a16; --muted:#736b5c; --accent:#e0631f; --accent-soft:#f6d9c4;
+    --signal:#1f6fb2; --signal-soft:#cfe4f4; --danger:#c0392b; --danger-soft:#f7dbd6;
+    --ok:#3f7d4d; --warn:#b9770e;
+    color-scheme: light;
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    padding-inline:20px; padding-block:20px 40px;
+  }
+  h1,h2,h3{text-wrap:balance; font-weight:600; margin:0}
+  .wrap{max-width:1220px; margin-inline:auto; display:flex; flex-direction:column; gap:20px}
+  code{font-family:var(--mono)}
+
+  @keyframes riseIn{ from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)} }
+  @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+  @media (prefers-reduced-motion:reduce){ *{animation-duration:.001s !important; transition-duration:.001s !important} }
+
+  header.page{
+    display:flex; flex-direction:column; gap:8px; padding-bottom:14px; border-bottom:1px solid var(--line);
+    animation:riseIn .5s ease both;
+  }
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); font-weight:600}
+  h1{font-size:clamp(20px,3.6vw,27px); letter-spacing:-.01em}
+  .sub{color:var(--muted); font-size:13px; max-width:70ch; line-height:1.5}
+
+  /* ---- top-level tabs ---- */
+  .tabbar{
+    display:flex; gap:4px; flex-wrap:wrap; position:sticky; top:0; z-index:20;
+    background:var(--bg); padding-block:10px; margin-top:-4px;
+  }
+  .tabbtn{
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.02em; color:var(--muted);
+    background:var(--surface); border:1px solid var(--line); padding:8px 14px; border-radius:9px 9px 0 0;
+    cursor:pointer; display:flex; align-items:center; gap:7px; transition:color .15s, border-color .15s;
+  }
+  .tabbtn .n{font-weight:700; color:var(--line-strong)}
+  .tabbtn[aria-selected="true"]{color:var(--ink); border-color:var(--accent); border-bottom-color:var(--surface); background:var(--surface); box-shadow:0 -2px 0 var(--accent) inset}
+  .tabbtn[aria-selected="true"] .n{color:var(--accent)}
+  .tabbtn:hover{color:var(--ink)}
+
+  .tabpanel{display:none; animation:fadeIn .35s ease both}
+  .tabpanel[data-active="true"]{display:block}
+
+  .panel-shell{background:var(--surface); border:1px solid var(--line); border-radius:0 12px 12px 12px; padding:20px}
+
+  .panel-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:16px}
+  .panel-head h2{font-size:18px}
+  .panel-head p{color:var(--muted); font-size:12.5px; max-width:70ch; line-height:1.5; margin:4px 0 0}
+
+  .legend{display:flex; gap:16px; flex-wrap:wrap; font-family:var(--mono); font-size:11px; color:var(--muted); margin-top:14px}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .swatch{width:11px; height:11px; border-radius:3px; display:inline-block}
+
+  .svg-scroll{overflow-x:auto}
+  svg{display:block; max-width:100%; height:auto}
+  text{font-family:var(--mono); fill:var(--ink)}
+  .lbl-sm{font-size:10.5px}
+  .lbl-md{font-size:11.5px}
+  .lbl-title{font-size:12.5px; font-weight:700}
+  .muted-t{fill:var(--muted)}
+  .accent-t{fill:var(--accent)}
+  .signal-t{fill:var(--signal)}
+
+  footer.note{font-family:var(--mono); font-size:11px; color:var(--muted); text-align:center; padding-top:6px}
+
+  /* ================= QUICKBITE PHONE MOCKS ================= */
+  .screens{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px; align-items:start}
+  .screen-col{display:flex; flex-direction:column; gap:8px; animation:riseIn .5s ease both}
+  .screen-col:nth-child(2){animation-delay:.06s} .screen-col:nth-child(3){animation-delay:.12s}
+  .screen-tag{font-family:var(--mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted)}
+  .screen-tag b{color:var(--accent)}
+  .screen-tag.sig b{color:var(--signal)}
+
+  .phone{width:100%; aspect-ratio:340/700; border-radius:26px; background:#0c0d10; padding:8px;
+    box-shadow:0 1px 0 var(--line-strong) inset, 0 10px 24px -14px rgba(0,0,0,.5); position:relative}
+  .phone .screen-surface{width:100%; height:100%; border-radius:19px; background:#fff8ef; overflow:hidden;
+    display:flex; flex-direction:column; font-family:var(--sans); position:relative}
+  .app-topbar{display:flex; align-items:center; justify-content:space-between; padding:14px 14px 10px; color:#1c1a16}
+  .app-brand{display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px}
+  .app-brand .dot{width:9px; height:9px; border-radius:50%; background:#e0631f}
+  .app-topbar .icons{display:flex; gap:10px; font-size:13px; opacity:.55}
+  .app-hero{margin:0 14px 12px; border-radius:14px; overflow:hidden; height:78px;
+    background:linear-gradient(135deg,#f7b267,#e0631f); position:relative}
+  .app-hero span{position:absolute; left:12px; bottom:10px; color:#fff; font-weight:700; font-size:13px; text-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .app-search{margin:0 14px 12px; background:#fff; border:1px solid #e7dfd2; border-radius:10px; padding:9px 11px;
+    font-size:12px; color:#8a806e; display:flex; align-items:center; gap:6px}
+  .app-menu{padding:0 14px; display:flex; flex-direction:column; gap:9px; flex:1; overflow:hidden}
+  .menu-item{background:#fff; border:1px solid #eee3d2; border-radius:12px; padding:10px 11px; display:flex;
+    align-items:center; gap:10px; position:relative; opacity:0; animation:riseIn .4s ease forwards}
+  .menu-item:nth-child(1){animation-delay:.15s} .menu-item:nth-child(2){animation-delay:.25s} .menu-item:nth-child(3){animation-delay:.35s}
+  .menu-thumb{width:42px; height:42px; border-radius:9px; flex:none; background:#f0e6d6}
+  .menu-copy{flex:1; min-width:0}
+  .menu-copy .name{font-size:12.5px; font-weight:600; color:#1c1a16}
+  .menu-copy .desc{font-size:10.5px; color:#8a806e; margin-top:2px}
+  .menu-price{font-size:12px; font-weight:700; color:#1c1a16}
+  .menu-item.flag{outline:1.5px dashed var(--signal); outline-offset:2px}
+  .menu-item .pop-note{position:absolute; right:8px; bottom:-9px; background:var(--signal); color:#fff;
+    font-family:var(--mono); font-size:8.5px; padding:2px 6px; border-radius:5px 5px 5px 0;
+    box-shadow:0 2px 6px -2px rgba(0,0,0,.4); max-width:180px; line-height:1.3; text-align:left}
+  .app-bottombar{margin-top:auto; padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));
+    background:#fff; border-top:1px solid #eee3d2; display:flex; align-items:center; justify-content:space-between}
+  .app-bottombar .total{font-size:11.5px; color:#8a806e}
+  .app-bottombar .cta{background:#1c1a16; color:#fff; font-size:11.5px; font-weight:600; padding:9px 16px; border-radius:9px}
+
+  .callscreen{background:#151315; color:#f4efe6; padding:0}
+  .call-top{padding:26px 18px 8px; text-align:center}
+  .call-top .who{font-size:15px; font-weight:700}
+  .call-top .num{font-size:11px; color:#a89f8c; margin-top:2px; font-family:var(--mono)}
+  .call-wave{display:flex; align-items:center; justify-content:center; gap:3px; height:46px; margin:8px 0}
+  .call-wave i{width:3px; border-radius:2px; background:var(--accent); display:inline-block; animation:wave 1.1s ease-in-out infinite}
+  .call-wave i:nth-child(1){height:14px; animation-delay:.0s} .call-wave i:nth-child(2){height:28px; animation-delay:.1s}
+  .call-wave i:nth-child(3){height:40px; animation-delay:.2s} .call-wave i:nth-child(4){height:22px; animation-delay:.3s}
+  .call-wave i:nth-child(5){height:34px; animation-delay:.4s} .call-wave i:nth-child(6){height:16px; animation-delay:.5s}
+  .call-wave i:nth-child(7){height:30px; animation-delay:.6s}
+  @keyframes wave{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+  .call-caption{margin:6px 16px 0; background:#221f1e; border:1px solid #3a352f; border-radius:12px; padding:12px 13px}
+  .call-caption .line{font-size:11.5px; line-height:1.5; color:#e7ded0; margin-bottom:8px; opacity:0; animation:riseIn .4s ease forwards}
+  .call-caption .line:nth-child(1){animation-delay:.2s} .call-caption .line:nth-child(2){animation-delay:.9s} .call-caption .line:nth-child(3){animation-delay:1.5s}
+  .call-caption .line:last-child{margin-bottom:0}
+  .call-caption .speaker{font-family:var(--mono); font-size:9px; color:#a89f8c; text-transform:uppercase; letter-spacing:.05em; display:block; margin-bottom:2px}
+  .call-caption .decode{font-family:var(--mono); font-size:9.5px; color:var(--signal); margin-top:3px}
+  .call-bottom{margin-top:auto; padding:16px; display:flex; justify-content:center; gap:26px}
+  .call-btn{width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px}
+  .call-btn.end{background:var(--danger); color:#fff}
+  .call-btn.mute{background:#2c2926; color:#e7ded0; border:1px solid #3a352f}
+
+  .live-pill{font-family:var(--mono); font-size:9px; letter-spacing:.05em; color:#fff; background:var(--danger);
+    padding:3px 8px; border-radius:20px; display:inline-flex; align-items:center; gap:5px}
+  .live-pill .blip{width:6px; height:6px; border-radius:50%; background:#fff; animation:blip 1.1s ease-in-out infinite}
+  @keyframes blip{0%,100%{opacity:1}50%{opacity:.25}}
+
+  /* ================= DASHBOARD SUB-TABS ================= */
+  .subtabbar{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; border-bottom:1px solid var(--line); padding-bottom:12px}
+  .subtabbtn{font-family:var(--mono); font-size:10.5px; color:var(--muted); background:var(--surface-2); border:1px solid var(--line);
+    padding:6px 11px; border-radius:20px; cursor:pointer; display:flex; align-items:center; gap:6px}
+  .subtabbtn[aria-selected="true"]{color:#fff; background:var(--signal); border-color:transparent}
+  .subtabbtn .dot-live{width:6px; height:6px; border-radius:50%; background:var(--danger); animation:blip 1.1s ease-in-out infinite}
+  .subpanel{display:none; animation:fadeIn .3s ease both}
+  .subpanel[data-active="true"]{display:block}
+
+  .console-frame{border-radius:12px; border:1px solid var(--line-strong); background:#0c0d10; padding:10px;
+    box-shadow:0 14px 34px -20px rgba(0,0,0,.55)}
+  .console-bezel{font-family:var(--mono); font-size:9px; color:#5b6270; display:flex; justify-content:space-between; padding:0 4px 8px}
+  .console-surface{background:var(--surface); border-radius:6px; overflow:hidden; color:var(--ink);
+    display:grid; grid-template-columns:minmax(220px,300px) 1fr; min-height:440px}
+  @media (max-width:760px){ .console-surface{grid-template-columns:1fr} }
+
+  .console-queue{border-right:1px solid var(--line); display:flex; flex-direction:column}
+  .console-queue-head{padding:12px 14px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between}
+  .console-queue-head b{font-size:12.5px}
+  .queue-item{padding:11px 14px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:4px;
+    opacity:0; animation:riseIn .4s ease forwards; transition:background .15s}
+  .queue-item:nth-child(1){animation-delay:.05s} .queue-item:nth-child(2){animation-delay:.12s} .queue-item:nth-child(3){animation-delay:.19s}
+  .queue-item.active{background:var(--signal-soft); border-left:3px solid var(--signal); padding-left:11px}
+  .queue-item .row1{display:flex; align-items:center; justify-content:space-between; font-family:var(--mono); font-size:10.5px}
+  .queue-item .id{font-weight:700}
+  .sev-chip{font-family:var(--mono); font-size:8.5px; padding:2px 7px; border-radius:20px; color:#fff}
+  .sev-chip.high{background:var(--danger)} .sev-chip.med{background:var(--warn)} .sev-chip.low{background:var(--ok)}
+  .queue-item .meta{font-size:10.5px; color:var(--muted)}
+  .queue-item .status-chip{font-family:var(--mono); font-size:8.5px; text-transform:uppercase; letter-spacing:.04em;
+    padding:2px 7px; border-radius:6px; width:fit-content; border:1px solid var(--line-strong); color:var(--muted)}
+  .queue-item .status-chip.new{color:#fff; background:var(--danger); border-color:transparent}
+  .queue-item .status-chip.ack{color:var(--signal); border-color:var(--signal)}
+
+  .console-detail{padding:16px 20px; display:flex; flex-direction:column; gap:14px; overflow:auto}
+  .console-detail-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  .console-detail-head h3{font-size:16px}
+  .console-detail-head .id{font-family:var(--mono); font-size:11px; color:var(--muted)}
+  .console-actions{display:flex; gap:8px}
+  .console-btn{font-family:var(--mono); font-size:10.5px; padding:7px 12px; border-radius:7px; border:1px solid var(--line-strong);
+    color:var(--ink); background:var(--surface-2); cursor:pointer; transition:transform .1s}
+  .console-btn:active{transform:scale(.96)}
+  .console-btn.primary{background:var(--signal); color:#fff; border-color:transparent}
+
+  .console-grid{display:grid; grid-template-columns:1.15fr .85fr; gap:14px}
+  @media (max-width:600px){ .console-grid{grid-template-columns:1fr} }
+  .console-map{height:150px; border-radius:10px; border:1px solid var(--line); position:relative;
+    background:radial-gradient(circle at 58% 44%, var(--accent) 0 7px, transparent 8px),
+      repeating-linear-gradient(0deg, var(--line) 0 1px, transparent 1px 26px),
+      repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 26px), var(--surface-2)}
+  .console-map .pin-label{position:absolute; left:60%; top:36%; font-family:var(--mono); font-size:9px; background:var(--accent);
+    color:#fff; padding:3px 6px; border-radius:5px 5px 5px 0; animation:pinPulse 1.8s ease-in-out infinite}
+  @keyframes pinPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,99,31,.4)}50%{box-shadow:0 0 0 8px rgba(224,99,31,0)}}
+
+  .console-fields{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .console-field{background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:9px 11px;
+    opacity:0; animation:riseIn .35s ease forwards}
+  .console-field:nth-child(1){animation-delay:.1s} .console-field:nth-child(2){animation-delay:.2s}
+  .console-field:nth-child(3){animation-delay:.3s} .console-field:nth-child(4){animation-delay:.4s}
+  .console-field .k{font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted)}
+  .console-field .v{font-size:12.5px; font-weight:600; margin-top:3px}
+  .console-field .v.pending{color:var(--muted); font-weight:400; font-style:italic}
+
+  .console-timeline{background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:10px 12px; font-size:11px; color:var(--muted); line-height:1.7}
+  .console-timeline .k{font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); display:block; margin-bottom:4px}
+  .console-notes{background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:10px 12px}
+  .console-notes .k{font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); display:block; margin-bottom:6px}
+  .console-notes .note{font-size:11.5px; margin-bottom:6px}
+  .console-notes .note b{font-family:var(--mono); font-size:9.5px; color:var(--signal); font-weight:600}
+
+  /* ---- live video call page (stretch goal, sub-goal A) ---- */
+  .video-layout{display:grid; grid-template-columns:1.4fr 1fr; gap:16px}
+  @media (max-width:760px){ .video-layout{grid-template-columns:1fr} }
+
+  .video-stage{border-radius:12px; overflow:hidden; border:1px solid var(--line-strong); background:#0c0d10; position:relative}
+  .video-stage-bar{display:flex; align-items:center; justify-content:space-between; padding:9px 13px; background:#15171c}
+  .video-stage-bar .tag{display:flex; align-items:center; gap:7px; font-family:var(--mono); font-size:10px; color:#e9ebef}
+  .video-stage-bar .rec-dot{width:7px; height:7px; border-radius:50%; background:var(--danger); animation:blip 1s ease-in-out infinite}
+  .video-stage-bar .cam-src{font-family:var(--mono); font-size:9.5px; color:#8f97a5}
+  .video-canvas{aspect-ratio:16/9; position:relative; background:
+      radial-gradient(ellipse at 50% 120%, #2a2f38 0%, #101318 60%),
+      repeating-linear-gradient(115deg, rgba(255,255,255,.02) 0 2px, transparent 2px 5px);
+    display:flex; align-items:flex-end; overflow:hidden}
+  .video-canvas .scan{position:absolute; inset:0; background:linear-gradient(180deg, transparent 0%, rgba(31,111,178,.08) 50%, transparent 100%);
+    height:40%; animation:scan 3.2s ease-in-out infinite}
+  @keyframes scan{0%{transform:translateY(-40%)}50%{transform:translateY(220%)}100%{transform:translateY(-40%)}}
+  .video-canvas .silhouette{position:absolute; left:38%; bottom:0; width:120px; height:85%;
+    background:radial-gradient(circle at 50% 18%, rgba(255,255,255,.10) 0 20px, transparent 22px),
+      linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+    border-radius:60px 60px 0 0; filter:blur(1px)}
+  .video-canvas .hud{position:absolute; inset:10px; pointer-events:none}
+  .video-canvas .hud .box{position:absolute; left:33%; top:8%; width:150px; height:78%; border:1.5px solid var(--signal); border-radius:6px; opacity:.85}
+  .video-canvas .hud .tag2{position:absolute; left:33%; top:calc(8% - 18px); font-family:var(--mono); font-size:8.5px; color:var(--signal); background:#0c0d10; padding:1px 5px; border-radius:3px}
+  .video-canvas .resbadge{position:absolute; right:10px; bottom:10px; font-family:var(--mono); font-size:8.5px; color:#8f97a5; background:rgba(0,0,0,.4); padding:3px 7px; border-radius:5px}
+  .video-canvas .fpsbadge{position:absolute; left:10px; bottom:10px; font-family:var(--mono); font-size:8.5px; color:#8f97a5; background:rgba(0,0,0,.4); padding:3px 7px; border-radius:5px}
+
+  .video-side{display:flex; flex-direction:column; gap:12px}
+  .video-meta{background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:12px 13px}
+  .video-meta .k{font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-bottom:4px}
+  .video-meta .v{font-size:12px; line-height:1.6}
+  .video-badge-row{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+  .vb{font-family:var(--mono); font-size:9px; padding:3px 8px; border-radius:20px; border:1px solid var(--line-strong); color:var(--muted)}
+  .vb.on{color:var(--ok); border-color:var(--ok)}
+  .vb.off{color:var(--muted); text-decoration:line-through; opacity:.55}
+
+  .gemini-strip{background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:12px 13px}
+  .gemini-strip .k{font-family:var(--mono); font-size:9px; text-transform:uppercase; letter-spacing:.05em; color:var(--signal); display:flex; align-items:center; gap:6px; margin-bottom:8px}
+  .gemini-strip .spark2{animation:sparkle 1.6s ease-in-out infinite}
+  .gemini-frame-row{display:flex; flex-direction:column; gap:6px}
+  .gemini-frame-row .fr{display:flex; gap:8px; align-items:flex-start; font-size:11px; opacity:0; animation:riseIn .4s ease forwards}
+  .gemini-frame-row .fr:nth-child(1){animation-delay:.1s} .gemini-frame-row .fr:nth-child(2){animation-delay:.6s} .gemini-frame-row .fr:nth-child(3){animation-delay:1.1s}
+  .gemini-frame-row .fr .ts2{font-family:var(--mono); font-size:9px; color:var(--line-strong); flex:none; padding-top:1px}
+
+  /* ---- notification feed page ---- */
+  .feed-wrap{background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:6px; max-width:640px}
+  .toast{display:flex; gap:11px; align-items:flex-start; background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:11px 13px; margin-bottom:6px; opacity:0; animation:toastIn .45s cubic-bezier(.2,.9,.25,1) forwards}
+  .toast:last-child{margin-bottom:0}
+  .toast:nth-child(1){animation-delay:.05s} .toast:nth-child(2){animation-delay:.35s} .toast:nth-child(3){animation-delay:.7s}
+  .toast:nth-child(4){animation-delay:1.05s} .toast:nth-child(5){animation-delay:1.4s}
+  @keyframes toastIn{ from{opacity:0; transform:translateX(-14px)} to{opacity:1; transform:translateX(0)} }
+  .toast .ic{width:30px; height:30px; border-radius:9px; flex:none; display:flex; align-items:center; justify-content:center; font-size:14px}
+  .toast .ic.start{background:var(--danger-soft); color:var(--danger)}
+  .toast .ic.field{background:var(--signal-soft); color:var(--signal)}
+  .toast .ic.sev{background:#fce8cf; color:var(--warn)}
+  .toast .ic.done{background:#dcf0e1; color:var(--ok)}
+  .toast .body{flex:1; min-width:0}
+  .toast .t1{font-size:12.5px; font-weight:600}
+  .toast .t2{font-size:11px; color:var(--muted); margin-top:2px}
+  .toast .ts{font-family:var(--mono); font-size:9.5px; color:var(--line-strong); flex:none; padding-top:2px}
+
+  /* ---- call report page ---- */
+  .report-doc{max-width:680px; background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:24px 26px;
+    opacity:0; animation:riseIn .5s ease forwards}
+  .report-doc .gen-tag{font-family:var(--mono); font-size:10px; color:var(--signal); display:flex; align-items:center; gap:6px; margin-bottom:14px}
+  .report-doc .gen-tag .spark{animation:sparkle 1.6s ease-in-out infinite}
+  @keyframes sparkle{0%,100%{opacity:.5; transform:scale(1)}50%{opacity:1; transform:scale(1.2)}}
+  .report-doc h3{font-size:16px; margin-bottom:4px}
+  .report-doc .meta-line{font-family:var(--mono); font-size:10.5px; color:var(--muted); margin-bottom:18px}
+  .report-doc .rblock{margin-bottom:16px}
+  .report-doc .rblock .k{font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--accent); margin-bottom:5px; display:block}
+  .report-doc .rblock p{font-size:12.5px; line-height:1.65; margin:0; color:var(--ink)}
+  .conf-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+  .conf-chip{font-family:var(--mono); font-size:9.5px; padding:3px 9px; border-radius:20px; border:1px solid var(--line-strong)}
+  .conf-chip.confirmed{color:var(--ok); border-color:var(--ok)}
+  .conf-chip.inferred{color:var(--warn); border-color:var(--warn)}
+
+  /* ---- case history page ---- */
+  .history-table{width:100%; border-collapse:collapse; font-size:12px}
+  .history-table th{font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+    text-align:left; padding:8px 12px; border-bottom:1px solid var(--line-strong)}
+  .history-table td{padding:11px 12px; border-bottom:1px solid var(--line)}
+  .history-table tr{opacity:0; animation:riseIn .35s ease forwards}
+  .history-table tr:nth-child(1){animation-delay:.05s} .history-table tr:nth-child(2){animation-delay:.1s}
+  .history-table tr:nth-child(3){animation-delay:.15s} .history-table tr:nth-child(4){animation-delay:.2s}
+  .history-table tr:hover td{background:var(--surface-2)}
+  .resolved-pill{font-family:var(--mono); font-size:9px; color:var(--ok); border:1px solid var(--ok); padding:2px 8px; border-radius:20px}
+</style>
+
+<div class="wrap">
+
+  <header class="page">
+    <span class="eyebrow">QuickBite / Covert Call — build reference</span>
+    <h1>Product tour</h1>
+    <p class="sub">Four tabs: the disguise app itself, the response team's Monitoring Dashboard, how the two connect, and what runs underneath. Orange marks the disguise surface; blue marks the real incident-response signal.</p>
+  </header>
+
+  <div class="tabbar" role="tablist" aria-label="Sections">
+    <button class="tabbtn" role="tab" data-tab="qb" aria-selected="true"><span class="n">01</span> QuickBite App</button>
+    <button class="tabbtn" role="tab" data-tab="dash" aria-selected="false"><span class="n">02</span> Monitoring Dashboard</button>
+    <button class="tabbtn" role="tab" data-tab="flow" aria-selected="false"><span class="n">03</span> User Flow</button>
+    <button class="tabbtn" role="tab" data-tab="arch" aria-selected="false"><span class="n">04</span> Architecture</button>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- TAB 01 — QUICKBITE APP                                        -->
+  <!-- ============================================================ -->
+  <section class="tabpanel" data-tab="qb" data-active="true" role="tabpanel">
+    <div class="panel-shell">
+      <div class="panel-head">
+        <h2>QuickBite — the disguise, three screens</h2>
+        <p>An ordinary food-delivery app on the surface. The two modes fork from the home screen and never touch each other — one leads to a live disguised call, the other to a silent tap-only checkout. Reload the tab to replay the entrance animation.</p>
+      </div>
+
+      <div class="screens">
+
+        <div class="screen-col">
+          <span class="screen-tag">Screen 01 · <b>disguise surface</b> — home, mode forks here</span>
+          <div class="phone"><div class="screen-surface">
+            <div class="app-topbar"><div class="app-brand"><span class="dot"></span>QuickBite</div><div class="icons">⚲ ♡ ☰</div></div>
+            <div class="app-hero"><span>Free delivery over ₹199 · 18–25 min</span></div>
+            <div class="app-search">⚲ Search restaurants, dishes…</div>
+            <div class="app-menu">
+              <div class="menu-item"><div class="menu-thumb"></div><div class="menu-copy"><div class="name">Margherita Pizza</div><div class="desc">Classic · serves 1–2</div></div><div class="menu-price">₹249</div></div>
+              <div class="menu-item"><div class="menu-thumb"></div><div class="menu-copy"><div class="name">Family Combo — Large</div><div class="desc">Feeds a group</div></div><div class="menu-price">₹699</div></div>
+              <div class="menu-item"><div class="menu-thumb"></div><div class="menu-copy"><div class="name">Extra Hot Sauce +</div><div class="desc">Add-on, any order</div></div><div class="menu-price">₹0</div></div>
+            </div>
+            <div class="app-bottombar"><span class="total">Ordering as guest</span><span class="cta">Call to order →</span></div>
+          </div></div>
+          <p style="font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5;margin:0">
+            "Call to order" and normal checkout are the ONLY two exits from here — never both from the same order.
+          </p>
+        </div>
+
+        <div class="screen-col">
+          <span class="screen-tag sig">Screen 01b · <b>disguise surface</b> — silent tap-only, no call</span>
+          <div class="phone"><div class="screen-surface">
+            <div class="app-topbar"><div class="app-brand"><span class="dot"></span>QuickBite</div><div class="icons">⚲ ♡ ☰</div></div>
+            <div class="app-hero" style="height:auto;padding:10px 12px;display:flex;align-items:center"><span style="position:static;text-shadow:none">Your cart</span></div>
+            <div class="app-menu">
+              <div class="menu-item flag"><div class="menu-thumb"></div><div class="menu-copy"><div class="name">Family Combo — Large</div><div class="desc">Qty: 3</div></div><div class="menu-price">₹699</div><div class="pop-note">long-press: quantity here quietly means people present</div></div>
+              <div class="menu-item"><div class="menu-thumb"></div><div class="menu-copy"><div class="name">Extra Hot Sauce +</div><div class="desc">Add-on</div></div><div class="menu-price">₹0</div></div>
+              <div class="app-search" style="margin-top:2px">✎ Add a note for the rider…</div>
+            </div>
+            <div class="app-bottombar"><span class="total">3 items · ₹699</span><span class="cta">Place order</span></div>
+          </div></div>
+          <p style="font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5;margin:0">
+            No call button anywhere on this path. "Place order" silently submits the tap-based report.
+          </p>
+        </div>
+
+        <div class="screen-col">
+          <span class="screen-tag">Screen 02 · <b>disguise surface</b> — the other fork: live call</span>
+          <div class="phone"><div class="screen-surface callscreen">
+            <div class="call-top"><div class="who">Tony's Pizza — Delivery Desk</div><div class="num">+91 80 4011 2299 · 00:47</div></div>
+            <div class="call-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="call-caption">
+              <div class="line"><span class="speaker">Agent</span>Just confirming — if there's anything dangerous going on, like a weapon nearby, just say you need extra hot sauce and I'll add it to the order.
+                <div class="decode">⚙ dev note only, not spoken: meaning is IN the line above</div></div>
+              <div class="line"><span class="speaker">Caller</span>Um— yeah, extra hot sauce would be good.
+                <div class="decode">⚙ dev note only: dangerIndicators += "weapon present"</div></div>
+              <div class="line"><span class="speaker">Agent</span>Got it. And what's the delivery address, exactly?</div>
+            </div>
+            <div class="call-bottom"><div class="call-btn mute">🔇</div><div class="call-btn end">⏹</div></div>
+          </div></div>
+          <p style="font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5;margin:0">
+            Every coded question states its real meaning in the same breath — nothing memorized beforehand.
+          </p>
+        </div>
+
+      </div>
+
+      <div class="legend"><span><i class="swatch" style="background:var(--accent)"></i>What an onlooker would see, at any point</span></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 02 — MONITORING DASHBOARD                                 -->
+  <!-- ============================================================ -->
+  <section class="tabpanel dash-forced-light" data-tab="dash" data-active="false" role="tabpanel">
+    <div class="panel-shell">
+      <div class="panel-head">
+        <h2>Monitoring Dashboard — a separate app, built for a response team</h2>
+        <p>Own deployment, own URL, designed for a wall monitor — not a phone-sized view of QuickBite. Five pages: the live queue, live video (stretch goal), the raw notification feed, the Gemini-written call-end report, and resolved-case history. <b>Product decision: this dashboard is light-themed</b>, shown here pinned to light regardless of your system theme, to match the actual planned UI (see <code>quickbite_plan.md</code>) — not a dark ops-console look.</p>
+      </div>
+
+      <div class="subtabbar" role="tablist" aria-label="Dashboard pages">
+        <button class="subtabbtn" role="tab" data-sub="queue" aria-selected="true"><span class="dot-live"></span>Live Queue</button>
+        <button class="subtabbtn" role="tab" data-sub="video" aria-selected="false"><span class="dot-live"></span>Live Video <span style="opacity:.6">· stretch</span></button>
+        <button class="subtabbtn" role="tab" data-sub="notif" aria-selected="false">Notifications</button>
+        <button class="subtabbtn" role="tab" data-sub="report" aria-selected="false">Call Report</button>
+        <button class="subtabbtn" role="tab" data-sub="history" aria-selected="false">Case History</button>
+      </div>
+
+      <!-- PAGE: LIVE QUEUE -->
+      <div class="subpanel" data-sub="queue" data-active="true">
+        <div class="console-frame">
+          <div class="console-bezel"><span>monitor.quickbite-ops.app / queue</span><span>1920×1080 reference</span></div>
+          <div class="console-surface">
+            <div class="console-queue">
+              <div class="console-queue-head"><b>Active incidents</b><span class="live-pill"><i class="blip"></i>3 LIVE</span></div>
+              <div class="queue-item active">
+                <div class="row1"><span class="id">#A17</span><span class="sev-chip high">HIGH</span></div>
+                <div class="meta">Live call · 00:47 elapsed</div>
+                <div class="status-chip new">unacknowledged</div>
+              </div>
+              <div class="queue-item">
+                <div class="row1"><span class="id">#A16</span><span class="sev-chip med">MED</span></div>
+                <div class="meta">Silent tap · 4 min ago</div>
+                <div class="status-chip ack">acknowledged — R. Iyer</div>
+              </div>
+              <div class="queue-item">
+                <div class="row1"><span class="id">#A15</span><span class="sev-chip low">LOW</span></div>
+                <div class="meta">Resolved · 22 min ago</div>
+                <div class="status-chip">resolved</div>
+              </div>
+            </div>
+            <div class="console-detail">
+              <div class="console-detail-head">
+                <div><h3>Incident #A17</h3><span class="id">live-call · session started 00:00 · high severity</span></div>
+                <div class="console-actions"><button class="console-btn primary">Acknowledge</button><button class="console-btn">Mark resolved</button></div>
+              </div>
+              <div class="console-grid">
+                <div class="console-map"><div class="pin-label">approx. pin — refining</div></div>
+                <div class="console-fields">
+                  <div class="console-field"><div class="k">People</div><div class="v">3</div></div>
+                  <div class="console-field"><div class="k">Danger flag</div><div class="v">Weapon present</div></div>
+                  <div class="console-field"><div class="k">Address</div><div class="v pending">refining…</div></div>
+                  <div class="console-field"><div class="k">Voice stress</div><div class="v">High ↑</div></div>
+                </div>
+              </div>
+              <div class="console-timeline"><span class="k">Timeline</span>00:00 alert fired · 00:22 people count confirmed · 00:41 danger flag raised · now confirming address</div>
+              <div class="console-notes"><span class="k">Response notes</span><div class="note"><b>R. IYER · 00:31</b> — dispatching nearest unit toward approx. pin, awaiting confirmed address</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--danger)"></i>Unacknowledged — needs a responder</span>
+          <span><i class="swatch" style="background:var(--signal)"></i>Acknowledged — someone has it</span>
+        </div>
+      </div>
+
+      <!-- PAGE: LIVE VIDEO (stretch goal — two independent sub-goals) -->
+      <div class="subpanel" data-sub="video" data-active="false">
+        <p style="font-family:var(--mono); font-size:11px; color:var(--muted); margin:0 0 14px; max-width:78ch; line-height:1.6">
+          <b style="color:var(--ink)">Stretch goal, mobile app only, back camera only.</b> Two independent sub-goals — neither gates the other: <b style="color:var(--accent)">(A)</b> continuous video streamed here like a video call (WebRTC-class, genuinely new infra, not built on anything already in the plan) and <b style="color:var(--signal)">(B)</b> Gemini sampling the same feed at ~1 frame/sec into structured signal alongside it. Camera activation always shows an OS-level indicator on the sender's phone — no platform allows suppressing this; nothing about the capture itself makes a sound or uses a flash.
+        </p>
+
+        <div class="video-layout">
+          <div>
+            <div class="video-stage">
+              <div class="video-stage-bar">
+                <div class="tag"><span class="rec-dot"></span>Incident #A17 · back camera</div>
+                <div class="cam-src">Sub-goal A — WebRTC, continuous</div>
+              </div>
+              <div class="video-canvas">
+                <div class="scan"></div>
+                <div class="silhouette"></div>
+                <div class="hud">
+                  <div class="box"></div>
+                  <div class="tag2">Sub-goal B tracks this region</div>
+                </div>
+                <div class="fpsbadge">responder view: ~30fps</div>
+                <div class="resbadge">Gemini samples: ~1 frame/sec</div>
+              </div>
+            </div>
+            <p style="font-family:var(--mono); font-size:10px; color:var(--muted); margin:8px 2px 0">
+              Placeholder scene — illustrates a dim room with one tracked region, not a real camera capture.
+            </p>
+          </div>
+
+          <div class="video-side">
+            <div class="video-meta">
+              <div class="k">Stream status</div>
+              <div class="v">Live · started 00:00 · 00:47 elapsed</div>
+              <div class="video-badge-row">
+                <span class="vb on">Sub-goal A: video call — on</span>
+                <span class="vb on">Sub-goal B: Gemini analysis — on</span>
+                <span class="vb off">Front camera — never used</span>
+              </div>
+            </div>
+
+            <div class="gemini-strip">
+              <div class="k"><span class="spark2">✦</span> Gemini frame analysis (Sub-goal B)</div>
+              <div class="gemini-frame-row">
+                <div class="fr"><span class="ts2">00:12</span><span>Dim interior, one person visible in tracked region</span></div>
+                <div class="fr"><span class="ts2">00:34</span><span>Object in frame consistent with a handheld weapon description</span></div>
+                <div class="fr"><span class="ts2">00:46</span><span>No change — signal folded into dangerIndicators, not shown as raw video to the field list</span></div>
+              </div>
+            </div>
+
+            <div class="video-meta">
+              <div class="k">Session constraint</div>
+              <div class="v" style="font-family:var(--mono); font-size:10.5px">Video-attached Gemini sessions cap at 2 min (vs. 15 min audio-only) — reconnect handling required for longer calls.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: NOTIFICATIONS -->
+      <div class="subpanel" data-sub="notif" data-active="false">
+        <p style="font-family:var(--mono); font-size:11px; color:var(--muted); margin:0 0 14px">
+          Raw event feed — every push the websocket hub broadcasts, in arrival order, for incident #A17. This is the log the queue/detail pages are built from.
+        </p>
+        <div class="feed-wrap">
+          <div class="toast">
+            <div class="ic start">✦</div>
+            <div class="body"><div class="t1">New incident — #A17 opened</div><div class="t2">callState: active · rough GPS attached · no fields extracted yet</div></div>
+            <div class="ts">00:00</div>
+          </div>
+          <div class="toast">
+            <div class="ic field">▤</div>
+            <div class="body"><div class="t1">Field updated — peopleCount</div><div class="t2">extractedFieldsLive.peopleCount = 3</div></div>
+            <div class="ts">00:22</div>
+          </div>
+          <div class="toast">
+            <div class="ic sev">▲</div>
+            <div class="body"><div class="t1">Severity escalated — LOW → HIGH</div><div class="t2">dangerIndicators += "weapon present"</div></div>
+            <div class="ts">00:41</div>
+          </div>
+          <div class="toast">
+            <div class="ic field">▤</div>
+            <div class="body"><div class="t1">Voice stress trend updated</div><div class="t2">stress score climbing — flagged High ↑ on incident card</div></div>
+            <div class="ts">00:44</div>
+          </div>
+          <div class="toast">
+            <div class="ic done">✓</div>
+            <div class="body"><div class="t1">Awaiting address confirmation</div><div class="t2">location.confirmed still null — refining live</div></div>
+            <div class="ts">00:47</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: CALL REPORT -->
+      <div class="subpanel" data-sub="report" data-active="false">
+        <p style="font-family:var(--mono); font-size:11px; color:var(--muted); margin:0 0 14px">
+          Written once, after <code>callState</code> flips to "ended" — a second Gemini pass over the full transcript, extracted fields, stress trend, and leakage-check result.
+        </p>
+        <div class="report-doc">
+          <div class="gen-tag"><span class="spark">✦</span> Generated by Gemini · post-call consolidation pass</div>
+          <h3>Incident #A17 — Call Report</h3>
+          <div class="meta-line">Session 00:00–02:14 · channel: live-call · overall severity: HIGH</div>
+
+          <div class="rblock">
+            <span class="k">Summary</span>
+            <p>Caller placed a disguised delivery order and, via the pre-arranged "extra hot sauce" phrase, indicated a weapon was present at their location. Three individuals reported present. Voice stress rose sharply after the danger indicator was raised and stayed elevated through the remainder of the call. Address was confirmed at 01:52 via the caller's own description ("second floor, blue gate, past the water tank").</p>
+          </div>
+
+          <div class="rblock">
+            <span class="k">Extracted fields</span>
+            <div class="conf-row">
+              <span class="conf-chip confirmed">people: 3 — confirmed</span>
+              <span class="conf-chip confirmed">danger: weapon present — confirmed</span>
+              <span class="conf-chip confirmed">address: resolved — confirmed</span>
+              <span class="conf-chip inferred">urgency: high — inferred from stress trend</span>
+            </div>
+          </div>
+
+          <div class="rblock">
+            <span class="k">Leakage check</span>
+            <p>No third parties named without apparent consent. One mention of "my sister" retained — caller referred to herself in third person briefly; not flagged as an uninvolved bystander.</p>
+          </div>
+
+          <div class="rblock">
+            <span class="k">Recommended priority</span>
+            <p>HIGH — armed threat, multiple people present, confirmed address. Immediate response recommended.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: CASE HISTORY -->
+      <div class="subpanel" data-sub="history" data-active="false">
+        <p style="font-family:var(--mono); font-size:11px; color:var(--muted); margin:0 0 14px">Resolved incidents — for review, not live monitoring.</p>
+        <div style="overflow-x:auto">
+          <table class="history-table">
+            <thead><tr><th>ID</th><th>Channel</th><th>Severity</th><th>Opened</th><th>Resolved by</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><code>#A15</code></td><td>silent-tap</td><td><span class="sev-chip low">LOW</span></td><td>Today, 09:12</td><td>K. Menon</td><td><span class="resolved-pill">resolved</span></td></tr>
+              <tr><td><code>#A12</code></td><td>live-call</td><td><span class="sev-chip med">MED</span></td><td>Yesterday, 22:40</td><td>R. Iyer</td><td><span class="resolved-pill">resolved</span></td></tr>
+              <tr><td><code>#A09</code></td><td>live-call</td><td><span class="sev-chip high">HIGH</span></td><td>Yesterday, 18:03</td><td>R. Iyer</td><td><span class="resolved-pill">resolved</span></td></tr>
+              <tr><td><code>#A07</code></td><td>silent-tap</td><td><span class="sev-chip low">LOW</span></td><td>2 days ago</td><td>K. Menon</td><td><span class="resolved-pill">resolved</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="legend" style="margin-top:16px">
+        <span><i class="swatch" style="background:var(--accent)"></i>Own deploy, distinct from QuickBite</span>
+        <span><i class="swatch" style="background:var(--signal)"></i>Real-time / shared state across responders</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 03 — USER FLOW                                            -->
+  <!-- ============================================================ -->
+  <section class="tabpanel" data-tab="flow" data-active="false" role="tabpanel">
+    <div class="panel-shell">
+      <div class="panel-head"><h2>User flow — from open app to help arriving</h2></div>
+      <div class="svg-scroll">
+        <svg viewBox="0 0 1400 760" role="img" aria-label="Flow diagram: a person opens QuickBite, which looks like an ordinary food delivery app, then either starts a live disguised call or uses silent tap-only mode depending on whether it is safe to speak; both paths extract a structured incident and stream it live to the Monitoring Dashboard which shows a rough location pin instantly and refines it as the interaction continues, ending in a consolidated case record.">
+          <defs>
+            <marker id="arrowInk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--ink)"/></marker>
+            <marker id="arrowSignal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--signal)"/></marker>
+          </defs>
+
+          <text x="20" y="26" class="lbl-title accent-t">DISGUISE SURFACE</text>
+          <text x="20" y="42" class="lbl-sm muted-t">what an onlooker sees</text>
+          <line x1="0" y1="56" x2="1400" y2="56" stroke="var(--line)" stroke-dasharray="3 4"/>
+          <text x="20" y="430" class="lbl-title signal-t">REAL SIGNAL</text>
+          <text x="20" y="446" class="lbl-sm muted-t">what actually happens</text>
+          <line x1="0" y1="460" x2="1400" y2="460" stroke="var(--line)" stroke-dasharray="3 4"/>
+
+          <rect x="20" y="90" width="150" height="76" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="95" y="122" text-anchor="middle" class="lbl-md">Open</text>
+          <text x="95" y="138" text-anchor="middle" class="lbl-md">QuickBite</text>
+          <text x="95" y="156" text-anchor="middle" class="lbl-sm muted-t">looks like any</text>
+          <text x="95" y="169" text-anchor="middle" class="lbl-sm muted-t">delivery app</text>
+
+          <line x1="170" y1="128" x2="220" y2="128" stroke="var(--ink)" marker-end="url(#arrowInk)"/>
+
+          <polygon points="290,90 400,128 290,166 180,128" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-width="1.4"/>
+          <text x="290" y="122" text-anchor="middle" class="lbl-sm">safe to</text>
+          <text x="290" y="136" text-anchor="middle" class="lbl-sm">speak &amp;</text>
+          <text x="290" y="150" text-anchor="middle" class="lbl-sm">connected?</text>
+
+          <line x1="400" y1="128" x2="450" y2="128" stroke="var(--ink)" marker-end="url(#arrowInk)"/>
+          <text x="415" y="118" class="lbl-sm muted-t">yes</text>
+
+          <rect x="450" y="80" width="210" height="96" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="555" y="102" text-anchor="middle" class="lbl-title">One tap, direct:</text>
+          <text x="555" y="118" text-anchor="middle" class="lbl-title">"Call to order"</text>
+          <text x="555" y="140" text-anchor="middle" class="lbl-sm muted-t">no menu browsing first —</text>
+          <text x="555" y="154" text-anchor="middle" class="lbl-sm muted-t">Gemini Live picks up as</text>
+          <text x="555" y="168" text-anchor="middle" class="lbl-sm muted-t">a restaurant employee</text>
+
+          <line x1="660" y1="128" x2="710" y2="128" stroke="var(--ink)" marker-end="url(#arrowInk)"/>
+
+          <rect x="710" y="80" width="230" height="96" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="825" y="105" text-anchor="middle" class="lbl-title">Coded question,</text>
+          <text x="825" y="121" text-anchor="middle" class="lbl-title">meaning stated live</text>
+          <text x="825" y="142" text-anchor="middle" class="lbl-sm muted-t">"need ketchup? just say so —</text>
+          <text x="825" y="156" text-anchor="middle" class="lbl-sm muted-t">that means a weapon's present"</text>
+
+          <line x1="940" y1="128" x2="990" y2="128" stroke="var(--ink)" marker-end="url(#arrowInk)"/>
+
+          <rect x="990" y="80" width="190" height="96" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="1085" y="112" text-anchor="middle" class="lbl-title">Person answers</text>
+          <text x="1085" y="128" text-anchor="middle" class="lbl-title">in plain speech</text>
+          <text x="1085" y="150" text-anchor="middle" class="lbl-sm muted-t">no code to remember,</text>
+          <text x="1085" y="163" text-anchor="middle" class="lbl-sm muted-t">only to hear</text>
+
+          <line x1="1180" y1="128" x2="1230" y2="128" stroke="var(--ink)" marker-end="url(#arrowInk)"/>
+
+          <rect x="1230" y="80" width="150" height="96" rx="10" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-width="1.4"/>
+          <text x="1305" y="112" text-anchor="middle" class="lbl-title">Zero-trace</text>
+          <text x="1305" y="128" text-anchor="middle" class="lbl-title">exit</text>
+          <text x="1305" y="150" text-anchor="middle" class="lbl-sm muted-t">sent / backed-out</text>
+          <text x="1305" y="163" text-anchor="middle" class="lbl-sm muted-t">look identical</text>
+
+          <path d="M290,166 V220 H555" stroke="var(--ink)" fill="none" marker-end="url(#arrowInk)"/>
+          <text x="305" y="200" class="lbl-sm muted-t">no</text>
+
+          <rect x="450" y="228" width="210" height="96" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="555" y="256" text-anchor="middle" class="lbl-title">Ordinary menu,</text>
+          <text x="555" y="272" text-anchor="middle" class="lbl-title">silent tap-only</text>
+          <text x="555" y="294" text-anchor="middle" class="lbl-sm muted-t">no sound, no call,</text>
+          <text x="555" y="308" text-anchor="middle" class="lbl-sm muted-t">works with zero signal</text>
+
+          <line x1="660" y1="276" x2="710" y2="276" stroke="var(--ink)" marker-end="url(#arrowInk)"/>
+
+          <rect x="710" y="228" width="230" height="96" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="825" y="256" text-anchor="middle" class="lbl-title">Long-press reveals</text>
+          <text x="825" y="272" text-anchor="middle" class="lbl-title">real meaning</text>
+          <text x="825" y="294" text-anchor="middle" class="lbl-sm muted-t">tooltip looks like a normal</text>
+          <text x="825" y="308" text-anchor="middle" class="lbl-sm muted-t">app hint, on demand only</text>
+
+          <line x1="940" y1="276" x2="990" y2="276" stroke="var(--ink)" marker-end="url(#arrowInk)"/>
+
+          <rect x="990" y="228" width="190" height="96" rx="10" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-width="1.4"/>
+          <text x="1085" y="260" text-anchor="middle" class="lbl-title">Tap selections</text>
+          <text x="1085" y="276" text-anchor="middle" class="lbl-title">submitted</text>
+          <text x="1085" y="298" text-anchor="middle" class="lbl-sm muted-t">still looks like</text>
+          <text x="1085" y="311" text-anchor="middle" class="lbl-sm muted-t">placing an order</text>
+
+          <line x1="1180" y1="276" x2="1230" y2="176" stroke="var(--ink)" fill="none" marker-end="url(#arrowInk)"/>
+
+          <line x1="825" y1="176" x2="825" y2="400" stroke="var(--signal)" stroke-width="1.6" stroke-dasharray="2 5"/>
+          <text x="833" y="360" class="lbl-sm signal-t">extracts</text>
+          <line x1="1085" y1="176" x2="1085" y2="400" stroke="var(--signal)" stroke-width="1.6" stroke-dasharray="2 5"/>
+          <line x1="825" y1="324" x2="825" y2="400" stroke="var(--signal)" stroke-width="1.6" stroke-dasharray="2 5"/>
+          <line x1="1085" y1="324" x2="1085" y2="400" stroke="var(--signal)" stroke-width="1.6" stroke-dasharray="2 5"/>
+
+          <rect x="60" y="500" width="220" height="100" rx="10" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.4"/>
+          <text x="170" y="528" text-anchor="middle" class="lbl-title">Incident created</text>
+          <text x="170" y="544" text-anchor="middle" class="lbl-title">at call START</text>
+          <text x="170" y="566" text-anchor="middle" class="lbl-sm muted-t">rough GPS attached</text>
+          <text x="170" y="580" text-anchor="middle" class="lbl-sm muted-t">instantly, not AI</text>
+
+          <line x1="280" y1="550" x2="330" y2="550" stroke="var(--signal)" marker-end="url(#arrowSignal)"/>
+
+          <rect x="330" y="500" width="220" height="100" rx="10" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.4"/>
+          <text x="440" y="528" text-anchor="middle" class="lbl-title">Dashboard alert</text>
+          <text x="440" y="544" text-anchor="middle" class="lbl-title">fires immediately</text>
+          <text x="440" y="566" text-anchor="middle" class="lbl-sm muted-t">approximate pin shown,</text>
+          <text x="440" y="580" text-anchor="middle" class="lbl-sm muted-t">before any details known</text>
+
+          <line x1="550" y1="550" x2="600" y2="550" stroke="var(--signal)" marker-end="url(#arrowSignal)"/>
+
+          <rect x="600" y="500" width="240" height="100" rx="10" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.4"/>
+          <text x="720" y="522" text-anchor="middle" class="lbl-title">Fields stream in</text>
+          <text x="720" y="538" text-anchor="middle" class="lbl-title">live, one by one</text>
+          <text x="720" y="560" text-anchor="middle" class="lbl-sm muted-t">people count · urgency ·</text>
+          <text x="720" y="574" text-anchor="middle" class="lbl-sm muted-t">danger flags · stress score</text>
+          <text x="720" y="588" text-anchor="middle" class="lbl-sm muted-t">address refines the pin</text>
+
+          <line x1="840" y1="550" x2="890" y2="550" stroke="var(--signal)" marker-end="url(#arrowSignal)"/>
+
+          <rect x="890" y="500" width="220" height="100" rx="10" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.4"/>
+          <text x="1000" y="528" text-anchor="middle" class="lbl-title">Leakage check</text>
+          <text x="1000" y="544" text-anchor="middle" class="lbl-title">on the report</text>
+          <text x="1000" y="566" text-anchor="middle" class="lbl-sm muted-t">flags any 3rd party</text>
+          <text x="1000" y="580" text-anchor="middle" class="lbl-sm muted-t">named without consent</text>
+
+          <line x1="1110" y1="550" x2="1160" y2="550" stroke="var(--signal)" marker-end="url(#arrowSignal)"/>
+
+          <rect x="1160" y="500" width="200" height="100" rx="10" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.6"/>
+          <text x="1260" y="528" text-anchor="middle" class="lbl-title">Consolidated</text>
+          <text x="1260" y="544" text-anchor="middle" class="lbl-title">case record</text>
+          <text x="1260" y="566" text-anchor="middle" class="lbl-sm muted-t">written once,</text>
+          <text x="1260" y="580" text-anchor="middle" class="lbl-sm muted-t">call has ended</text>
+
+          <rect x="60" y="650" width="1300" height="66" rx="10" fill="none" stroke="var(--line)" stroke-dasharray="4 4"/>
+          <text x="80" y="677" class="lbl-md muted-t">Elapsed from the person's first tap to a responder seeing a located, prioritized incident: the length of the call —</text>
+          <text x="80" y="696" class="lbl-md muted-t">not the length of the call <tspan class="accent-t" style="font-weight:700">plus</tspan> a wait for it to end. The dashboard is already live before the person finishes speaking.</text>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--accent)"></i>Disguise surface</span>
+        <span><i class="swatch" style="background:var(--signal)"></i>Real signal (Monitoring Dashboard / incident state)</span>
+        <span><i class="swatch" style="background:var(--line-strong)"></i>Decision / terminal step</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- TAB 04 — ARCHITECTURE                                         -->
+  <!-- ============================================================ -->
+  <section class="tabpanel" data-tab="arch" data-active="false" role="tabpanel">
+    <div class="panel-shell">
+      <div class="panel-head"><h2>System architecture — what talks to what</h2></div>
+      <div class="svg-scroll">
+        <svg viewBox="0 0 1360 1180" role="img" aria-label="Architecture diagram: QuickBite web app and native app both connect to Gemini Live API for the disguised conversation and to a Cloud Run backend over a websocket for real-time streaming; the backend writes to Firestore, calls Gemini for consolidation and leakage checks, and calls Google Maps APIs for geocoding; the separately-deployed Monitoring Dashboard subscribes to the same websocket channel and reads Firestore for case history. A stretch-goal band shows two independent sub-goals for back-camera video on the native app only: sub-goal A streams continuous video to the dashboard via a WebRTC signaling service, unrelated to Gemini; sub-goal B samples the same feed at roughly one frame per second through the existing Gemini Live path into structured signal, capped at a two-minute session when video is attached.">
+          <defs>
+            <marker id="aArch" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--ink)"/></marker>
+            <marker id="aArchSig" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--signal)"/></marker>
+          </defs>
+
+          <text x="20" y="28" class="lbl-title accent-t">CLIENTS</text>
+          <rect x="20" y="44" width="230" height="92" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="135" y="76" text-anchor="middle" class="lbl-title">QuickBite web app</text>
+          <text x="135" y="94" text-anchor="middle" class="lbl-sm muted-t">Next.js — built first</text>
+          <text x="135" y="110" text-anchor="middle" class="lbl-sm muted-t">runs in any browser,</text>
+          <text x="135" y="124" text-anchor="middle" class="lbl-sm muted-t">no install footprint</text>
+
+          <rect x="20" y="152" width="230" height="80" rx="10" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="5 4"/>
+          <text x="135" y="180" text-anchor="middle" class="lbl-title">QuickBite native app</text>
+          <text x="135" y="198" text-anchor="middle" class="lbl-sm muted-t">React Native — built</text>
+          <text x="135" y="212" text-anchor="middle" class="lbl-sm muted-t">after web is proven</text>
+          <text x="245" y="164" text-anchor="end" class="lbl-sm muted-t" style="font-style:italic">later</text>
+
+          <line x1="250" y1="90" x2="330" y2="90" stroke="var(--ink)" marker-end="url(#aArch)"/>
+          <text x="255" y="82" class="lbl-sm muted-t">websocket, audio</text>
+
+          <rect x="330" y="44" width="230" height="92" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.8"/>
+          <text x="445" y="76" text-anchor="middle" class="lbl-title">Gemini Live API</text>
+          <text x="445" y="94" text-anchor="middle" class="lbl-sm muted-t">persona conversation +</text>
+          <text x="445" y="108" text-anchor="middle" class="lbl-sm muted-t">native-audio stress read +</text>
+          <text x="445" y="122" text-anchor="middle" class="lbl-sm muted-t">incremental extraction</text>
+
+          <line x1="445" y1="136" x2="445" y2="300" stroke="var(--signal)" stroke-width="1.6" marker-end="url(#aArchSig)"/>
+          <text x="453" y="230" class="lbl-sm signal-t">function-call</text>
+          <text x="453" y="244" class="lbl-sm signal-t">payload, mid-call</text>
+
+          <path d="M250,200 C 300,260 380,300 420,300" fill="none" stroke="var(--ink)"/>
+          <path d="M420,300 L 410,296 M420,300 L 416,308" stroke="var(--ink)" fill="none"/>
+          <text x="270" y="255" class="lbl-sm muted-t">GPS + tap</text>
+          <text x="270" y="269" class="lbl-sm muted-t">payload</text>
+
+          <text x="20" y="290" class="lbl-title signal-t">BACKEND — CLOUD RUN</text>
+          <rect x="20" y="306" width="700" height="130" rx="12" fill="var(--surface-2)" stroke="var(--signal)" stroke-width="1.6"/>
+          <text x="40" y="332" class="lbl-md">API + real-time channel (FastAPI / Node)</text>
+          <line x1="40" y1="344" x2="700" y2="344" stroke="var(--line)"/>
+
+          <rect x="40" y="356" width="200" height="64" rx="8" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="140" y="380" text-anchor="middle" class="lbl-sm">Incident endpoint</text>
+          <text x="140" y="396" text-anchor="middle" class="lbl-sm muted-t">create / update</text>
+
+          <rect x="260" y="356" width="200" height="64" rx="8" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="360" y="380" text-anchor="middle" class="lbl-sm">Websocket / SSE hub</text>
+          <text x="360" y="396" text-anchor="middle" class="lbl-sm muted-t">broadcasts field diffs</text>
+
+          <rect x="480" y="356" width="220" height="64" rx="8" fill="var(--surface)" stroke="var(--line-strong)"/>
+          <text x="590" y="380" text-anchor="middle" class="lbl-sm">Consolidation + leakage</text>
+          <text x="590" y="396" text-anchor="middle" class="lbl-sm muted-t">2nd/3rd Gemini pass</text>
+
+          <line x1="140" y1="436" x2="140" y2="520" stroke="var(--ink)" marker-end="url(#aArch)"/>
+          <text x="150" y="480" class="lbl-sm muted-t">writes</text>
+
+          <line x1="590" y1="420" x2="590" y2="52" stroke="var(--ink)" fill="none" marker-start="url(#aArch)"/>
+          <path d="M590,420 C 590,220 480,120 340,92" fill="none" stroke="var(--ink)" marker-end="url(#aArch)"/>
+          <text x="470" y="210" class="lbl-sm muted-t" transform="rotate(-58 470 210)">structured text call</text>
+
+          <line x1="700" y1="380" x2="770" y2="380" stroke="var(--ink)" marker-end="url(#aArch)"/>
+          <rect x="770" y="340" width="210" height="96" rx="10" fill="var(--surface-2)" stroke="var(--line-strong)" stroke-width="1.4"/>
+          <text x="875" y="364" text-anchor="middle" class="lbl-title">Google Maps</text>
+          <text x="875" y="380" text-anchor="middle" class="lbl-sm muted-t">JS API — dashboard pin</text>
+          <text x="875" y="396" text-anchor="middle" class="lbl-sm muted-t">Geocoding — coords</text>
+          <text x="875" y="410" text-anchor="middle" class="lbl-sm muted-t">→ readable address</text>
+          <text x="875" y="426" text-anchor="middle" class="lbl-sm accent-t">free tier at this scale</text>
+
+          <rect x="20" y="520" width="700" height="86" rx="12" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.6"/>
+          <text x="40" y="546" class="lbl-title">Firestore</text>
+          <text x="40" y="564" class="lbl-sm muted-t">one incident doc per call — location.rough, extractedFieldsLive,</text>
+          <text x="40" y="578" class="lbl-sm muted-t">consolidatedSummary, voiceStressTrend, response{status,ack'dBy…}</text>
+          <text x="40" y="596" class="lbl-sm muted-t">callState: active → ended flips which fields are still live</text>
+
+          <text x="770" y="502" class="lbl-title accent-t">SEPARATE APP — RESPONSE TEAM SIDE</text>
+          <text x="770" y="516" class="lbl-sm muted-t">own deploy, own URL — not part of the QuickBite bundle</text>
+          <line x1="360" y1="420" x2="360" y2="650" stroke="var(--signal)" stroke-width="1.6" stroke-dasharray="2 5" marker-end="url(#aArchSig)"/>
+          <path d="M360,650 H 1020" stroke="var(--signal)" stroke-width="1.6" stroke-dasharray="2 5" marker-end="url(#aArchSig)"/>
+          <text x="620" y="642" class="lbl-sm signal-t">live push, sub-second</text>
+
+          <rect x="770" y="524" width="360" height="146" rx="12" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="790" y="550" class="lbl-title">Monitoring Dashboard</text>
+          <text x="790" y="566" class="lbl-sm muted-t">Next.js, own Cloud Run/Firebase deploy — built for a wall</text>
+          <line x1="790" y1="576" x2="1110" y2="576" stroke="var(--line)"/>
+          <text x="790" y="596" class="lbl-sm">→ queue, notifications, report, history</text>
+          <text x="790" y="612" class="lbl-sm">→ acknowledge / in-progress / resolve</text>
+          <text x="790" y="628" class="lbl-sm">→ live field-by-field during a call</text>
+          <text x="790" y="644" class="lbl-sm">→ shared state — any responder's action</text>
+          <text x="800" y="658" class="lbl-sm accent-t">is this deployment's mandatory link</text>
+
+          <line x1="700" y1="563" x2="770" y2="597" stroke="var(--ink)" marker-end="url(#aArch)"/>
+          <text x="705" y="555" class="lbl-sm muted-t">reads case history</text>
+
+          <rect x="20" y="720" width="1310" height="150" rx="12" fill="none" stroke="var(--line)" stroke-dasharray="4 4"/>
+          <text x="40" y="748" class="lbl-title muted-t">MANDATORY-TECH FOOTPRINT (hackathon requirement, highlighted for reference)</text>
+          <line x1="40" y1="760" x2="1290" y2="760" stroke="var(--line)"/>
+
+          <g><rect x="40" y="776" width="150" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="115" y="800" text-anchor="middle" class="lbl-sm">Gemini family</text><text x="115" y="816" text-anchor="middle" class="lbl-sm muted-t">Live + text</text><text x="115" y="830" text-anchor="middle" class="lbl-sm accent-t">required ✓</text></g>
+          <g><rect x="210" y="776" width="150" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="285" y="800" text-anchor="middle" class="lbl-sm">Cloud Run</text><text x="285" y="816" text-anchor="middle" class="lbl-sm muted-t">deployment target</text><text x="285" y="830" text-anchor="middle" class="lbl-sm accent-t">required ✓</text></g>
+          <g><rect x="380" y="776" width="150" height="70" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="455" y="800" text-anchor="middle" class="lbl-sm">Firebase Hosting</text><text x="455" y="816" text-anchor="middle" class="lbl-sm muted-t">alt. deploy target</text><text x="455" y="830" text-anchor="middle" class="lbl-sm accent-t">required ✓</text></g>
+          <g><rect x="550" y="776" width="150" height="70" rx="8" fill="var(--surface)" stroke="var(--line-strong)"/><text x="625" y="800" text-anchor="middle" class="lbl-sm">AI Studio keys</text><text x="625" y="816" text-anchor="middle" class="lbl-sm muted-t">free-tier dev</text><text x="625" y="830" text-anchor="middle" class="lbl-sm muted-t">supporting</text></g>
+          <g><rect x="720" y="776" width="150" height="70" rx="8" fill="var(--surface)" stroke="var(--line-strong)"/><text x="795" y="800" text-anchor="middle" class="lbl-sm">Maps + Geocoding</text><text x="795" y="816" text-anchor="middle" class="lbl-sm muted-t">location display</text><text x="795" y="830" text-anchor="middle" class="lbl-sm muted-t">supporting</text></g>
+          <g><rect x="890" y="776" width="410" height="70" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="4 4"/><text x="1095" y="800" text-anchor="middle" class="lbl-sm">Extensible: Vertex AI · Grounding w/ Maps ·</text><text x="1095" y="816" text-anchor="middle" class="lbl-sm">Cloud Logging · Firebase Auth · Speech-to-Text</text><text x="1095" y="833" text-anchor="middle" class="lbl-sm muted-t">proposed, not built — see plan §5a</text></g>
+
+          <!-- STRETCH GOAL: back-camera video, mobile only, two independent sub-goals -->
+          <rect x="20" y="900" width="1310" height="170" rx="12" fill="none" stroke="var(--signal)" stroke-dasharray="4 4"/>
+          <text x="40" y="928" class="lbl-title signal-t">STRETCH GOAL — back-camera video, mobile app only, neither sub-goal gates the other</text>
+          <line x1="40" y1="940" x2="1290" y2="940" stroke="var(--line)"/>
+
+          <rect x="40" y="956" width="230" height="94" rx="8" fill="var(--surface-2)" stroke="var(--line-strong)"/>
+          <text x="155" y="978" text-anchor="middle" class="lbl-sm">QuickBite native app</text>
+          <text x="155" y="994" text-anchor="middle" class="lbl-sm muted-t">back camera only,</text>
+          <text x="155" y="1008" text-anchor="middle" class="lbl-sm muted-t">never front — no flash/</text>
+          <text x="155" y="1022" text-anchor="middle" class="lbl-sm muted-t">sound, OS indicator only</text>
+
+          <line x1="270" y1="985" x2="310" y2="985" stroke="var(--ink)" marker-end="url(#aArch)"/>
+          <text x="272" y="978" class="lbl-sm muted-t" style="font-size:9px">same feed, two paths</text>
+
+          <rect x="310" y="956" width="260" height="94" rx="8" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="440" y="976" text-anchor="middle" class="lbl-title">Sub-goal A — WebRTC</text>
+          <text x="440" y="992" text-anchor="middle" class="lbl-sm muted-t">continuous video, ~30fps,</text>
+          <text x="440" y="1006" text-anchor="middle" class="lbl-sm muted-t">via signaling service</text>
+          <text x="440" y="1020" text-anchor="middle" class="lbl-sm muted-t">(e.g. LiveKit) — new infra</text>
+          <text x="440" y="1036" text-anchor="middle" class="lbl-sm accent-t">NOT reused from elsewhere</text>
+
+          <line x1="570" y1="985" x2="620" y2="985" stroke="var(--accent)" stroke-width="1.6" marker-end="url(#aArch)"/>
+
+          <rect x="620" y="956" width="230" height="94" rx="8" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="1.4"/>
+          <text x="735" y="985" text-anchor="middle" class="lbl-title">Monitoring Dashboard</text>
+          <text x="735" y="1002" text-anchor="middle" class="lbl-sm muted-t">Live Video page</text>
+          <text x="735" y="1018" text-anchor="middle" class="lbl-sm muted-t">watched like a video call</text>
+
+          <rect x="310" y="1064" width="260" height="94" rx="8" fill="var(--signal-soft)" stroke="var(--signal)" stroke-width="1.6"/>
+          <text x="440" y="1084" text-anchor="middle" class="lbl-title">Sub-goal B — Gemini</text>
+          <text x="440" y="1100" text-anchor="middle" class="lbl-sm muted-t">~1 frame/sec sampled,</text>
+          <text x="440" y="1114" text-anchor="middle" class="lbl-sm muted-t">via Live API (not WebRTC)</text>
+          <text x="440" y="1128" text-anchor="middle" class="lbl-sm muted-t">2-min session cap w/ video</text>
+          <text x="440" y="1144" text-anchor="middle" class="lbl-sm signal-t">reuses existing Gemini path</text>
+
+          <line x1="155" y1="1050" x2="155" y2="1111" stroke="var(--ink)" fill="none"/>
+          <path d="M155,1111 H310" stroke="var(--ink)" fill="none" marker-end="url(#aArch)"/>
+
+          <line x1="570" y1="1111" x2="620" y2="1050" stroke="var(--signal)" stroke-width="1.6" fill="none" marker-end="url(#aArchSig)"/>
+          <text x="575" y="1105" class="lbl-sm signal-t" style="font-size:9px">structured signal → Firestore</text>
+        </svg>
+      </div>
+      <div class="legend">
+        <span><i class="swatch" style="background:var(--accent)"></i>Client-facing / mandatory-tech surface</span>
+        <span><i class="swatch" style="background:var(--signal)"></i>Real-time data path</span>
+        <span><i class="swatch" style="background:var(--line-strong); border:1px dashed var(--line)"></i>Supporting service</span>
+      </div>
+      <p style="font-family:var(--mono); font-size:11px; color:var(--muted); max-width:80ch; line-height:1.6; margin-top:14px">
+        The bottom band is the camera stretch goal — note it has <b style="color:var(--ink)">two separate arrows leaving the same native-app box</b>, not one: Sub-goal A never touches the Gemini/backend path at all (its own WebRTC infra), while Sub-goal B rejoins the existing Gemini→Firestore→Dashboard path used everywhere else in this diagram. Building one does not require building the other.
+      </p>
+    </div>
+  </section>
+
+  <footer class="note">QuickBite build reference — generated from covert_call/docs/quickbite_plan.md</footer>
+</div>
+
+<script>
+(function(){
+  function wireTabs(barSel, panelSel, dataAttr){
+    var bar = document.querySelector(barSel);
+    if(!bar) return;
+    var btns = bar.querySelectorAll('[role="tab"]');
+    btns.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var key = btn.getAttribute(dataAttr);
+        btns.forEach(function(b){ b.setAttribute('aria-selected', b === btn ? 'true' : 'false'); });
+        document.querySelectorAll(panelSel).forEach(function(p){
+          var match = p.getAttribute(dataAttr) === key;
+          p.setAttribute('data-active', match ? 'true' : 'false');
+        });
+      });
+    });
+  }
+  wireTabs('.tabbar', '.tabpanel', 'data-tab');
+  document.querySelectorAll('.subtabbar').forEach(function(bar){
+    var btns = bar.querySelectorAll('[role="tab"]');
+    var panels = bar.parentElement.querySelectorAll('.subpanel');
+    btns.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var key = btn.getAttribute('data-sub');
+        btns.forEach(function(b){ b.setAttribute('aria-selected', b === btn ? 'true' : 'false'); });
+        panels.forEach(function(p){ p.setAttribute('data-active', p.getAttribute('data-sub') === key ? 'true' : 'false'); });
+      });
+    });
+  });
+})();
+</script>
