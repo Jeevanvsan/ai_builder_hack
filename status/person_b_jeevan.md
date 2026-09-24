@@ -1,7 +1,7 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-24 23:15 IST
+**Last updated:** 2026-09-25 00:05 IST — merged `main` (Ameen's PR #3, Story 1.1) into `ep-4`: no conflicts, backlog kept both sides' ticks, dashboard still builds. Opened PR `ep-4` → `main` for Ameen's review.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
 
 ## Snapshot
@@ -48,8 +48,8 @@
 
 | Item | Waiting on |
 |---|---|
-| 3.2 Gemini function calls → `updateLiveFields()` | Ameen's Gemini Live code in this repo |
-| 3.3 persona "delivery address" → `confirmAddress()` | Ameen's Gemini Live code |
+| 3.2 Gemini function calls → `updateLiveFields()` | Ameen's Gemini Live call flow (Story 1.2). Web app is in the repo since PR #3, but `CallPage` is still a placeholder |
+| 3.3 persona "delivery address" → `confirmAddress()` | Same, Story 1.2 |
 | 3.4 Post-call Gemini summary | A backend (Cloud Run/Functions) → billing on `quickbite-5cde0` (project owner) |
 | Notifications with the dashboard fully closed | Firebase Cloud Messaging + server → billing |
 | Google Maps (instead of OpenStreetMap) | A Maps key → billing account |

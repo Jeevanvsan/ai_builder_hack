@@ -14,8 +14,9 @@
 | Epic 7 — Sender side (back-camera capture in native app) | Not started — shared publisher is ready (see below) |
 
 ## Done
-- _Ameen to fill in: stories/tasks completed, with dates._
-- Known: QuickBite web app deployed to Firebase Hosting (`quickbite-5cde0.web.app`).
+- **Story 1.1: disguised home, cart and checkout** (PR #3 `web/disguise-home`, merged to `main`). Includes the React (Vite) web app in `covert_call/web/` (home with menu, categories, search and promo banner; item sheet; cart; checkout; `CallPage` placeholder for Story 1.2), food images with credits, and backlog 1.1 ticked.
+- QuickBite web app deployed to Firebase Hosting (`quickbite-5cde0.web.app`, hosting only, so it doesn't touch Firestore rules or the dashboard site).
+- _Ameen: add anything else, with dates._
 
 ## In progress / next
 - _Ameen to fill in._
@@ -29,7 +30,7 @@
 | Scripted call to see the dashboard react without the app | `npm run simulate-call` (from `covert_call/`) | — |
 
 ## What Jeevan (Person B) needs from Ameen
-1. **Web app code in this repo** under `covert_call/web/` (add `"web"` to `workspaces` in `covert_call/package.json`) — unblocks 3.2/3.3 wiring.
+1. ~~Web app code in this repo~~ ✅ done in PR #3. Optional: add `"web"` to `workspaces` in `covert_call/package.json` (and remove `web/package-lock.json`) so web can import `shared/` with the same single Firebase copy as the dashboard. Needed once web starts using the shared incident client.
 2. **Call `startIncident()` the moment a QuickBite session starts** (live call or silent tap), then `updateLiveFields()` / `recordVoiceStress()` from each Gemini Live function call, `confirmAddress()` when the "delivery address" question is answered, `endIncident()` on hang-up / zero-trace exit.
 3. **Agree before changing the data model** (`shared/incidents/types.ts`) — the dashboard reads every field.
 4. **Don't deploy Firestore rules from another folder** — `covert_call/dashboard/firestore.rules` is the only rules file.
