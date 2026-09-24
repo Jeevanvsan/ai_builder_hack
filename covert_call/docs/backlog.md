@@ -87,7 +87,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 **As a responder, I want to see a new incident the instant someone starts a QuickBite session, so that I'm already watching before any details are even known.**
 
 - [ ] Backend: create incident document in Firestore the moment a session starts (`callState: "active"`), not when the call ends
-- [ ] Establish real-time channel (websocket or SSE) between backend and dashboard — confirm Cloud Run supports long-lived connections early (de-risk before building on top of it)
+- [ ] Establish real-time channel between backend and dashboard — decided: Firestore real-time listeners (dashboard subscribes to `incidents` directly; backend only writes to Firestore). Dashboard side built in Story 4.3
 - [ ] Push a "new incident" event to the dashboard at session start, before any fields are extracted
 
 ### User Story 3.2
@@ -126,33 +126,33 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As a response team, I want our own dedicated application, so that we have a real operations tool, not a scaled-down view of the disguise app.**
 
-- [ ] Scaffold the Monitoring Dashboard as its own repo/app — do not fold into the QuickBite frontend project
-- [ ] Deploy a skeleton version live on Cloud Run/Firebase on day 1-2 (mandatory deliverable — de-risk early)
-- [ ] Design for a large monitor/operations-center display, not phone-first
+- [x] Scaffold the Monitoring Dashboard as its own repo/app — do not fold into the QuickBite frontend project
+- [x] Deploy a skeleton version live on Cloud Run/Firebase on day 1-2 (mandatory deliverable — de-risk early) — live at https://quickbite-5cde0-dashboard.web.app
+- [x] Design for a large monitor/operations-center display, not phone-first
 
 ### User Story 4.2
 
 **As a responder, I want a queue of all active incidents ranked by severity, so that I can see at a glance which case needs attention first.**
 
-- [ ] Build multi-case queue view: severity chips, status chips, time-elapsed/time-ago
-- [ ] Implement severity sorting/ranking logic
-- [ ] Design for scanning at a glance on a large display (wide, multi-column — not a single stacked card)
+- [x] Build multi-case queue view: severity chips, status chips, time-elapsed/time-ago (mock data until the Epic 3 real-time channel exists)
+- [x] Implement severity sorting/ranking logic — severity, then unclaimed, then live calls, then longest waiting (`dashboard/src/lib/ranking.ts`)
+- [x] Design for scanning at a glance on a large display (wide, multi-column — not a single stacked card)
 
 ### User Story 4.3
 
 **As a responder, I want to open one incident and see everything about it — location, extracted fields, timeline — so that I have full context before acting.**
 
-- [ ] Build incident detail panel: location pin, extracted fields grid, timeline of events
-- [ ] Wire detail panel to the real-time channel for live updates during an active call
-- [ ] Transition detail panel from "live" state to consolidated case record once the call ends
+- [x] Build incident detail panel: location pin, extracted fields grid, timeline of events — map uses Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is set, otherwise free OpenStreetMap
+- [x] Wire detail panel to the real-time channel for live updates during an active call — Firestore real-time listeners, verified with `npm run simulate-call`
+- [x] Transition detail panel from "live" state to consolidated case record once the call ends
 
 ### User Story 4.4
 
 **As a responder, I want to claim an incident and mark its progress, so that my team knows who's handling what and nobody works the same case twice.**
 
-- [ ] Add `response` block to the Firestore data model: `status`, `acknowledgedBy`, `acknowledgedAt`, `resolvedAt`, `notes`
-- [ ] Build Acknowledge / Mark Resolved actions in the dashboard UI
-- [ ] Ensure a status change from one responder's screen reflects on every other subscribed dashboard instance in real time
+- [x] Add `response` block to the Firestore data model: `status`, `acknowledgedBy`, `acknowledgedAt`, `resolvedAt`, `notes`
+- [x] Build Acknowledge / Mark Resolved actions in the dashboard UI — plus Start response and team notes; acknowledge is a Firestore transaction so only one responder can claim; responder name set in-app until real auth exists
+- [x] Ensure a status change from one responder's screen reflects on every other subscribed dashboard instance in real time
 
 ### User Story 4.5
 
@@ -235,5 +235,5 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 ## Notes for using this backlog
 
 - **Epics 1, 3, and 5 are the non-negotiable core** — if the 4 weeks run short, everything else (Epics 2, 4-partial, 6, 7) is where scope gets cut first, per the plan's own priority tiers.
-- Epic 4 (Dashboard) got real scope in a later planning pass — don't under-budget it as "just wire up the websocket."
+- Epic 4 (Dashboard) got real scope in a later planning pass — don't under-budget it as "just wire up the data feed."
 - Epics 6 and 7 are explicitly sequential stretch goals (7 only after 6), and within Epic 7, stories 7.1 and 7.2 are parallel, not sequential.
