@@ -1,0 +1,39 @@
+{
+  "name": "quickbite-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "deploy": "npm run build && npx firebase-tools deploy --only hosting:dashboard",
+    "seed": "node --no-warnings scripts/seed.ts",
+    "simulate-call": "node --no-warnings scripts/simulate-call.ts",
+    "deploy:rules": "npx firebase-tools deploy --only firestore:rules",
+    "emulator": "npx firebase-tools emulators:start --only firestore --project quickbite-5cde0",
+    "dev:emulator": "vite --mode emulator",
+    "seed:emulator": "node --no-warnings scripts/seed.ts --emulator",
+    "simulate-call:emulator": "node --no-warnings scripts/simulate-call.ts --emulator"
+  },
+  "dependencies": {
+    "@vis.gl/react-google-maps": "^1.10.1",
+    "firebase": "^12.19.0",
+    "leaflet": "^1.9.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.9.0"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}

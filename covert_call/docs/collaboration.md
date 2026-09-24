@@ -34,7 +34,7 @@ quickbite/
 │   └── backend/               # Shared Cloud Run API — SHARED ownership, see §2
 │       ├── api/
 │       │   ├── incidents/     # create/update incident endpoints
-│       │   └── realtime/      # websocket/SSE hub
+│       │   └── realtime/      # (not needed: dashboard uses Firestore real-time listeners)
 │       ├── services/
 │       │   ├── extraction.ts       # structured extraction from transcript/taps
 │       │   ├── stress_detection.ts

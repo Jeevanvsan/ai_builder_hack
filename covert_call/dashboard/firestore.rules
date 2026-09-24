@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Demo-only rules for the hackathon prototype: incidents are open to read/write with no auth.
+// Tighten (Firebase Auth for responders, backend-only writes) before handling any real data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /incidents/{incidentId} {
+      allow read, write: if true;
+    }
+  }
+}
