@@ -1,6 +1,6 @@
 import { arrayUnion, doc, runTransaction, updateDoc } from 'firebase/firestore'
 import { db } from './firebase'
-import { INCIDENTS } from './incidentsStore'
+import { INCIDENTS } from '../../../shared/incidents/client.ts'
 
 export class AlreadyClaimedError extends Error {
   by: string | null
@@ -31,10 +31,22 @@ export function startResponse(id: string): Promise<void> {
   return updateDoc(ref(id), { 'response.status': 'in_progress' })
 }
 
-export function resolve(id: string): Promise<void> {
-  return updateDoc(ref(id), { 'response.status': 'resolved', 'response.resolvedAt': now() })
+// A resolved case can't still be a live call: if the session never ended (caller's app closed, lost signal),
+// resolving closes it too so the dashboard never shows 'call in progress' on a resolved case.
+export function resolve(id: string, callStillActive: boolean): Promise<void> {
+  const at = now()
+  return updateDoc(ref(id), {
+    'response.status': 'resolved',
+    'response.resolvedAt': at,
+    ...(callStillActive ? { callState: 'ended', sessionEndedAt: at } : {}),
+  })
 }
 
 export function addNote(id: string, responder: string, text: string): Promise<void> {
   return updateDoc(ref(id), { 'response.notes': arrayUnion({ responderId: responder, text, at: now() }) })
+}
+
+// First open by any responder clears the "new incident" highlight for everyone.
+export function markViewed(id: string, responder: string): Promise<void> {
+  return updateDoc(ref(id), { 'response.viewedAt': now(), 'response.viewedBy': responder || null })
 }

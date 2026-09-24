@@ -2,18 +2,22 @@ import { Link, useNavigate } from 'react-router-dom'
 import Chip from '../../components/Chip'
 import StressMeter from '../../components/StressMeter'
 import DataState from '../../components/DataState'
+import Pagination from '../../components/Pagination'
 import { useIncidents } from '../../lib/incidentsStore'
-import { rankOpenIncidents } from '../../lib/ranking'
+import { isUnviewed, rankOpenIncidents } from '../../lib/ranking'
+import { usePagination } from '../../lib/usePagination'
 import { formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
 import { useNow } from '../../lib/useNow'
 
 export default function QueuePage() {
   const now = useNow()
   const navigate = useNavigate()
-  const { data, loading, error } = useIncidents()
+  const { data, loading, error } = useIncidents('open')
   const queue = rankOpenIncidents(data)
+  const pager = usePagination(queue)
 
   const stats = [
+    { label: 'Not yet opened', value: queue.filter(isUnviewed).length, tone: 'new' },
     { label: 'Open incidents', value: queue.length },
     { label: 'High severity', value: queue.filter((i) => i.severity === 'high').length, tone: 'high' },
     { label: 'Unclaimed', value: queue.filter((i) => i.response.status === 'new').length, tone: 'medium' },
@@ -24,7 +28,7 @@ export default function QueuePage() {
     <section>
       <div className="page-head">
         <h1>Live queue</h1>
-        <p className="muted">Ranked by severity, then unclaimed, then live calls, then longest waiting. Updates live from Firestore.</p>
+        <p className="muted">New incidents stay highlighted at the top until a responder opens them. The rest are ranked by severity, then unclaimed, then live calls, then longest waiting.</p>
       </div>
 
       <div className="stats">
@@ -41,6 +45,7 @@ export default function QueuePage() {
       ) : queue.length === 0 ? (
         <div className="card empty">No open incidents.</div>
       ) : (
+        <>
         <table className="table queue">
           <thead>
             <tr>
@@ -58,18 +63,21 @@ export default function QueuePage() {
             </tr>
           </thead>
           <tbody>
-            {queue.map((i, index) => {
+            {pager.pageItems.map((i, index) => {
               const f = i.extractedFieldsLive
-              const needsAttention = i.response.status === 'new' && i.severity === 'high'
+              const unviewed = isUnviewed(i)
               return (
                 <tr
                   key={i.id}
-                  className={`row-${i.severity}${needsAttention ? ' row-attention' : ''}`}
+                  className={`row-${i.severity}${unviewed ? ' row-new' : ''}`}
                   onClick={() => navigate(`/incident/${i.id}`)}
                 >
-                  <td className="rank">{index + 1}</td>
+                  <td className="rank">{pager.offset + index + 1}</td>
                   <td><Chip tone={i.severity} filled>{i.severity}</Chip></td>
-                  <td className="mono"><Link to={`/incident/${i.id}`}>{i.id}</Link></td>
+                  <td className="mono">
+                    <Link to={`/incident/${i.id}`}>{i.id}</Link>
+                    {unviewed && <div><Chip tone="new" filled>New</Chip></div>}
+                  </td>
                   <td>
                     <Chip tone={i.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(i.response.status)}</Chip>
                     {i.response.acknowledgedBy && <div className="sub">{i.response.acknowledgedBy}</div>}
@@ -92,11 +100,13 @@ export default function QueuePage() {
                   <td>
                     {i.location.confirmed ? (
                       i.location.confirmed.address
-                    ) : (
+                    ) : i.location.rough ? (
                       <>
                         ≈ {i.location.rough.lat.toFixed(3)}, {i.location.rough.lng.toFixed(3)}
                         <div className="sub">Approximate ({i.location.rough.source === 'gps' ? 'GPS' : 'IP'})</div>
                       </>
+                    ) : (
+                      <span className="muted-inline">Locating…</span>
                     )}
                   </td>
                   <td className="mono">{formatElapsed(i.sessionStartedAt, now)}</td>
@@ -106,6 +116,8 @@ export default function QueuePage() {
             })}
           </tbody>
         </table>
+        <Pagination {...pager} noun="open incidents" onPage={pager.setPage} />
+        </>
       )}
     </section>
   )

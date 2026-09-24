@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { acknowledge, AlreadyClaimedError, resolve, startResponse } from '../lib/responseActions'
 import { useResponder } from '../lib/responderContext'
-import type { Incident } from '../lib/types'
+import type { Incident } from '../../../shared/incidents/types'
 import Modal from './Modal'
 import ResponderNameDialog from './ResponderNameDialog'
 
@@ -21,7 +21,7 @@ export default function ResponseActions({ incident }: { incident: Incident }) {
     try {
       if (action === 'acknowledge') await acknowledge(incident.id, responder)
       if (action === 'start') await startResponse(incident.id)
-      if (action === 'resolve') await resolve(incident.id)
+      if (action === 'resolve') await resolve(incident.id, incident.callState === 'active')
     } catch (e) {
       setError(e instanceof AlreadyClaimedError ? e.message : `Couldn't update the incident: ${(e as Error).message}`)
     } finally {
@@ -96,6 +96,9 @@ export default function ResponseActions({ incident }: { incident: Incident }) {
           }
         >
           <p>It leaves the live queue and moves to case history for every responder.</p>
+          {incident.callState === 'active' && (
+            <p className="modal-warning">The call is still live. Resolving will also mark the call as ended on the dashboard.</p>
+          )}
         </Modal>
       )}
     </div>

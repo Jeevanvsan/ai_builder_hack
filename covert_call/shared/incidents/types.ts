@@ -1,10 +1,17 @@
-// Mirrors the Firestore `incidents` document shape in docs/quickbite_plan.md §5b.
+// The Firestore `incidents` document shape (docs/quickbite_plan.md §5b). Shared by the QuickBite app and the dashboard.
 
 export type Channel = 'live-call' | 'silent-tap'
 export type CallState = 'active' | 'ended'
 export type Severity = 'low' | 'medium' | 'high'
 export type ResponseStatus = 'new' | 'acknowledged' | 'in_progress' | 'resolved'
 export type FieldConfidence = 'confirmed' | 'inferred' | 'uncertain'
+
+export interface RoughLocation {
+  lat: number
+  lng: number
+  source: 'gps' | 'ip-fallback'
+  capturedAt: string
+}
 
 export interface Incident {
   id: string
@@ -13,7 +20,8 @@ export interface Incident {
   channel: Channel
   callState: CallState
   location: {
-    rough: { lat: number; lng: number; source: 'gps' | 'ip-fallback'; capturedAt: string }
+    // null for the first moments of a call: the incident is created before location capture finishes.
+    rough: RoughLocation | null
     confirmed: {
       address: string
       lat: number
@@ -34,11 +42,16 @@ export interface Incident {
   voiceStressTrend: { timestamp: string; score: number }[]
   leakageCheckStatus: { reviewed: boolean; redactions: string[] }
   severity: Severity
+  // Present once the QuickBite app starts streaming the back camera (Epic 7.1). Absent means no video for this incident.
+  video?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
   response: {
     status: ResponseStatus
     acknowledgedBy: string | null
     acknowledgedAt: string | null
     resolvedAt: string | null
     notes: { responderId: string; text: string; at: string }[]
+    // First time any responder opened the incident; until then the dashboard highlights it as new.
+    viewedAt?: string | null
+    viewedBy?: string | null
   }
 }

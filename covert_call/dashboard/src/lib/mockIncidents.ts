@@ -1,4 +1,4 @@
-import type { Incident } from './types'
+import type { Incident } from '../../../shared/incidents/types'
 
 // Static fixtures until the real-time channel from Epic 3 exists. Timestamps are relative to page load so the queue looks live.
 const loadedAt = Date.now()
@@ -41,6 +41,9 @@ function incident(id: string, startedMinsAgo: number, o: Overrides): Incident {
       acknowledgedAt: null,
       resolvedAt: null,
       notes: [],
+      // Seeded incidents count as already seen, so only genuinely new calls get highlighted.
+      viewedAt: startedAt,
+      viewedBy: null,
       ...o.response,
     },
   }
@@ -149,5 +152,58 @@ export const mockIncidents: Incident[] = [
       acknowledgedAt: minsAgo(1499),
       resolvedAt: minsAgo(1420),
     },
+  }),
+  incident('INC-1035', 330, {
+    channel: 'silent-tap',
+    callState: 'ended',
+    sessionEndedAt: minsAgo(327),
+    severity: 'high',
+    location: {
+      rough: { lat: 12.9166, lng: 77.6101, source: 'gps', capturedAt: minsAgo(330) },
+      confirmed: { address: 'BTM Layout 2nd Stage, Bengaluru', lat: 12.9166, lng: 77.6101, confidence: 'inferred', confirmedAt: minsAgo(328) },
+    },
+    extractedFieldsLive: { peopleCount: 1, dangerIndicators: ['aggressor present'], urgency: 'high', notes: 'Rider note: "he is still here"' },
+    consolidatedSummary: 'Silent report from BTM Layout: caller alone with an aggressor present, unable to speak. Location inferred from rider note and GPS.',
+    response: { status: 'resolved', acknowledgedBy: 'Responder C', acknowledgedAt: minsAgo(329), resolvedAt: minsAgo(290) },
+  }),
+  incident('INC-1029', 2900, {
+    callState: 'ended',
+    sessionEndedAt: minsAgo(2893),
+    severity: 'low',
+    voiceStressScore: 31,
+    location: {
+      rough: { lat: 13.0358, lng: 77.597, source: 'gps', capturedAt: minsAgo(2900) },
+      confirmed: { address: 'Hebbal Kempapura, Bengaluru', lat: 13.0358, lng: 77.597, confidence: 'confirmed', confirmedAt: minsAgo(2897) },
+    },
+    extractedFieldsLive: { peopleCount: 1, urgency: 'low' },
+    consolidatedSummary: 'Caller felt unsafe walking home in Hebbal and stayed on the line until reaching home. No danger indicators.',
+    response: { status: 'resolved', acknowledgedBy: 'Responder B', acknowledgedAt: minsAgo(2899), resolvedAt: minsAgo(2880) },
+  }),
+  incident('INC-1022', 6200, {
+    callState: 'ended',
+    sessionEndedAt: minsAgo(6192),
+    severity: 'medium',
+    voiceStressScore: 63,
+    location: {
+      rough: { lat: 12.9259, lng: 77.5838, source: 'gps', capturedAt: minsAgo(6200) },
+      confirmed: { address: 'Jayanagar 4th Block, Bengaluru', lat: 12.9259, lng: 77.5838, confidence: 'confirmed', confirmedAt: minsAgo(6196) },
+    },
+    extractedFieldsLive: { peopleCount: 3, dangerIndicators: ['injury'], urgency: 'medium' },
+    consolidatedSummary: 'Domestic incident in Jayanagar with one minor injury; three people present. Caller safe after responders arrived.',
+    leakageCheckStatus: { reviewed: true, redactions: ["child's name"] },
+    response: { status: 'resolved', acknowledgedBy: 'Responder A', acknowledgedAt: minsAgo(6199), resolvedAt: minsAgo(6130) },
+  }),
+  incident('INC-1014', 14500, {
+    channel: 'silent-tap',
+    callState: 'ended',
+    sessionEndedAt: minsAgo(14496),
+    severity: 'medium',
+    location: {
+      rough: { lat: 12.9591, lng: 77.6974, source: 'ip-fallback', capturedAt: minsAgo(14500) },
+      confirmed: null,
+    },
+    extractedFieldsLive: { peopleCount: 2, urgency: 'medium' },
+    consolidatedSummary: 'Silent report near Marathahalli; address never confirmed. Responders located the caller from the approximate location.',
+    response: { status: 'resolved', acknowledgedBy: 'Responder C', acknowledgedAt: minsAgo(14498), resolvedAt: minsAgo(14420) },
   }),
 ]
