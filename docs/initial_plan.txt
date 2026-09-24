@@ -1,0 +1,39 @@
+AI Builder Cup 2026 — Final Plan Summary
+Pitch: "A dual-channel Gen AI safety platform: anonymous reporting for people who can't speak up, mesh-relayed SOS for people who can't reach help — one AI backbone triaging both."
+Feature 1 — Covert Notice (anonymous incident reporting)
+Photo (+ optional voice/text) submitted, even offline via mesh
+Gemini vision analyzes photo-only submissions and infers what's happening; cross-references location history
+Anonymization pipeline strips identity signal from text/voice/photo before it reaches authorities
+Adversarial re-identification agent verifies the report can't be traced back
+Design rule: identity never captured
+Feature 2 — SOS (emergency relay)
+Manual trigger + automatic sensor detection (accelerometer/gyroscope/barometer fall/crash classifier, Gemma on-device)
+A → relays hop-to-hop through nearby app users → first hop with bandwidth delivers to dashboard
+Every hop logs its own GPS+timestamp at relay time, building a location trail (better than A's last fix alone)
+Relay participants are identified so authorities can contact them directly for faster on-ground rescue
+Case B (app installed, not registered): background push "help nearby?" → phone number requested only on tap-to-help, opt-in
+Design rule: participants identified by design — different threat model from Feature 1
+Shared backbone
+Both features feed one Gemini triage/clustering layer — de-identify-and-cluster for reports, locate-and-prioritize for rescue. This shared architecture, not either feature alone, is your technical-merit story.
+The one line that reconciles the whole system
+"Reporting is anonymous by design; rescue-relay participation is identified by design — same AI backbone, different threat models."
+Competitive honesty slide (name these yourself)
+SOS GPS Rescue (fall/crash detection, duress mode) and Life Signal (mesh blackout relay) already exist — acknowledge them, then say: "detection and transport are solved; the AI triage layer — anonymization, adversarial re-ID checking, cross-report clustering — is what neither has."
+Roadmap slide (scoped honestly, not built)
+Coverage today = app users only; density scales with adoption
+Near-term: low-cost fixed LoRa gateway nodes (NGO-deployed) to extend reach without needing every bystander to install the app
+Long-term vision: register with Google's Find My Device network (real, Google-owned, BLE crowdsourced network on hundreds of millions of Android phones) to extend SOS beacon reach beyond your own install base — explicitly framed as a future registration/partnership, not something built in 4 weeks
+Consent notice at signup: relay participants may be contacted if near an emergency
+Fall detection demo = staged drop test, not a clinical-accuracy claim
+Scoring alignment
+Criterion	How this plan hits it
+Technical merit (40%)	Gemma on-device classifier + Gemini cloud triage + adversarial anonymization agent — real hybrid Gen AI, not a wrapper
+Originality (25%)	AI triage backbone explicitly differentiated from named existing apps
+Impact	Two underserved populations: silenced reporters, unreachable victims
+Credibility with Google judges	Accurate, gated framing of Find My Device — shows platform fluency, not overclaiming
+4-week build priority
+Core mesh relay + hop logging (Path: any hop with bandwidth = gateway)
+Gemini anonymization + inference pipeline for Covert Notice
+Gemma on-device fall/crash classifier + check-in countdown
+Dashboard: hop-trail map + case clustering view
+Deck + 3-min demo script built around the triage layer, not the sensor trigger
