@@ -47,8 +47,8 @@ python src/main.py
 
 ### Dashboard Setup
 ```bash
+npm install        # from covert_call/: one install for the whole workspace
 cd dashboard
-npm install
 npm run dev
 # Runs on http://localhost:5174 (Vite, second port)
 ```

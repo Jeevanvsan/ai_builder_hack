@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { collection, doc, onSnapshot, Timestamp } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, Timestamp, where } from 'firebase/firestore'
 import { db } from './firebase'
-import type { Incident } from './types'
+import { INCIDENTS } from '../../../shared/incidents/client.ts'
+import type { Incident } from '../../../shared/incidents/types'
 
-export const INCIDENTS = 'incidents'
 
 // The backend may write Firestore Timestamps; the UI works with ISO strings throughout.
 function normalize(value: unknown): unknown {
@@ -15,22 +15,30 @@ function normalize(value: unknown): unknown {
   return value
 }
 
-function toIncident(id: string, data: Record<string, unknown>): Incident {
+export function toIncident(id: string, data: Record<string, unknown>): Incident {
   return { ...(normalize(data) as Omit<Incident, 'id'>), id }
 }
 
 type State<T> = { data: T; loading: boolean; error: string | null }
 
-export function useIncidents(): State<Incident[]> {
+export type IncidentScope = 'open' | 'resolved'
+
+// Queue and history each subscribe to only their own slice, so the live queue never downloads the whole case archive.
+export const scopeQuery = (scope: IncidentScope) =>
+  scope === 'resolved'
+    ? query(collection(db, INCIDENTS), where('response.status', '==', 'resolved'))
+    : query(collection(db, INCIDENTS), where('response.status', 'in', ['new', 'acknowledged', 'in_progress']))
+
+export function useIncidents(scope: IncidentScope): State<Incident[]> {
   const [state, setState] = useState<State<Incident[]>>({ data: [], loading: true, error: null })
   useEffect(
     () =>
       onSnapshot(
-        collection(db, INCIDENTS),
+        scopeQuery(scope),
         (snap) => setState({ data: snap.docs.map((d) => toIncident(d.id, d.data())), loading: false, error: null }),
         (err) => setState({ data: [], loading: false, error: err.message }),
       ),
-    [],
+    [scope],
   )
   return state
 }

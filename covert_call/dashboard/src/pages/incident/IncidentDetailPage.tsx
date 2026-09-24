@@ -1,16 +1,20 @@
+import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Chip from '../../components/Chip'
 import DataState from '../../components/DataState'
 import IncidentMap from '../../components/IncidentMap'
 import LiveValue from '../../components/LiveValue'
+import LiveVideo from '../../components/LiveVideo'
 import NoteForm from '../../components/NoteForm'
 import ResponseActions from '../../components/ResponseActions'
 import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
 import { formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
+import { useResponder } from '../../lib/responderContext'
+import { markViewed } from '../../lib/responseActions'
 import { buildTimeline } from '../../lib/timeline'
-import type { FieldConfidence } from '../../lib/types'
+import type { FieldConfidence } from '../../../../shared/incidents/types'
 import { useNow } from '../../lib/useNow'
 
 function Confidence({ level }: { level: FieldConfidence | undefined }) {
@@ -22,6 +26,14 @@ export default function IncidentDetailPage() {
   const { id } = useParams()
   const { data: incident, loading, error } = useIncident(id)
   const now = useNow()
+  const { name } = useResponder()
+
+  // Opening the incident clears its "new" highlight on every dashboard.
+  const incidentId = incident?.id
+  const viewedAt = incident?.response.viewedAt
+  useEffect(() => {
+    if (incidentId && viewedAt === null) void markViewed(incidentId, name)
+  }, [incidentId, viewedAt, name])
 
   if (loading || error) {
     return (
@@ -45,7 +57,8 @@ export default function IncidentDetailPage() {
   }
 
   const f = incident.extractedFieldsLive
-  const live = incident.callState === 'active'
+  // A resolved case is never shown as a live call, even if the caller's session never reported ending.
+  const live = incident.callState === 'active' && incident.response.status !== 'resolved'
   const conf = incident.fieldConfidence
   const back = incident.response.status === 'resolved'
     ? { to: '/history', label: 'Back to case history' }
@@ -90,7 +103,16 @@ export default function IncidentDetailPage() {
         </div>
       </div>
 
-      <div className="detail-grid">
+      <div className={incident.video ? 'detail-grid has-video' : 'detail-grid'}>
+        {incident.video && (
+          <div className="card video-card">
+            <div className="video-card-head">
+              <h2>Live video</h2>
+              <Link to={`/incident/${incident.id}/video`} className="btn btn-sm">Full screen</Link>
+            </div>
+            <LiveVideo incident={incident} />
+          </div>
+        )}
         <div className="card map-card">
           <h2>Location</h2>
           <IncidentMap location={incident.location} />
@@ -107,12 +129,14 @@ export default function IncidentDetailPage() {
             </div>
             <div className="sub">
               <span className="legend legend-rough" />
-              Approximate: {rough.lat.toFixed(4)}, {rough.lng.toFixed(4)} ({rough.source === 'gps' ? 'GPS' : 'IP fallback'})
+              {rough
+                ? `Approximate: ${rough.lat.toFixed(4)}, ${rough.lng.toFixed(4)} (${rough.source === 'gps' ? 'GPS' : 'IP fallback'})`
+                : 'Approximate location: capturing…'}
             </div>
           </div>
         </div>
 
-        <div className="card">
+        <div className="card fields-card">
           <h2>Extracted fields</h2>
           <dl className="fields fields-lg">
             <dt>People present</dt>
@@ -133,7 +157,7 @@ export default function IncidentDetailPage() {
           </dl>
         </div>
 
-        <div className="card">
+        <div className="card stress-card">
           <h2>Voice stress</h2>
           <LiveValue value={incident.voiceStressScore}>
             <StressMeter score={incident.voiceStressScore} />
@@ -154,7 +178,7 @@ export default function IncidentDetailPage() {
           <NoteForm incidentId={incident.id} />
         </div>
 
-        <div className="card wide summary-card">
+        <div className="card summary-card">
           <h2>Consolidated summary</h2>
           {incident.consolidatedSummary ? (
             <>

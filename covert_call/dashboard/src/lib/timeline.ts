@@ -1,14 +1,16 @@
-import type { Incident } from './types'
+import type { Incident } from '../../../shared/incidents/types'
 
 export type TimelineEvent = { at: string; label: string; tone?: 'live' | 'high' | 'done' }
 
 export function buildTimeline(i: Incident): TimelineEvent[] {
   const events: (TimelineEvent | null)[] = [
     { at: i.sessionStartedAt, label: `Session started (${i.channel === 'live-call' ? 'voice call' : 'silent tap'})`, tone: 'live' },
-    {
-      at: i.location.rough.capturedAt,
-      label: `Approximate location captured (${i.location.rough.source === 'gps' ? 'GPS' : 'IP fallback'})`,
-    },
+    i.location.rough
+      ? {
+          at: i.location.rough.capturedAt,
+          label: `Approximate location captured (${i.location.rough.source === 'gps' ? 'GPS' : 'IP fallback'})`,
+        }
+      : null,
     i.location.confirmed ? { at: i.location.confirmed.confirmedAt, label: `Address confirmed: ${i.location.confirmed.address}` } : null,
     i.response.acknowledgedAt ? { at: i.response.acknowledgedAt, label: `Acknowledged by ${i.response.acknowledgedBy ?? 'responder'}` } : null,
     i.sessionEndedAt ? { at: i.sessionEndedAt, label: 'Call ended' } : null,

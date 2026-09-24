@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { Incident } from '../lib/types'
+import type { MapProps } from './mapTypes'
 
 function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap()
@@ -12,19 +12,18 @@ function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
 }
 
 // Free fallback (no key, no billing) used when no Google Maps key is configured.
-export default function OsmIncidentMap({ location }: { location: Incident['location'] }) {
-  const { rough, confirmed } = location
-  const target = confirmed ?? rough
-
+export default function OsmIncidentMap({ rough, confirmed, target }: MapProps) {
   return (
     <MapContainer className="map" center={[target.lat, target.lng]} zoom={15} scrollWheelZoom={false}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <CircleMarker center={[rough.lat, rough.lng]} radius={9} pathOptions={{ color: '#5f6673', fillColor: '#8a919c', fillOpacity: 0.9, weight: 2 }}>
-        <Tooltip>Approximate location</Tooltip>
-      </CircleMarker>
+      {rough && (
+        <CircleMarker center={[rough.lat, rough.lng]} radius={9} pathOptions={{ color: '#5f6673', fillColor: '#8a919c', fillOpacity: 0.9, weight: 2 }}>
+          <Tooltip>Approximate location</Tooltip>
+        </CircleMarker>
+      )}
       {confirmed && (
         <>
           {/* Halo + white ring keep the incident pin distinct from the red hospital icons on OSM tiles. */}

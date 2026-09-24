@@ -1,5 +1,9 @@
 # AI Builder Cup 2026 — Project Context
 
+## MANDATORY: check team status first (always apply)
+Before starting any work in this repo, **read both status files**: `status/person_b_jeevan.md` (Person B, Jeevan: Monitoring Dashboard + real-time pipeline) and `status/person_a_ameen.md` (Person A, Ameen: QuickBite app + Gemini Live). Treat them as the current source of truth for what's done, in progress, blocked and agreed between the two people. They can be newer than `covert_call/docs/backlog.md`.
+After completing any work, **update the relevant status file** with what was done, the date and time (IST), and any note the other person needs. When working with Jeevan, only change Ameen's file to add notes or requests for Ameen, never to claim progress on his behalf.
+
 ## What this project is
 Submission for **AI Builder Cup 2026 | Google Cloud JAPAC Hackathon**, theme "Sustainability & Social Impact." Solo/small-team hackathon repo — currently just planning docs in `docs/`, no code yet.
 
