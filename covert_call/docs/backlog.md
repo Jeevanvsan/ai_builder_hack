@@ -14,9 +14,9 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As a person in danger, I want the app to look and behave exactly like a normal food-delivery app, so that anyone watching me sees nothing unusual.**
 
-- [ ] Build disguised home screen: menu, cart, checkout flow, branded as an ordinary delivery app (visual polish is high-priority — disguise realism is the entire premise)
-- [ ] Ensure home screen is the single fork point: only two exits — "Call to order" and ordinary checkout — never a sequence where tapping leads into calling
-- [ ] QA pass: does any screen, at any point, visually suggest this is a safety app?
+- [x] Build disguised home screen: menu, cart, checkout flow, branded as an ordinary delivery app (visual polish is high-priority — disguise realism is the entire premise)
+- [x] Ensure home screen is the single fork point: only two exits — "Call to order" and ordinary checkout — never a sequence where tapping leads into calling
+- [x] QA pass: does any screen, at any point, visually suggest this is a safety app?
 
 ### User Story 1.2
 
