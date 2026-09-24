@@ -25,6 +25,9 @@ __pycache__/
 .venv/
 venv/
 
+# Per-machine Claude Code settings (e.g. the allow-git hook marker)
+.claude/
+
 # Logs and OS/editor files
 *.log
 .DS_Store

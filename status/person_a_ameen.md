@@ -1,14 +1,14 @@
 # Status — Person A: Ameen
 
 **Role:** QuickBite disguise app — web (React/Vite) then React Native; Gemini Live conversation logic (owns Epic 1, Epic 2, Epic 6, sender half of Epic 7; shares Epic 5 with Jeevan)
-**Last updated:** 2026-09-24 23:15 IST (initial version written from Jeevan's side — Ameen, please update with your actual progress)
+**Last updated:** 2026-09-25 00:05 IST (maintained from Jeevan's side using merged PRs; Ameen, please correct or add your own progress)
 **Live web app:** https://quickbite-5cde0.web.app
 
-## Snapshot (as known on 2026-09-24)
+## Snapshot (as known on 2026-09-25)
 
 | Epic | Status |
 |---|---|
-| Epic 1 — QuickBite disguise (core) | ❓ Web app is live, but its code isn't in this repo yet (`covert_call/web/` has only placeholders) — Ameen to fill in |
+| Epic 1 — QuickBite disguise (core) | 🟡 Story 1.1 done (PR #3, merged); 1.2–1.5 not yet in the repo |
 | Epic 2 — Second AI layer (stress detection, leakage check) | ❓ To be updated by Ameen |
 | Epic 6 — Stretch: mesh relay | Not started (stretch, after core) |
 | Epic 7 — Sender side (back-camera capture in native app) | Not started — shared publisher is ready (see below) |
