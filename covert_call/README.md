@@ -17,7 +17,8 @@ Theme alignment: **Sustainability & Social Impact** (resilience strengthening, c
 
 ## Quick Links
 
-- **Build plan**: [`docs/standalone_covert_call_plan.md`](docs/standalone_covert_call_plan.md)
+- **Build plan**: [`docs/quickbite_plan.md`](docs/quickbite_plan.md) (authoritative — supersedes `standalone_covert_call_plan.md`)
+- **Backlog**: [`docs/backlog.md`](docs/backlog.md) (epics, user stories, sub-tasks)
 - **Architecture**: [`docs/architecture/`](docs/architecture/)
 - **API docs**: [`docs/api/`](docs/api/)
 
@@ -25,20 +26,19 @@ Theme alignment: **Sustainability & Social Impact** (resilience strengthening, c
 
 ```
 covert_call/
-├── web/                    # Next.js web app (primary deliverable)
+├── web/                    # React (Vite) web app (primary deliverable)
 │   ├── src/
-│   │   ├── app/           # Next.js pages & routes
+│   │   ├── pages/         # Route-level views
 │   │   ├── components/    # React components
 │   │   │   ├── disguise/  # Food-delivery UI components
-│   │   │   ├── gemini/    # Gemini Live integration
-│   │   │   └── responder/ # Responder dashboard
+│   │   │   └── gemini/    # Gemini Live integration
 │   │   ├── lib/           # Utilities
 │   │   │   ├── gemini/    # Gemini API helpers
 │   │   │   ├── realtime/  # WebSocket/SSE handling
 │   │   │   └── location/  # Location services
 │   │   └── public/        # Static assets
 │   ├── package.json
-│   └── next.config.js
+│   └── vite.config.ts
 │
 ├── native/                 # React Native app (demo/future)
 │   ├── src/
@@ -57,15 +57,16 @@ covert_call/
 │   ├── requirements.txt (or package.json)
 │   └── main.py (or server.js)
 │
-├── dashboard/             # Responder dashboard (Next.js)
+├── dashboard/             # Monitoring Dashboard — separate app, React (Vite)
 │   ├── src/
-│   │   ├── app/           # Dashboard pages
+│   │   ├── pages/         # Queue / detail / case-history views
 │   │   ├── components/    # Dashboard UI
 │   │   └── lib/           # Dashboard utilities
 │   └── package.json
 │
 ├── docs/                  # Documentation
-│   ├── standalone_covert_call_plan.md  # Build reference
+│   ├── quickbite_plan.md  # Authoritative build reference
+│   ├── backlog.md         # Epics/user stories
 │   ├── architecture/      # System diagrams, data model
 │   ├── api/               # Endpoint documentation
 │   └── setup/             # Deployment, env setup
@@ -86,7 +87,7 @@ See [`docs/setup/`](docs/setup/) for:
 
 | Component | Tech |
 |-----------|------|
-| Web app | Next.js, React, TypeScript |
+| Web app | React (Vite), TypeScript |
 | Native app | React Native |
 | Backend | FastAPI or Node.js, Python/JavaScript |
 | Database | Firestore |
@@ -118,7 +119,7 @@ See [`docs/setup/`](docs/setup/) for:
 
 ## Development Checklist
 
-- [ ] Web app initial setup (Next.js scaffold + basic pages)
+- [ ] Web app initial setup (React/Vite scaffold + basic pages)
 - [ ] Backend server setup (FastAPI/Node)
 - [ ] Gemini Live integration (connection + audio stream)
 - [ ] Disguise UI (food-delivery form mock)
@@ -135,7 +136,7 @@ See [`docs/setup/`](docs/setup/) for:
 
 ## Contribution Notes
 
-- Follow Next.js and React best practices
+- Follow React best practices
 - Keep components small and focused
 - Maintain separation between disguise UI and backend logic
 - All data flows through the real-time channel (no direct polling)
