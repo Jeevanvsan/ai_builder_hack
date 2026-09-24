@@ -1,7 +1,7 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-25 00:05 IST — merged `main` (Ameen's PR #3, Story 1.1) into `ep-4`: no conflicts, backlog kept both sides' ticks, dashboard still builds. Opened PR `ep-4` → `main` for Ameen's review.
+**Last updated:** 2026-09-25 00:05 IST — merged `main` (Ameen's PR #3, Story 1.1) into `ep-4`: no conflicts, backlog kept both sides' ticks, dashboard still builds. Opened PR #4 `ep-4` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/4), reviewer: Ameen (`alameen1999`). Mergeable, no conflicts; CodeRabbit review pending.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
 
 ## Snapshot
