@@ -23,13 +23,22 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 // Captures the mic, resamples to 16kHz mono PCM16, and calls `onChunk` with base64-encoded audio ready for
 // Session.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } }).
-export async function startMicCapture(onChunk: (base64Pcm: string) => void): Promise<{ stop: () => void }> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } })
+export async function startMicCapture(onChunk: (base64Pcm: string) => void): Promise<{ stop: () => void; stream: MediaStream }> {
+  // Phone browsers play Web Audio through the loudspeaker (a web page can't pick the earpiece), so echo
+  // cancellation matters: without it Mia hears her own voice back through the mic.
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  })
   const context = new AudioContext()
   const source = context.createMediaStreamSource(stream)
   // ScriptProcessorNode is deprecated but still the simplest cross-browser way to get raw PCM frames without
   // shipping a separate AudioWorklet module file for a hackathon-scope integration.
   const processor = context.createScriptProcessor(4096, 1, 1)
+  // A silent gain node, not context.destination — ScriptProcessorNode needs to be connected to something to
+  // fire onaudioprocess in some browsers, but connecting straight to the speakers would echo the caller's own
+  // voice back to them.
+  const silentSink = context.createGain()
+  silentSink.gain.value = 0
 
   processor.onaudioprocess = (e) => {
     const input = e.inputBuffer.getChannelData(0)
@@ -38,10 +47,12 @@ export async function startMicCapture(onChunk: (base64Pcm: string) => void): Pro
   }
 
   source.connect(processor)
-  processor.connect(context.destination)
+  processor.connect(silentSink)
+  silentSink.connect(context.destination)
 
   let stopped = false
   return {
+    stream,
     stop: () => {
       if (stopped) return
       stopped = true
@@ -62,11 +73,15 @@ function resampleTo16k(input: Float32Array, inputRate: number): Float32Array {
   return out
 }
 
-// Plays back base64 PCM16 audio chunks the model sends, in order, as they arrive.
+// Plays back base64 PCM16 audio chunks the model sends, in order, as they arrive. Also exposes the same audio
+// as a MediaStream (`recordingStream`) so the call recorder can mix it with the caller's mic without needing a
+// second decode of the same data.
 export function createAudioPlayer() {
   const context = new AudioContext({ sampleRate: OUTPUT_SAMPLE_RATE })
+  const recordingDestination = context.createMediaStreamDestination()
   let nextStartTime = 0
   let closed = false
+  let activeSources: AudioBufferSourceNode[] = []
 
   function play(base64Pcm: string) {
     if (closed) return
@@ -88,9 +103,25 @@ export function createAudioPlayer() {
     const source = context.createBufferSource()
     source.buffer = buffer
     source.connect(context.destination)
+    source.connect(recordingDestination)
+    // If real time has already caught up to (or passed) the scheduled queue — e.g. after a pause between
+    // chunks — start immediately instead of scheduling in the past, which some browsers silently drop.
     const startAt = Math.max(context.currentTime, nextStartTime)
     source.start(startAt)
     nextStartTime = startAt + buffer.duration
+    activeSources.push(source)
+    source.onended = () => { activeSources = activeSources.filter((s) => s !== source) }
+  }
+
+  // Barge-in: the model sends `interrupted: true` whenever the caller's voice cuts across its own speech — this
+  // is normal mid-conversation, not the end of the call. Only the currently-queued audio should stop; the
+  // context itself must stay open so the model's next turn can still be heard.
+  function clearQueue() {
+    for (const source of activeSources) {
+      try { source.stop() } catch { /* already finished */ }
+    }
+    activeSources = []
+    nextStartTime = context.currentTime
   }
 
   function stop() {
@@ -100,5 +131,7 @@ export function createAudioPlayer() {
     void context.close()
   }
 
-  return { play, stop }
+  const isPlaying = () => !closed && nextStartTime > context.currentTime
+
+  return { play, stop, clearQueue, isPlaying, recordingStream: recordingDestination.stream }
 }

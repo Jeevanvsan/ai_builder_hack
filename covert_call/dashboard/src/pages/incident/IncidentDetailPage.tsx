@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import CallRecordingPlayer from '../../components/CallRecordingPlayer'
 import Chip from '../../components/Chip'
 import DataState from '../../components/DataState'
 import IncidentMap from '../../components/IncidentMap'
@@ -142,7 +143,7 @@ export default function IncidentDetailPage() {
           <h2>Extracted fields</h2>
           <dl className="fields fields-lg">
             <dt>People present</dt>
-            <dd><LiveValue value={f.peopleCount}>{f.peopleCount ?? <span className="pending">Listening…</span>}</LiveValue> <Confidence level={conf.peopleCount} /></dd>
+            <dd><LiveValue value={f.peopleCount}>{f.peopleCount ?? <span className="pending">{live ? 'Listening…' : 'Not reported'}</span>}</LiveValue> <Confidence level={conf.peopleCount} /></dd>
             <dt>Danger indicators</dt>
             <dd>
               <LiveValue value={f.dangerIndicators}>
@@ -153,7 +154,7 @@ export default function IncidentDetailPage() {
               <Confidence level={conf.dangerIndicators} />
             </dd>
             <dt>Urgency</dt>
-            <dd><LiveValue value={f.urgency}>{f.urgency ?? <span className="pending">Listening…</span>}</LiveValue> <Confidence level={conf.urgency} /></dd>
+            <dd><LiveValue value={f.urgency}>{f.urgency ?? <span className="pending">{live ? 'Listening…' : 'Not reported'}</span>}</LiveValue> <Confidence level={conf.urgency} /></dd>
             <dt>Notes</dt>
             <dd><LiveValue value={f.notes}>{f.notes ?? <span className="pending">—</span>}</LiveValue></dd>
           </dl>
@@ -179,6 +180,14 @@ export default function IncidentDetailPage() {
           </ol>
           <NoteForm incidentId={incident.id} />
         </div>
+
+        {incident.hasRecording && (
+          <div className="card recording-card">
+            <h2>Call recording</h2>
+            <CallRecordingPlayer incidentId={incident.id} />
+            <p className="sub">Full call audio (mic + AI voice), for evidence and verification. Playable anytime.</p>
+          </div>
+        )}
 
         <div className="card summary-card">
           <h2>Consolidated summary</h2>
