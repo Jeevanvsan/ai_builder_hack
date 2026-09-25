@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MenuItem } from '../../data/menu'
-import { CODE_BY_ID } from '../../lib/codes'
+import { CODE_BY_ID } from '../../../../shared/codes'
 import { formatRupees, useCart } from '../../state/cart'
 import { CloseIcon, StarIcon, VegMark } from './icons'
 import { QtyStepper } from './QtyStepper'

@@ -10,7 +10,7 @@
 // read them, and are what the dashboard's deriveSeverity() inspects (e.g. it treats anything matching /weapon/i
 // as high severity), so keep the responder-facing phrasing here.
 
-import type { Severity } from '../../../shared/incidents/types.ts'
+import type { Severity } from './incidents/types.ts'
 
 export type CodeScope = 'self' | 'other'
 

@@ -6,7 +6,7 @@ import { PageHeader } from '../components/disguise/PageHeader'
 import { ClockIcon, HomeIcon, WalletIcon } from '../components/disguise/icons'
 import { computeBill, formatRupees, useCart } from '../state/cart'
 import { db } from '../lib/firebase'
-import { decodeOrder } from '../lib/codes'
+import { decodeOrder } from '../../../shared/codes'
 import { startIncident, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Severity } from '../../../shared/incidents/types.ts'
 

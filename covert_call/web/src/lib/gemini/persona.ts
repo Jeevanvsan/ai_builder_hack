@@ -1,4 +1,4 @@
-import { personaCodeList } from '../codes.ts'
+import { personaCodeList } from '../../../../shared/codes.ts'
 
 // System instruction for the SILENT SOS (Epic 11.3): no conversation, no spoken output. The model only watches
 // the cameras and listens to the room, and reports what it observes through tool calls. There is no caller to

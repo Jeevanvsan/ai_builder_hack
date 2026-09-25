@@ -3,11 +3,13 @@
   "private": true,
   "workspaces": [
     "dashboard",
-    "web"
+    "web",
+    "native"
   ],
   "scripts": {
     "dashboard": "npm run dev -w dashboard",
     "web": "npm run dev -w web",
+    "native": "npm run start -w quickbite-native",
     "simulate-call": "npm run simulate-call -w dashboard",
     "seed": "npm run seed -w dashboard --",
     "deploy:dashboard": "npm run deploy -w dashboard",

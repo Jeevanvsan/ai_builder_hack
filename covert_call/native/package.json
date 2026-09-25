@@ -1,0 +1,32 @@
+{
+  "name": "quickbite-native",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild"
+  },
+  "//": "UNTESTED SCAFFOLD (Epic 12) — versions below are indicative. After cloning, run `npx expo install --fix` to align every native module to the installed Expo SDK, then build a dev client (not Expo Go — WebRTC / PCM audio / alternate icons need native code). See README.md.",
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.1.0",
+    "@react-navigation/native": "^7.0.0",
+    "@react-navigation/native-stack": "^7.0.0",
+    "expo": "^52.0.0",
+    "expo-brightness": "^13.0.0",
+    "expo-keep-awake": "^14.0.0",
+    "expo-status-bar": "^2.0.0",
+    "firebase": "^12.19.0",
+    "react": "19.2.8",
+    "react-native": "0.79.0",
+    "react-native-safe-area-context": "^5.0.0",
+    "react-native-screens": "^4.0.0",
+    "react-native-webrtc": "^124.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "typescript": "~6.0.2"
+  }
+}

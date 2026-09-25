@@ -156,6 +156,15 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-25 20:31 IST: Epics 12 + 13 (native app foundation + personalisation) scaffolded on `phase-2` — UNTESTED.**
+  - `covert_call/native/` is now a React Native (Expo) app: navigation + disguise screens (Home with heart-double-tap SOS, Cart, Checkout coded-order, Order placed, Silent tap, Settings), sharing `shared/incidents`, `shared/video`, `shared/codes`. See `native/README.md`.
+  - **I moved `web/src/lib/codes.ts` → `shared/codes.ts`** so web + native share one coded-meaning table (Story 8.1's intent). Web imports updated; web still typechecks/builds. Heads-up in case you have local edits to that file.
+  - `native` added to the npm workspace + a `native` script in `covert_call/package.json`.
+  - **Explicitly untested**: I had no Expo toolchain/device here, so nothing was built or run. The Gemini AV (PCM audio, camera frames) and WebRTC pieces are **stubbed** with a clear plan in `native/src/lib/nativeCall.ts` (they reuse the web conversation logic). Personalisation persists via AsyncStorage; the OS alternate-icon switch is stubbed pending icon assets + a config plugin.
+  - Run steps for when you're on your machine are in `native/README.md` (`npx expo install --fix`, dev client, env vars).
+  - **Still open (small, verifiable dashboard bits — your Epic 14)**: analytics channel breakdown for the new channels, and a second *live* video feed (front camera) on the detail page.
+
+
 - **2026-09-25 20:20 IST: Epic 11 (Heart double-tap silent SOS, hostage) built on branch `phase-2`.**
   - Double-tap the heart on the home screen → `/sos` (`SosPage`), a full-black "phone is off" overlay that swallows touches while it silently records. Exit with **three taps in the top-left corner**.
   - It records both cameras + mic where the device allows two camera streams (else back-only; `cameraMode` saved), streams the **back** camera live to the dashboard, records **both** cameras to Drive, and runs a **silent Gemini observer** (`silentSession.ts`, TEXT modality so nothing plays into the room) that reports captors/hostages/weapons/etc. via tools. Consolidation + leakage check run on exit.
