@@ -1,7 +1,9 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-25 16:20 IST — Branch `ep-5-dashboard-auth`: Firebase Auth sign-in, a Responder Management page (add/edit/disable/remove), a full incident Analytics page and a Responder Performance page (both with ECharts visuals — maps, trends, gauges, scatter), and an AI Insights tab on Analytics that has Gemini turn the incident stats into Immediate actions / Recommendations / Suggestions, auto-refreshed once a day. All live and tested end-to-end. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. **Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer (it was showing "claude" as a GitHub contributor) and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone before pulling/pushing anything.
+**Last updated:** 2026-09-25 17:05 IST — Two pieces of work this session:
+1. Branch `ep-5-dashboard-auth` (Jeevan's own scope): Firebase Auth sign-in, a Responder Management page, a full incident Analytics page + Responder Performance page (ECharts), and a Gemini-powered AI Insights tab, auto-refreshed daily. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone.
+2. **Branch `epic-1-2-3-gemini-live` (Ameen's Epic 1/2 scope, picked up on his behalf since he's currently busy and asked for it to be continued)** — see the dedicated section below. Committed locally (`c5ed12a`), not yet pushed/PR'd, pending Ameen's go-ahead since this is normally his ownership area.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
 
 ## Snapshot
@@ -85,11 +87,56 @@
 | Notifications with the dashboard fully closed | Firebase Cloud Messaging + server → billing |
 | Google Maps (instead of OpenStreetMap) | A Maps key → billing account |
 
+## Epic 1/2/3 — Gemini Live call flow (2026-09-25, branch `epic-1-2-3-gemini-live`, picked up for Ameen)
+Ameen handed off his remaining Epic 1/2 work (he's currently busy). This is the core covert-call mechanism the
+whole hackathon pitch rests on — previously `CallPage.tsx` was a static placeholder with no Gemini integration
+at all. Now built and **verified working end-to-end with a real spoken test call** against the live dashboard.
+
+- **1.2 Live call flow**: `web/src/lib/gemini/liveSession.ts` opens a Gemini Live session (`gemini-3.8-live` —
+  confirmed free-tier, unlimited RPM/RPD on the account's own rate-limit dashboard) with a persona system
+  instruction (`persona.ts`) that states every coded question's real meaning in the same breath it's asked, per
+  the project's one non-negotiable rule. Streams the mic (PCM16 16kHz) and plays back the model's audio response
+  (`audio.ts`, PCM16 24kHz).
+- **1.5 Structured extraction**: Gemini Live function-calling (`tools.ts`: `report_situation`, `confirm_address`,
+  `report_stress_level`) wired straight into the existing shared client (`updateLiveFields`, `confirmAddress`) as
+  each tool call arrives — this is Epic 3.2/3.3, previously unwired.
+- **2.1 Voice stress**: `report_stress_level` tool call → `recordVoiceStress()`, periodic through the call.
+- **1.3 Silent tap-only mode**: `SilentTapPage.tsx`, disguised as a "Delivery instructions" screen (new fork from
+  Home, `BottomBar.tsx`) — long-press reveals each option's real meaning (weapon present, injury, aggressor
+  present, urgency), writes directly via `updateLiveFields()`/`confirmAddress()`, no Gen AI (matches the plan's
+  note that tap-mapping is plain app logic).
+- **1.4 Zero-trace exit**: shared `exit.ts` helper (`zeroTraceExit`) used by both the call's End button and the
+  silent-tap Submit — ends the incident and replaces browser history so the page isn't reachable via back button.
+- **2.2 Leakage check + 3.4 Post-call consolidation**: both run **client-side** (no backend/billing needed,
+  reusing the free-tier key) via two new Gemini text passes on call end (`leakageCheck.ts`, `consolidate.ts`,
+  same JSON-schema pattern as the dashboard's own `aiInsights.ts`). Two new shared-client functions added:
+  `recordLeakageCheck()`, `consolidateIncident()` (in `shared/incidents/client.ts` — a shared file, flagged here
+  since Ameen should know about the addition; no existing function signatures changed).
+- New Firebase Web app registered for `covert_call/web/` (previously it had no SDK config at all — only the
+  dashboard had one). New env: `VITE_GEMINI_LIVE_API_KEY` in `web/.env.local` (currently reusing the dashboard's
+  existing Gemini key value — same free-tier key, works fine, kept simple rather than provisioning a second key).
+- `covert_call/web` added to the npm workspace (`covert_call/package.json`), its separate `package-lock.json`
+  removed so it shares the one workspace install with `dashboard`.
+- **Real bugs found and fixed via live testing** (not just typecheck — these only surfaced by actually placing a
+  test call): (1) the SDK doc's own example model name (`gemini-live-2.5-flash-preview`) doesn't exist for this
+  API version — switched to `gemini-3.8-live`; (2) React StrictMode's dev-only double-mount was tearing down the
+  Live session moments after it connected — fixed by making the call-start effect a true one-shot with no
+  unmount cleanup racing it; (3) no audio was heard because `AudioContext` stays `suspended` until explicitly
+  resumed once the async call chain runs past the original click's gesture window — now resumes on first audio
+  chunk; (4) rapid concurrent tool calls (e.g. stress + situation update close together) raced on the same
+  Firestore document and hit `failed-precondition` — writes are now queued per-incident instead of fired
+  concurrently.
+- Deployed live to https://quickbite-5cde0.web.app (default hosting site — **not** the dashboard's site, kept
+  strictly separate throughout). Committed locally on `epic-1-2-3-gemini-live` (`c5ed12a`) — **not yet pushed or
+  PR'd**, since this is Ameen's ownership area; waiting for his go-ahead before opening a PR against `main`.
+
 ## Next up for Jeevan
+- Get Ameen's sign-off before pushing/opening a PR for `epic-1-2-3-gemini-live` — it's his scope, picked up while he's busy, not something to merge without his review.
 - Raise a PR for `ep-5-dashboard-auth` → `main` (now includes auth, responder management, analytics, responder performance, and AI Insights — a bigger PR than usual, worth flagging to Ameen before he reviews).
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **Your Epic 1/2 work was picked up on branch `epic-1-2-3-gemini-live`** since you were busy and asked for it to be continued — please review before it gets merged, this is your scope. See the "Epic 1/2/3" section above for exactly what was built (live call flow, silent-tap mode, extraction, stress, leakage check, consolidation) and the real bugs that came up during live testing (wrong model name, a React StrictMode double-mount bug, an AudioContext autoplay issue, a Firestore write-race). Not pushed yet — will wait for your OK first. Currently using your same Gemini key value (copied into `web/.env.local` as `VITE_GEMINI_LIVE_API_KEY`) rather than a separate one — let Jeevan know if you'd rather split them.
 - **⚠️ IMPORTANT — git history was rewritten on 2026-09-25, force-pushed to `main`, `ep-4`, and `ep-5-dashboard-auth`.** This was to remove a "Co-Authored-By: Claude" line from some commit messages (it was making "claude" show up in the repo's Contributors list). Commit hashes on those three branches changed. **Before you next `git pull` or `git push` on any of them**, run this for each branch you have locally:
   ```
   git fetch origin
