@@ -6,6 +6,7 @@ import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, mark
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
+import { APP_NAME } from '../lib/brand'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
@@ -36,6 +37,7 @@ export function CallPage() {
   const mediaRef = useRef<MediaStream | null>(null)
   const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
   const videoRecRef = useRef<VideoRecorderHandle | null>(null)
+  const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Cart state at the moment this page mounted — later cart changes (e.g. adding items in another tab) must not
   // retrigger the call setup, only the render-time redirect below reacts to those.
   const cartHadItemsOnMount = useRef(cart.count > 0)
@@ -91,6 +93,12 @@ export function CallPage() {
           if (rec) {
             videoRecRef.current = rec
             void upsertVideoRecording(db, id, { camera: 'back', status: 'recording', startedAt: new Date().toISOString() })
+            // Periodically upload the recording-so-far (overwrites by filename) so a tab killed mid-call still
+            // leaves footage in Drive (Epic 9.2).
+            snapshotTimerRef.current = setInterval(() => {
+              const blob = rec.snapshot()
+              if (blob) void uploadCallVideo(blob, { incidentId: id, camera: 'back', mimeType: rec.mimeType }).catch(() => {})
+            }, 20_000)
           }
         }
       }
@@ -110,7 +118,8 @@ export function CallPage() {
     const call = callRef.current
     const transcript = call?.getTranscript() ?? ''
 
-    // Stop the Drive video recorder first, while the camera track is still live, so the final chunk is captured.
+    // Stop periodic snapshot uploads, then stop the recorder while the camera is still live for the final chunk.
+    if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
     const videoBlob = videoRecRef.current ? await videoRecRef.current.stop() : null
     const videoMime = videoRecRef.current?.mimeType ?? 'video/webm'
 
@@ -193,7 +202,7 @@ export function CallPage() {
     <div className="page call-page">
       <div className="call-top">
         <div className="call-avatar" aria-hidden="true">QB</div>
-        <h1>QuickBite Order Desk</h1>
+        <h1>{APP_NAME} Order Desk</h1>
         <p className="call-status">
           {status === 'live' ? `${minutes}:${secs}` : STATUS_LABEL[status]}
         </p>

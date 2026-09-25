@@ -33,6 +33,7 @@ export function SosPage() {
   const observerRef = useRef<SilentObserverHandle | null>(null)
   const publisherStopsRef = useRef<(() => Promise<void>)[]>([])
   const recordersRef = useRef<{ facing: 'back' | 'front'; rec: VideoRecorderHandle }[]>([])
+  const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const streamsRef = useRef<MediaStream[]>([])
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
 
@@ -99,6 +100,13 @@ export function SosPage() {
             void upsertVideoRecording(db, id, { camera: cam.facing, status: 'recording', startedAt: new Date().toISOString() })
           }
         }
+        // Periodic snapshot uploads per camera so a long SOS (or one force-closed) still leaves footage (Epic 9.2).
+        snapshotTimerRef.current = setInterval(() => {
+          for (const { facing, rec } of recordersRef.current) {
+            const blob = rec.snapshot()
+            if (blob) void uploadCallVideo(blob, { incidentId: id, camera: facing, mimeType: rec.mimeType }).catch(() => {})
+          }
+        }, 20_000)
       }
     })()
   }, [])
@@ -108,6 +116,7 @@ export function SosPage() {
     endingRef.current = true
     const id = incidentIdRef.current
 
+    if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
     // Stop the Drive recorders while the camera tracks are still live, then kick off uploads in the background.
     const recordings = await Promise.all(
       recordersRef.current.map(async ({ facing, rec }) => ({ facing, blob: await rec.stop(), mimeType: rec.mimeType })),

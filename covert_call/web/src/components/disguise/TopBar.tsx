@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DELIVERY_ADDRESS } from '../../data/menu'
+import { APP_NAME } from '../../lib/brand'
 import { ChevronDownIcon, HeartIcon, PinIcon, UserIcon } from './icons'
 
 export function TopBar() {
@@ -23,7 +24,7 @@ export function TopBar() {
       <div className="topbar-row">
         <div className="brand">
           <span className="brand-dot" />
-          QuickBite
+          {APP_NAME}
         </div>
         <div className="topbar-actions">
           <button type="button" className="icon-btn" aria-label="Favourites" onClick={onHeartTap}>

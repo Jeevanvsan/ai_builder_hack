@@ -41,7 +41,7 @@ function buildPrompt(a: IncidentAnalytics): string {
   const stats = [
     `total=${a.total} open=${a.open} resolved=${a.resolved}`,
     `severity: high=${a.bySeverity.high} med=${a.bySeverity.medium} low=${a.bySeverity.low}`,
-    `channel: call=${a.byChannel.liveCall} tap=${a.byChannel.silentTap}`,
+    `channel: call=${a.byChannel.liveCall} tap=${a.byChannel.silentTap} codedOrder=${a.byChannel.clickOrder} silentSos=${a.byChannel.silentSos} (sosTotal=${a.sosCount})`,
     `avgAckMin=${a.avgTimeToAcknowledgeMin?.toFixed(0) ?? '-'} avgResolveMin=${a.avgTimeToResolveMin?.toFixed(0) ?? '-'} avgStress=${a.avgVoiceStress?.toFixed(0) ?? '-'}`,
     top('busiestHours', hours),
     top('busiestDays', days),

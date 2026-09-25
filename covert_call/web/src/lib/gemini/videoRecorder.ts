@@ -12,6 +12,9 @@ const VIDEO_BITS_PER_SECOND = 800_000
 
 export type VideoRecorderHandle = {
   mimeType: string
+  // The recording so far, as a complete blob — uploaded periodically during the call so a tab killed mid-call
+  // still leaves footage in Drive (Epic 9.2). Null until the first chunk is flushed.
+  snapshot: () => Blob | null
   stop: () => Promise<Blob | null>
 }
 
@@ -35,6 +38,7 @@ export function startVideoRecording(stream: MediaStream): VideoRecorderHandle | 
   let stopped = false
   return {
     mimeType,
+    snapshot: () => (chunks.length ? new Blob(chunks, { type: mimeType }) : null),
     stop: () =>
       new Promise((resolve) => {
         if (stopped) return resolve(null)
