@@ -46,10 +46,12 @@ export function CheckoutPage() {
       .filter((l) => l.item.code)
       .map((l) => ({ codeId: l.item.code as string, qty: l.qty }))
 
+    let incidentId: string | null = null
     if (codedLines.length > 0) {
       try {
         const decoded = decodeOrder(codedLines, deliveryUrgency)
         const { id } = await startIncident(db, { channel: 'click-order' })
+        incidentId = id
         await updateLiveFields(db, id, {
           dangerIndicators: decoded.dangerIndicators,
           peopleCount: decoded.peopleCount,
@@ -62,7 +64,8 @@ export function CheckoutPage() {
       }
     }
 
-    navigate('/order-placed', { replace: true })
+    // Pass the incident id so the order-tracking screen can mirror the responder's progress in disguise (Epic 8.3).
+    navigate('/order-placed', { replace: true, state: incidentId ? { incidentId } : undefined })
     cart.clear()
   }
 

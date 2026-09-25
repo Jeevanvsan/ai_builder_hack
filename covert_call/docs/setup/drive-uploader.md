@@ -26,8 +26,14 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents)
     const bytes = Utilities.base64Decode(body.base64)
-    const blob = Utilities.newBlob(bytes, body.mimeType || 'video/webm', body.filename || 'call.webm')
-    const file = DriveApp.getFolderById(FOLDER_ID).createFile(blob)
+    const filename = body.filename || 'call.webm'
+    const folder = DriveApp.getFolderById(FOLDER_ID)
+    // The app re-uploads the same filename periodically during a call (Epic 9.2 snapshots), then once more at the
+    // end — so remove any earlier version of this file first and keep just the latest, complete one.
+    const existing = folder.getFilesByName(filename)
+    while (existing.hasNext()) existing.next().setTrashed(true)
+    const blob = Utilities.newBlob(bytes, body.mimeType || 'video/webm', filename)
+    const file = folder.createFile(blob)
     // Anyone in the team with the folder can already view it; return a link responders can open.
     return ContentService
       .createTextOutput(JSON.stringify({ fileId: file.getId(), url: file.getUrl() }))
@@ -53,7 +59,8 @@ dashboard feed and the Firestore audio recording are unaffected.
 ## Prototype limits (state these plainly, don't hide them)
 - The uploader URL sits in the client bundle — anyone reading the JS can POST to it. Acceptable for a hackathon
   prototype; a real build would put a secret/token in front of it or move it behind Cloud Run.
-- The video is uploaded **when the call ends**, not streamed during it, so a call killed mid-way (tab closed
-  before the End button) leaves no Drive video. Chunked-during-call upload is a follow-up (backlog 9.2).
+- The recording-so-far is uploaded every ~20s during the call (overwriting the same file) and once more at the
+  end, so a call killed mid-way still leaves the last snapshot in Drive. Each snapshot re-sends the whole file,
+  which is fine for short demo calls but not bandwidth-optimal for long ones.
 - Apps Script limits a single request to a few tens of MB, which comfortably covers a short demo call at the
   app's ~0.8 Mbps video bitrate.
