@@ -22,15 +22,51 @@ runs under the Firebase JS SDK on React Native. The audio/video pipeline is stub
 - **Alternate home-screen icons** (Epic 13): wire `setIcon()` in `src/lib/appearance.tsx` to a config-plugin lib
   (e.g. `expo-alternate-app-icons`) once icon assets exist; configure it in `app.json`.
 
-## Run it (on your machine)
-1. `npm install` at the `covert_call/` root (native is a workspace).
-2. `cd native && npx expo install --fix` to align every native module to the installed Expo SDK.
-3. Set env vars in `native/.env` (Expo uses the `EXPO_PUBLIC_` prefix, not `VITE_`):
-   - `EXPO_PUBLIC_FIREBASE_*` — copy the web app's Firebase values.
-   - the Gemini key, for the call.
-   - `EXPO_PUBLIC_DRIVE_UPLOAD_URL` — same Apps Script URL as the web's `VITE_DRIVE_UPLOAD_URL`, **once native video
-     recording is implemented** (it's stubbed today, so nothing reads it yet). See `docs/setup/drive-uploader.md`.
-4. Build a **dev client** (not Expo Go — WebRTC / PCM / alternate icons need native code): `npx expo run:android`.
+## How to test it (on your machine)
+
+You need Node, and either **Android Studio** (an emulator) or a physical device with USB debugging. You must build
+a **dev client** — Expo Go won't work because of `react-native-webrtc`.
+
+```bash
+# 1. Install the workspace (native is a workspace member)
+cd covert_call && npm install
+
+# 2. Reconcile every Expo/native module to the SDK, and add the WebRTC config plugin app.json needs.
+cd native
+npx expo install --fix
+npx expo install @config-plugins/react-native-webrtc
+
+# 3. Create native/.env (Expo uses the EXPO_PUBLIC_ prefix, NOT VITE_):
+#    EXPO_PUBLIC_FIREBASE_API_KEY=...        (copy the web app's Firebase values)
+#    EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+#    EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+#    EXPO_PUBLIC_FIREBASE_APP_ID=...
+#    (EXPO_PUBLIC_DRIVE_UPLOAD_URL — only once native recording exists; nothing reads it yet)
+
+# 4. Generate native projects and run a dev build on a device/emulator:
+npx expo run:android      # or: npx expo run:ios   (macOS + Xcode)
+```
+
+### Fastest way to see it actually working
+The native app writes to the **same Firestore** as the web app, so open the live dashboard
+(https://quickbite-5cde0-dashboard.web.app) on the side and watch it react. These paths already work end-to-end
+(no native AV needed):
+- **Coded order:** add a coded item (e.g. Extra Pepperoni) → Checkout → Place order → a `click-order` incident
+  appears on the dashboard.
+- **Silent tap:** Home → Delivery instructions → pick options + address → Save → a `silent-tap` incident appears.
+- **Silent SOS:** double-tap the heart → black screen; a `silent-sos` / hostage incident appears; three taps
+  top-left exits.
+
+### What will NOT work yet (stubbed)
+- The **live call** and the **SOS observer** create the incident and the UI, but there's **no Gemini audio/video**
+  — native PCM capture/playback + camera frames aren't implemented (see `src/lib/nativeCall.ts`). So no persona
+  conversation, no live video feed, no Drive recording on native.
+- **Alternate home-screen icon** switching (name changes work in-app; the OS icon swap is stubbed).
+
+### Known setup gaps to expect (I couldn't build this here)
+- `app.json` references `@config-plugins/react-native-webrtc` — that's why step 2 installs it before `run:android`.
+- Firestore live listeners on RN sometimes need `experimentalForceLongPolling` (see `src/lib/firebase.ts`).
+- Versions in `package.json` are indicative; `npx expo install --fix` is what makes them coherent for your SDK.
 
 ## Shared code
 Imports `../shared/incidents/*`, `../shared/video/*` and `../shared/codes` directly — the same source of truth as
