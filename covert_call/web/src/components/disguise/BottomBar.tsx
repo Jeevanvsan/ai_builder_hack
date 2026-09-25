@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom'
 import { formatRupees, useCart } from '../../state/cart'
 import { ChevronRightIcon, PhoneIcon } from './icons'
 
-// Home is the only fork point: calling is offered only while the cart is empty,
-// so the checkout path and the call path can never belong to the same order.
+// Home is the only fork point: calling, silent reporting, and checkout are three separate forks, never a
+// sequence — offered only while the cart is empty so none of them can ever belong to the same order.
+// "Delivery instructions" is the silent-tap mode's disguise: an ordinary, unremarkable thing to tap on a food app.
 export function BottomBar() {
   const cart = useCart()
 
@@ -30,7 +31,7 @@ export function BottomBar() {
       <div className="guest-bar">
         <span className="guest-copy">
           <strong>Ordering as guest</strong>
-          <span>Prefer to order by phone?</span>
+          <Link to="/delivery-instructions" className="guest-subtle-link">Delivery instructions</Link>
         </span>
         <Link to="/call" className="call-cta">
           <PhoneIcon size={16} /> Call to order

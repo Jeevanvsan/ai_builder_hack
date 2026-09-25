@@ -2,12 +2,15 @@
   "name": "quickbite",
   "private": true,
   "workspaces": [
-    "dashboard"
+    "dashboard",
+    "web"
   ],
   "scripts": {
     "dashboard": "npm run dev -w dashboard",
+    "web": "npm run dev -w web",
     "simulate-call": "npm run simulate-call -w dashboard",
     "seed": "npm run seed -w dashboard --",
-    "deploy:dashboard": "npm run deploy -w dashboard"
+    "deploy:dashboard": "npm run deploy -w dashboard",
+    "deploy:web": "npm run deploy -w web"
   }
 }
