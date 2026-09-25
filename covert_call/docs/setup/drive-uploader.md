@@ -56,6 +56,10 @@ VITE_DRIVE_UPLOAD_URL=https://script.google.com/macros/s/XXXX/exec
 Rebuild the web app. If the variable is unset, video uploads are skipped and the call still works — the live
 dashboard feed and the Firestore audio recording are unaffected.
 
+**Native app:** same endpoint, but React Native/Expo reads `EXPO_PUBLIC_*` vars, not `VITE_*`. When native video
+recording is implemented (it's currently a stub — `react-native-webrtc` has no `MediaRecorder`), set the same URL
+as `EXPO_PUBLIC_DRIVE_UPLOAD_URL` in `native/.env` and reuse this same uploader. Nothing in native reads it yet.
+
 ## Prototype limits (state these plainly, don't hide them)
 - The uploader URL sits in the client bundle — anyone reading the JS can POST to it. Acceptable for a hackathon
   prototype; a real build would put a secret/token in front of it or move it behind Cloud Run.
