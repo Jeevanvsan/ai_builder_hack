@@ -378,20 +378,20 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ## EPIC 12 — Native App Foundation (React Native) 🔴
 
-*`covert_call/native/` is empty. Phase 2 is built in web and native in parallel, so native first needs to reach parity with the web disguise.*
+*Native foundation scaffolded on branch `phase-2` — **UNTESTED** (no Expo toolchain/device in the build env). See `native/README.md`. UI + incident-writing ported; Gemini AV + WebRTC stubbed.*
 
 ### User Story 12.1
 **As a developer, I want a React Native app that shares the incident and video code with web, so that both apps write the same incidents to the same dashboard.**
-- [ ] Scaffold with Expo using a **development build** (not Expo Go — WebRTC, PCM audio streaming and alternate icons all need native modules)
-- [ ] Add `native` to the npm workspace; import `shared/incidents` and `shared/video` directly
-- [ ] Firebase config via env, matching `web/.env.example`
+- [x] Expo dev-build scaffold: `package.json`, `app.json`, `tsconfig`, `babel.config.js`, `index.ts` (registers WebRTC globals), `App.tsx` (React Navigation). Untested.
+- [x] `native` added to the workspace; screens import `../../../shared/incidents`, `shared/video`, `shared/codes` directly (codes.ts moved to `shared/` so all three apps share it)
+- [x] `native/src/lib/firebase.ts` reads `EXPO_PUBLIC_FIREBASE_*` (copy the web values)
 
 ### User Story 12.2
 **As a person using the phone app, I want the same disguise and the same two forks as the web app, so that it looks like an ordinary installed delivery app.**
-- [ ] Port Home, cart, checkout, call screen and silent-tap screen from `web/src/pages/`
-- [ ] Gemini Live in React Native: mic PCM16 16 kHz streaming out, 24 kHz playback in (needs a native audio-streaming module), with the same persona and tools
-- [ ] Zero-trace exit on native: reset the navigation stack, leaving no back history
-- [ ] Test on a real Android phone against the live dashboard
+- [~] Ported: Home (with heart-double-tap SOS), Cart, Checkout (coded-order), OrderPlaced, Silent tap, Settings. Call + SOS screens are shells (AV pending).
+- [ ] Gemini Live on RN (PCM capture/playback + camera frames) — **stubbed** in `native/src/lib/nativeCall.ts` with the exact plan; reuses the web conversation logic. Not implemented.
+- [x] Zero-trace exit uses `navigation.reset()` to Home (no back history)
+- [ ] Test on a real Android phone — pending (couldn't build/run in this env)
 
 ---
 
@@ -401,17 +401,17 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 13.1
 **As a person using QuickBite, I want to change the app's icon and name, so that it blends in with the other apps on my phone.**
-- [ ] "App appearance" screen reached from Account, styled like a normal app setting
-- [ ] Preset icon set (~6: food, grocery, pharmacy, cab, notes …) switched with the OS alternate-icon mechanism (iOS alternate icons, Android activity-alias, via an Expo config plugin)
-- [ ] App name: free text, shown everywhere inside the app (top bar, splash, call screen "… Order Desk", and the persona's spoken greeting)
-- [ ] OS limitation, stated plainly: the home-screen label under the icon can only be one of the preset names (Android), and can't be changed at all on iOS. The free-text name applies inside the app
-- [ ] Put all brand strings in one place (today they're hard-coded in `TopBar`, `CallPage`, `menu.ts`, `persona.ts`)
+- [x] `SettingsScreen` ("App appearance"), reached from the Account button, styled as a normal setting
+- [~] 6 icon presets in the UI (`ICON_PRESETS`); the OS alternate-icon switch is stubbed in `appearance.tsx setIcon()` (needs icon assets + a config plugin)
+- [x] Free-text app name shown across the native app (home top bar, call screen "… Order Desk") via `useAppearance()`
+- [x] OS limitation stated in the Settings screen + README
+- [~] Native reads the name from one place (`appearance.tsx`). The **web** app's brand strings are still hard-coded — centralising those is outstanding.
 
 ### User Story 13.2
 **As a person who customised the app, I want my icon and name to stay the same after I close or restart the app, so that it never flips back to "QuickBite".**
-- [ ] Persist the choice on the device (AsyncStorage or MMKV)
-- [ ] Load it before the first screen renders, so "QuickBite" never flashes on launch
-- [ ] Test: change it, kill the app, reboot the phone, then check the icon, name and greeting all stay
+- [x] Persisted with AsyncStorage (`appearance.tsx`)
+- [x] Loaded in `AppearanceProvider` before the first screen renders (`ready` gate)
+- [ ] Test across kill/reboot on a device — pending
 
 ---
 
