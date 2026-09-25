@@ -44,6 +44,10 @@ export interface Incident {
   severity: Severity
   // Present once the QuickBite app starts streaming the back camera (Epic 7.1). Absent means no video for this incident.
   video?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
+  // True once the full call recording (mic + AI voice) has been saved to the incidents/{id}/recording/audio
+  // subcollection doc — kept off the main document since Firestore caps a document at 1MiB. Absent/false if
+  // recording wasn't supported in the caller's browser, or the call was too long to fit in one document.
+  hasRecording?: boolean
   response: {
     status: ResponseStatus
     acknowledgedBy: string | null
