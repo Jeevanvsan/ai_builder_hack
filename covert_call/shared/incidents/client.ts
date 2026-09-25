@@ -2,7 +2,7 @@ import { arrayUnion, doc, getDoc, runTransaction, setDoc, updateDoc, type Firest
 import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
 import { deriveSeverity, maxSeverity } from './severity.ts'
-import type { Channel, Incident, RoughLocation } from './types.ts'
+import type { Channel, FieldConfidence, Incident, RoughLocation } from './types.ts'
 
 // Write side of the incident pipeline (Epic 3), called by the QuickBite app. The dashboard only reads.
 
@@ -112,4 +112,20 @@ export async function confirmAddress(
 
 export function endIncident(db: Firestore, id: string): Promise<void> {
   return updateDoc(ref(db, id), { callState: 'ended', sessionEndedAt: now() })
+}
+
+// A second Gemini pass reviews the call for uninvolved third parties mentioned without consent (a bystander, a
+// child) — this just records the result; the review itself happens in the caller (Epic 2.2).
+export function recordLeakageCheck(db: Firestore, id: string, redactions: string[]): Promise<void> {
+  return updateDoc(ref(db, id), { leakageCheckStatus: { reviewed: true, redactions } })
+}
+
+// Replaces the live working state with a permanent, dispatcher-style case record once the call has ended.
+// Call after endIncident() (or endIncident() can follow this — order doesn't matter, they touch different fields).
+export function consolidateIncident(
+  db: Firestore,
+  id: string,
+  patch: { consolidatedSummary: string; fieldConfidence: Record<string, FieldConfidence> },
+): Promise<void> {
+  return updateDoc(ref(db, id), { consolidatedSummary: patch.consolidatedSummary, fieldConfidence: patch.fieldConfidence })
 }

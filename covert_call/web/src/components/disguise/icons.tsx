@@ -110,6 +110,13 @@ export const MicOffIcon = (p: IconProps) => (
   </Svg>
 )
 
+export const MicIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M19 11a7 7 0 0 1-14 0M12 19v3" />
+  </Svg>
+)
+
 export const SpeakerIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M11 5 6 9H3v6h3l5 4V5ZM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
