@@ -21,13 +21,16 @@ export function toIncident(id: string, data: Record<string, unknown>): Incident 
 
 type State<T> = { data: T; loading: boolean; error: string | null }
 
-export type IncidentScope = 'open' | 'resolved'
+export type IncidentScope = 'open' | 'resolved' | 'all'
 
 // Queue and history each subscribe to only their own slice, so the live queue never downloads the whole case archive.
+// Analytics needs the full set, so 'all' skips the status filter entirely.
 export const scopeQuery = (scope: IncidentScope) =>
   scope === 'resolved'
     ? query(collection(db, INCIDENTS), where('response.status', '==', 'resolved'))
-    : query(collection(db, INCIDENTS), where('response.status', 'in', ['new', 'acknowledged', 'in_progress']))
+    : scope === 'open'
+      ? query(collection(db, INCIDENTS), where('response.status', 'in', ['new', 'acknowledged', 'in_progress']))
+      : query(collection(db, INCIDENTS))
 
 export function useIncidents(scope: IncidentScope): State<Incident[]> {
   const [state, setState] = useState<State<Incident[]>>({ data: [], loading: true, error: null })

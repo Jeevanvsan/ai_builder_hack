@@ -1,33 +1,27 @@
 import { useState, type FormEvent } from 'react'
 import { addNote } from '../lib/responseActions'
-import { useResponder } from '../lib/responderContext'
-import ResponderNameDialog from './ResponderNameDialog'
+import { useAuth } from '../lib/authContext'
+import { responderLabel } from '../lib/auth'
 
 export default function NoteForm({ incidentId }: { incidentId: string }) {
-  const { name, setName } = useResponder()
+  const { user, responder } = useAuth()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [askName, setAskName] = useState(false)
 
-  const save = async (responder: string) => {
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!text.trim()) return
     setBusy(true)
     setError(null)
     try {
-      await addNote(incidentId, responder, text.trim())
+      await addNote(incidentId, responderLabel(user, responder), text.trim())
       setText('')
     } catch (e) {
       setError(`Couldn't save the note: ${(e as Error).message}`)
     } finally {
       setBusy(false)
     }
-  }
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    if (!text.trim()) return
-    if (!name) return setAskName(true)
-    void save(name)
   }
 
   return (
@@ -42,17 +36,6 @@ export default function NoteForm({ incidentId }: { incidentId: string }) {
       />
       <button type="submit" className="btn" disabled={busy || !text.trim()}>Add note</button>
       {error && <p className="action-error" role="alert">{error}</p>}
-      {askName && (
-        <ResponderNameDialog
-          initial={name}
-          onClose={() => setAskName(false)}
-          onSave={(n) => {
-            setName(n)
-            setAskName(false)
-            void save(n)
-          }}
-        />
-      )}
     </form>
   )
 }

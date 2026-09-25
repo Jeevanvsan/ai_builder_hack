@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useResponder } from '../lib/responderContext'
+import { useAuth } from '../lib/authContext'
+import { responderLabel } from '../lib/auth'
 import { useIncidentAlerts, type AlertPermission } from '../lib/useIncidentAlerts'
 import IncidentToasts from './IncidentToasts'
-import ResponderNameDialog from './ResponderNameDialog'
+import ResponderMenu from './ResponderMenu'
 
 const alertLabel: Record<AlertPermission, string> = {
   default: 'Enable alerts',
@@ -13,8 +13,7 @@ const alertLabel: Record<AlertPermission, string> = {
 }
 
 export default function Layout() {
-  const { name, setName } = useResponder()
-  const [editing, setEditing] = useState(false)
+  const { user, responder, isAdmin } = useAuth()
   const alerts = useIncidentAlerts()
 
   return (
@@ -26,10 +25,6 @@ export default function Layout() {
           <span className="brand-sub">Monitoring Dashboard</span>
         </div>
         <div className="topbar-right">
-          <nav className="nav">
-            <NavLink to="/" end>Live queue</NavLink>
-            <NavLink to="/history">Case history</NavLink>
-          </nav>
           <button
             type="button"
             className={`alerts-toggle alerts-${alerts.permission}`}
@@ -38,11 +33,16 @@ export default function Layout() {
           >
             {alertLabel[alerts.permission]}
           </button>
-          <button type="button" className="responder-chip" onClick={() => setEditing(true)}>
-            {name ? <>On shift: <strong>{name}</strong></> : 'Set your name'}
-          </button>
+          <ResponderMenu name={responderLabel(user, responder)} />
         </div>
       </header>
+      <nav className="subnav">
+        <NavLink to="/" end>Live queue</NavLink>
+        <NavLink to="/history">Case history</NavLink>
+        <NavLink to="/analytics">Analytics</NavLink>
+        {isAdmin && <NavLink to="/admin/responders">Responder management</NavLink>}
+        {isAdmin && <NavLink to="/admin/performance">Responder performance</NavLink>}
+      </nav>
       {alerts.soundBlocked && (
         <button type="button" className="sound-banner" onClick={alerts.enable}>
           <span className="live-dot" />
@@ -53,13 +53,6 @@ export default function Layout() {
         <Outlet />
       </main>
       <IncidentToasts toasts={alerts.toasts} onDismiss={alerts.dismiss} />
-      {editing && (
-        <ResponderNameDialog
-          initial={name}
-          onSave={(n) => { setName(n); setEditing(false) }}
-          onClose={() => setEditing(false)}
-        />
-      )}
     </div>
   )
 }
