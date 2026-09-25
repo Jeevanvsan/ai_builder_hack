@@ -156,6 +156,18 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-25 20:54 IST: swept the rest of the backlog — every code-doable item on `phase-2` is now done.**
+  - **Analytics (Epic 14):** channel donut + AI-insights prompt now count all four channels + an SOS total.
+  - **Order tracking (8.3):** the order-placed screen mirrors responder progress as disguised delivery status.
+  - **Photo + vision (6.1):** silent tap can attach a photo; `photoVision.ts` reads it into danger indicators + scene observations.
+  - **Drive chunked upload (9.2):** recording-so-far uploaded every ~20s (overwrites by filename) so a killed call still leaves footage; Apps Script doc updated.
+  - **Web brand (13.1):** app name centralised in `web/src/lib/brand.ts`.
+  - **7.2** marked superseded by Epic 10.
+  - **Submission docs (Epic 5):** `docs/deck.md` (deck content incl. Google-stack table + honesty framing), `docs/demo-script.md` (3-min script), `docs/theme-fit.md` (the settled theme answer — resilience + community, no invented environmental angle), and a rewritten `README.md`. **Please confirm the theme-fit answer** — it's 25% of scoring and was previously unresolved.
+  - **Everything left open in the backlog now genuinely needs a device, our Google account, or a human**: record/edit the video, rehearse, on-phone tests, dark-room test, set up the team Drive folder, the native app's Gemini-AV/WebRTC transport (needs the Expo toolchain + device), and the Bluetooth mesh stretch (hardware). None are code I could finish or verify here.
+  - Verify: tsc + lint + build all clean on web and dashboard. **Phase 2 isn't deployed yet** — deploy from `phase-2` before the submission link is judged.
+
+
 - **2026-09-25 20:39 IST: Dashboard live video is now switchable Back/Front for a dual-camera SOS (`phase-2`).**
   - The SOS now publishes **both** cameras as independent live feeds; the dashboard `LiveVideo` shows a Back/Front toggle when both exist. A single-camera call is unchanged (back only, no toggle).
   - **Data-model (your area): `Incident.videoFront`** added (same shape as `video`); the front feed uses a parallel `videoViewersFront` signaling subcollection. Rules updated for both. `shared/video/signaling.ts` + `publisher.ts` are now camera-aware (default `back`, so the existing call path is untouched).
