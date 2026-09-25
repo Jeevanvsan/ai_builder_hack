@@ -5,9 +5,11 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client",
+    "start:go": "expo start --go",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "prebuild": "expo prebuild"
+    "prebuild": "expo prebuild",
+    "build:preview": "eas build -p android --profile preview"
   },
   "//": "UNTESTED SCAFFOLD (Epic 12) — versions below are indicative. After cloning, run `npx expo install --fix` to align every native module to the installed Expo SDK, then build a dev client (not Expo Go — WebRTC / PCM audio / alternate icons need native code). See README.md.",
   "dependencies": {
@@ -15,6 +17,7 @@
     "@react-navigation/native": "^7.0.0",
     "@react-navigation/native-stack": "^7.0.0",
     "expo": "^53.0.0",
+    "expo-dev-client": "~5.0.0",
     "expo-brightness": "~13.0.0",
     "expo-keep-awake": "~14.0.0",
     "expo-status-bar": "~2.2.0",
