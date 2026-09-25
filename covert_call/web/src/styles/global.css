@@ -627,6 +627,14 @@ img {
   color: var(--muted);
 }
 
+.guest-subtle-link {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  width: fit-content;
+}
+
 .call-cta {
   display: inline-flex;
   align-items: center;
@@ -833,6 +841,62 @@ img {
   margin-bottom: 10px;
 }
 
+.tap-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: -4px 0 12px;
+}
+
+.tap-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tap-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  user-select: none;
+}
+
+.tap-option.is-selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+}
+
+.tap-option-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tap-option-meaning {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.tap-input {
+  width: 100%;
+  font: inherit;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: inherit;
+}
+
+.tap-textarea {
+  resize: vertical;
+}
+
 .cart-line {
   display: grid;
   grid-template-columns: auto 1fr auto 64px;
@@ -1006,7 +1070,7 @@ img {
   margin: 2px 0 0;
 }
 
-/* ---------- Call screen (placeholder) ---------- */
+/* ---------- Call screen ---------- */
 
 .call-page {
   background: var(--call-bg);
@@ -1074,6 +1138,15 @@ img {
 
 .call-btn.end svg {
   transform: rotate(135deg);
+}
+
+.call-btn.active {
+  background: var(--call-end);
+  color: #fff;
+}
+
+.call-btn:disabled {
+  opacity: 0.5;
 }
 
 /* ---------- Motion ---------- */
