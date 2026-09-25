@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { doc, getDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, markHasRecording } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { db } from '../lib/firebase'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
+import { saveCallRecording } from '../lib/gemini/uploadRecording'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
 
 const STATUS_LABEL: Record<CallStatus, string> = {
@@ -30,6 +31,10 @@ export function CallPage() {
   // retrigger the call setup, only the render-time redirect below reacts to those.
   const cartHadItemsOnMount = useRef(cart.count > 0)
   const startedRef = useRef(false)
+  // finishCall is called from two places (the End button, and the model's end_call tool call once the caller
+  // confirms or after 3 silent retries) — guard so whichever fires first wins and the other is a no-op.
+  const endingRef = useRef(false)
+  const finishCallRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     // startedRef makes this a true one-shot for the component's whole lifetime, including across React
@@ -46,7 +51,10 @@ export function CallPage() {
       incidentIdRef.current = id
 
       try {
-        const handle = await startLiveCall(db, id, { onStatusChange: setStatus })
+        const handle = await startLiveCall(db, id, {
+          onStatusChange: setStatus,
+          onCallEnd: () => finishCallRef.current(),
+        })
         callRef.current = handle
       } catch {
         setStatus('failed')
@@ -61,10 +69,12 @@ export function CallPage() {
   }, [status])
 
   const finishCall = async () => {
+    if (endingRef.current) return
+    endingRef.current = true
     const id = incidentIdRef.current
     const call = callRef.current
     const transcript = call?.getTranscript() ?? ''
-    call?.end()
+    const recording = await call?.end()
     setStatus('ended')
 
     if (id) {
@@ -86,11 +96,26 @@ export function CallPage() {
         // Best-effort: the incident's live-extracted fields are already saved even if consolidation/leakage
         // check fails here (e.g. no key configured) — a responder still sees everything gathered during the call.
       }
+
+      if (recording) {
+        try {
+          await saveCallRecording(id, recording)
+          await markHasRecording(db, id)
+        } catch {
+          // Best-effort: losing the recording (e.g. a long call too big for one Firestore document) shouldn't
+          // block ending the call — every other piece of the incident (fields, summary, location) is still saved.
+        }
+      }
+
       zeroTraceExit(db, id, navigate)
     } else {
       navigate('/', { replace: true })
     }
   }
+
+  useEffect(() => {
+    finishCallRef.current = () => void finishCall()
+  })
 
   const toggleMute = () => {
     const nowMuted = callRef.current?.toggleMute() ?? !muted

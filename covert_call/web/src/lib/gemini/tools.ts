@@ -14,7 +14,7 @@ export const REPORT_SITUATION: FunctionDeclaration = {
       dangerIndicators: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
-        description: 'Short tags for any danger signals mentioned, e.g. "weapon mentioned", "aggressor present", "injury"',
+        description: 'Short tags for the NEW danger signals learned from the latest answer only — earlier tags are kept automatically, so do not resend them. Give each distinct fact its own specific tag, e.g. "weapon: knife", "attacker still present", "victim injured - bleeding", "attacker on scooter", "child involved", "3+ people involved".',
       },
       urgency: { type: Type.STRING, enum: ['low', 'medium', 'high'], description: 'How urgent the situation seems' },
       notes: { type: Type.STRING, description: 'Any other free-form detail worth passing to a responder' },
@@ -46,4 +46,10 @@ export const REPORT_STRESS_LEVEL: FunctionDeclaration = {
   },
 }
 
-export const LIVE_CALL_TOOLS: Tool[] = [{ functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL] }]
+export const END_CALL: FunctionDeclaration = {
+  name: 'end_call',
+  description: 'Call this the moment you finish your closing line (e.g. "your order\'s on its way, thanks for calling") — after the caller has confirmed they\'re done, whether that means they gave a clear closing signal or you\'ve gathered what you reasonably can. This actually ends the call, so only call it once you are done speaking.',
+  parameters: { type: Type.OBJECT, properties: {} },
+}
+
+export const LIVE_CALL_TOOLS: Tool[] = [{ functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, END_CALL] }]

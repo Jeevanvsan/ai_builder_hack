@@ -129,6 +129,19 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Deployed live to https://quickbite-5cde0.web.app (default hosting site — **not** the dashboard's site, kept
   strictly separate throughout). Committed locally on `epic-1-2-3-gemini-live` (`c5ed12a`) — **not yet pushed or
   PR'd**, since this is Ameen's ownership area; waiting for his go-ahead before opening a PR against `main`.
+- **Follow-up round from live phone testing (2026-09-25, ~6:00 pm IST), deployed to the web site only, not committed yet:**
+  call recording (mic + AI voice, stored as base64 in the Firestore subcollection `incidents/{id}/recording/audio`
+  because Storage needs the Blaze plan) with a player on the dashboard detail page; persona renamed to "Mia" with
+  the Kore voice; multilingual; pin code confirmed digit by digit plus a Nominatim pin-code fallback; persona
+  fully rewritten as an order-taking call (not order confirmation) with **options-only questions**: 13 disguised
+  scenario codes plus a fixed drill-down code set (headcount, weapon type, clothing, vehicle, colour, movement,
+  injury, and more), urgency always asked, read-back before goodbye; silence watchdog in code (Live only speaks
+  after hearing the caller); transcription turned on (the transcript was empty before, so summaries said "no
+  transcript"); danger indicators and notes now build up over the call instead of being overwritten; echo
+  cancellation on the mic. Dashboard now shows "Not reported" instead of "Listening…" once a call ends
+  (dashboard code only, **not deployed** to the dashboard site). Firestore rules were redeployed for the recording subcollection.
+- 2026-09-25 ~6:15 pm IST: the tool description and prompt now tell the model to send only new facts, each as
+  its own specific danger tag, instead of repeating one general tag or rephrasing old notes. Deployed to the web site.
 
 ## Next up for Jeevan
 - Get Ameen's sign-off before pushing/opening a PR for `epic-1-2-3-gemini-live` — it's his scope, picked up while he's busy, not something to merge without his review.

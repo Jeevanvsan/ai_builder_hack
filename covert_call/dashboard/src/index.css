@@ -342,19 +342,22 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "map fields stress" "map timeline timeline" "summary summary summary";
+  grid-template-areas: "map fields stress" "map timeline timeline" "recording recording recording" "summary summary summary";
   gap: 1rem;
 }
 /* With a camera feed: medium video box in the right column; Full screen opens the large view. */
-.detail-grid.has-video { grid-template-areas: "map fields video" "map stress video" "timeline timeline timeline" "summary summary summary"; }
+.detail-grid.has-video { grid-template-areas: "map fields video" "map stress video" "timeline timeline timeline" "recording recording recording" "summary summary summary"; }
 .map-card { grid-area: map; display: flex; flex-direction: column; }
 .fields-card { grid-area: fields; }
 .stress-card { grid-area: stress; }
 .timeline-card { grid-area: timeline; }
+.recording-card { grid-area: recording; }
 .summary-card { grid-area: summary; }
 .video-card { grid-area: video; display: flex; flex-direction: column; }
 .detail-live .summary-card { border-style: dashed; }
 .detail-ended .summary-card { border-color: var(--text); }
+
+.recording-player { width: 100%; margin: 0.5rem 0; }
 
 .map { flex: 1; min-height: 340px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
 .map-loading { display: flex; align-items: center; justify-content: center; color: var(--muted); background: #f3f5f8; }
