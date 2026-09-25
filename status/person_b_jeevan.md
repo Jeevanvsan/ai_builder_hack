@@ -156,6 +156,12 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-25 20:39 IST: Dashboard live video is now switchable Back/Front for a dual-camera SOS (`phase-2`).**
+  - The SOS now publishes **both** cameras as independent live feeds; the dashboard `LiveVideo` shows a Back/Front toggle when both exist. A single-camera call is unchanged (back only, no toggle).
+  - **Data-model (your area): `Incident.videoFront`** added (same shape as `video`); the front feed uses a parallel `videoViewersFront` signaling subcollection. Rules updated for both. `shared/video/signaling.ts` + `publisher.ts` are now camera-aware (default `back`, so the existing call path is untouched).
+  - Verified: tsc + lint + build clean on web and dashboard. Live WebRTC still needs a real-device test.
+
+
 - **2026-09-25 20:31 IST: Epics 12 + 13 (native app foundation + personalisation) scaffolded on `phase-2` — UNTESTED.**
   - `covert_call/native/` is now a React Native (Expo) app: navigation + disguise screens (Home with heart-double-tap SOS, Cart, Checkout coded-order, Order placed, Silent tap, Settings), sharing `shared/incidents`, `shared/video`, `shared/codes`. See `native/README.md`.
   - **I moved `web/src/lib/codes.ts` → `shared/codes.ts`** so web + native share one coded-meaning table (Story 8.1's intent). Web imports updated; web still typechecks/builds. Heads-up in case you have local edits to that file.

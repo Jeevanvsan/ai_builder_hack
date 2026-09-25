@@ -1,16 +1,25 @@
 import { addDoc, doc, onSnapshot, updateDoc, type Firestore, type Unsubscribe } from 'firebase/firestore'
 import { INCIDENTS } from '../incidents/client.ts'
-import { HEARTBEAT_MS, ICE_SERVERS, publisherCandidates, toPlain, viewerCandidates, viewerDoc, viewersCollection } from './signaling.ts'
+import { HEARTBEAT_MS, ICE_SERVERS, publisherCandidates, toPlain, videoField, viewerCandidates, viewerDoc, viewersCollection, type Camera } from './signaling.ts'
 
-// Called by the QuickBite app with the back-camera stream. Each dashboard that opens the incident gets its own
-// direct peer connection. Returns a stop function that closes every connection and marks the feed ended.
-export async function startVideoPublisher(db: Firestore, incidentId: string, stream: MediaStream): Promise<() => Promise<void>> {
+// Called by the QuickBite app with a camera stream. `camera` defaults to 'back' (the call, Epic 9) and can be
+// 'front' for the SOS's second feed (Epic 11) — each camera streams and signals independently, so a dashboard can
+// switch between them. Each dashboard that opens the incident gets its own direct peer connection. Returns a stop
+// function that closes every connection and marks this camera's feed ended.
+export async function startVideoPublisher(
+  db: Firestore,
+  incidentId: string,
+  stream: MediaStream,
+  opts: { camera?: Camera } = {},
+): Promise<() => Promise<void>> {
+  const camera: Camera = opts.camera ?? 'back'
+  const field = videoField(camera)
   const startedAt = new Date().toISOString()
   const incident = doc(db, INCIDENTS, incidentId)
-  await updateDoc(incident, { video: { status: 'live', startedAt, endedAt: null, heartbeatAt: startedAt } })
+  await updateDoc(incident, { [field]: { status: 'live', startedAt, endedAt: null, heartbeatAt: startedAt } })
   // Heartbeat lets dashboards tell a live feed from one whose sender vanished without calling stop().
   const heartbeat = setInterval(() => {
-    void updateDoc(incident, { 'video.heartbeatAt': new Date().toISOString() }).catch(() => {})
+    void updateDoc(incident, { [`${field}.heartbeatAt`]: new Date().toISOString() }).catch(() => {})
   }, HEARTBEAT_MS)
 
   const peers = new Map<string, { pc: RTCPeerConnection; unsubscribe: Unsubscribe }>()
@@ -27,14 +36,14 @@ export async function startVideoPublisher(db: Firestore, incidentId: string, str
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     stream.getTracks().forEach((track) => pc.addTrack(track, stream))
     pc.onicecandidate = (e) => {
-      if (e.candidate) void addDoc(publisherCandidates(db, incidentId, viewerId), e.candidate.toJSON())
+      if (e.candidate) void addDoc(publisherCandidates(db, incidentId, viewerId, camera), e.candidate.toJSON())
     }
     await pc.setRemoteDescription(offer)
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
-    await updateDoc(viewerDoc(db, incidentId, viewerId), { answer: toPlain(answer) })
+    await updateDoc(viewerDoc(db, incidentId, viewerId, camera), { answer: toPlain(answer) })
     // Remote description is set before subscribing, so viewer candidates can be applied as they arrive.
-    const unsubscribe = onSnapshot(viewerCandidates(db, incidentId, viewerId), (snap) => {
+    const unsubscribe = onSnapshot(viewerCandidates(db, incidentId, viewerId, camera), (snap) => {
       for (const c of snap.docChanges()) {
         if (c.type === 'added') pc.addIceCandidate(new RTCIceCandidate(c.doc.data())).catch(() => {})
       }
@@ -42,7 +51,7 @@ export async function startVideoPublisher(db: Firestore, incidentId: string, str
     peers.set(viewerId, { pc, unsubscribe })
   }
 
-  const unsubscribeViewers = onSnapshot(viewersCollection(db, incidentId), (snap) => {
+  const unsubscribeViewers = onSnapshot(viewersCollection(db, incidentId, camera), (snap) => {
     for (const change of snap.docChanges()) {
       const viewerId = change.doc.id
       if (change.type === 'removed') {
@@ -61,6 +70,6 @@ export async function startVideoPublisher(db: Firestore, incidentId: string, str
     unsubscribeViewers()
     ;[...peers.keys()].forEach(close)
     stream.getTracks().forEach((t) => t.stop())
-    await updateDoc(incident, { 'video.status': 'ended', 'video.endedAt': new Date().toISOString() })
+    await updateDoc(incident, { [`${field}.status`]: 'ended', [`${field}.endedAt`]: new Date().toISOString() })
   }
 }

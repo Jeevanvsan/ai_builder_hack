@@ -7,6 +7,7 @@ import {
   toPlain,
   viewerCandidates,
   viewersCollection,
+  type Camera,
 } from '../../../shared/video/signaling.ts'
 import type { Incident } from '../../../shared/incidents/types'
 import { db } from './firebase'
@@ -18,9 +19,10 @@ const CONNECT_TIMEOUT_MS = 20_000
 
 type Connection = { key: string; state: 'live' | 'failed'; stream: MediaStream | null }
 
-// Opens a receive-only peer connection to the incident's live camera feed. Reconnects automatically when the
-// phone starts a new feed session (new startedAt) or when the responder hits retry.
-export function useVideoViewer(incidentId: string, video: Incident['video'], viewerName: string) {
+// Opens a receive-only peer connection to one of the incident's live camera feeds (`camera`, default 'back').
+// Reconnects automatically when the phone starts a new feed session (new startedAt), when the responder switches
+// camera, or when they hit retry.
+export function useVideoViewer(incidentId: string, video: Incident['video'], viewerName: string, camera: Camera = 'back') {
   const [attempt, setAttempt] = useState(0)
   const [conn, setConn] = useState<Connection | null>(null)
   const now = useNow(5_000)
@@ -29,13 +31,13 @@ export function useVideoViewer(incidentId: string, video: Incident['video'], vie
   const heartbeat = video?.heartbeatAt ?? video?.startedAt
   const lost = video?.status === 'live' && !!heartbeat && now - Date.parse(heartbeat) > HEARTBEAT_STALE_MS
   const live = video?.status === 'live' && !lost
-  const key = `${incidentId}|${video?.startedAt ?? ''}|${attempt}`
+  const key = `${incidentId}|${camera}|${video?.startedAt ?? ''}|${attempt}`
 
   useEffect(() => {
     if (!live) return
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
     pc.addTransceiver('video', { direction: 'recvonly' })
-    const viewerRef = doc(viewersCollection(db, incidentId))
+    const viewerRef = doc(viewersCollection(db, incidentId, camera))
     const pending: RTCIceCandidateInit[] = []
     const unsubscribers: (() => void)[] = []
     let remote: MediaStream | null = null
@@ -47,7 +49,7 @@ export function useVideoViewer(incidentId: string, video: Incident['video'], vie
     const fail = () => setConn({ key, state: 'failed', stream: null })
 
     pc.onicecandidate = (e) => {
-      if (e.candidate) void addDoc(viewerCandidates(db, incidentId, viewerRef.id), e.candidate.toJSON())
+      if (e.candidate) void addDoc(viewerCandidates(db, incidentId, viewerRef.id, camera), e.candidate.toJSON())
     }
     pc.ontrack = (e) => {
       remote = e.streams[0] ?? new MediaStream([e.track])
@@ -74,7 +76,7 @@ export function useVideoViewer(incidentId: string, video: Incident['video'], vie
             // Candidates that arrived before the answer are buffered, then applied once it's in place.
             pending.splice(0).forEach((c) => pc.addIceCandidate(c).catch(() => {}))
           }),
-          onSnapshot(publisherCandidates(db, incidentId, viewerRef.id), (snap) => {
+          onSnapshot(publisherCandidates(db, incidentId, viewerRef.id, camera), (snap) => {
             for (const c of snap.docChanges()) {
               if (c.type !== 'added') continue
               const candidate = c.doc.data() as RTCIceCandidateInit

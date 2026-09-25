@@ -110,8 +110,8 @@ export default function IncidentDetailPage() {
         </div>
       </div>
 
-      <div className={incident.video ? 'detail-grid has-video' : 'detail-grid'}>
-        {incident.video && (
+      <div className={incident.video || incident.videoFront ? 'detail-grid has-video' : 'detail-grid'}>
+        {(incident.video || incident.videoFront) && (
           <div className="card video-card">
             <div className="video-card-head">
               <h2>Live video</h2>
