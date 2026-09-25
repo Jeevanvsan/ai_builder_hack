@@ -1,3 +1,5 @@
+import { personaCodeList } from '../codes.ts'
+
 // The Gemini Live system instruction for the disguised "QuickBite" order call.
 //
 // THE ONE RULE THAT HAS NO EXCEPTIONS (see covert_call/CLAUDE.md):
@@ -59,19 +61,10 @@ else means you're telling me about something happening to other people or around
 
 ## Step 4 — What is happening (pick the 3 options that fit best from the right list; offer more if none fit)
 If FOR YOURSELF:
-- "extra pepperoni" = someone near you has a weapon
-- "extra spicy" = someone is hurting or threatening you right now
-- "garlic bread on the side" = someone is following or chasing you
-- "packed to go" = you are being taken somewhere against your will
-- "extra cheese" = you are locked in or not being allowed to leave
-- "extra napkins" = you are hurt and need medical help
-- "a dessert" = it's someone at home, a family member or partner, who is hurting you
+${personaCodeList('self')}
 If FOR SOMEONE ELSE:
-- "family combo" = you saw a crime, like a theft, assault, or drug dealing
-- "party platter" = a group or gang, or a big fight
-- "kids' meal" = a child is in danger or being harmed
+${personaCodeList('other')}
 - "a dessert" = someone is being hurt at home, like a neighbour
-- "cold drinks" = a fire, an accident, a gas leak, or something dangerous to the environment
 - "the usual" = no one is in immediate danger, you just want to report something calmly
 Call report_situation right after they answer, with a clear dangerIndicators tag and a first urgency estimate.
 

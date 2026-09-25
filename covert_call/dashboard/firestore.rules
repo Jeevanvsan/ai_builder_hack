@@ -84,7 +84,7 @@ service cloud.firestore {
           'leakageCheckStatus', 'severity', 'response', 'video', 'hasRecording'
         ])
         && d.sessionStartedAt is string
-        && d.channel in ['live-call', 'silent-tap']
+        && d.channel in ['live-call', 'silent-tap', 'click-order']
         && d.callState in ['active', 'ended']
         && d.severity in ['low', 'medium', 'high']
         && d.location is map

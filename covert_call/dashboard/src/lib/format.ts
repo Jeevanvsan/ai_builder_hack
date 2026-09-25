@@ -11,6 +11,21 @@ export function statusLabel(status: string): string {
   return status.replace('_', ' ')
 }
 
+// How each incident channel reads to a responder. Kept in one place so every view (queue, detail, history,
+// alerts, timeline) labels a channel the same way, including the Epic 8 "click & order" path.
+export function channelLabel(channel: string): string {
+  switch (channel) {
+    case 'live-call':
+      return 'Voice call'
+    case 'silent-tap':
+      return 'Silent tap'
+    case 'click-order':
+      return 'Coded order'
+    default:
+      return channel
+  }
+}
+
 export function formatElapsed(fromIso: string, now: number): string {
   const total = Math.max(0, Math.floor((now - Date.parse(fromIso)) / 1000))
   const h = Math.floor(total / 3600)

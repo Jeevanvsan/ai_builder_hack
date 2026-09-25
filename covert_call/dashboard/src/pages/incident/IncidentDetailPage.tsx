@@ -10,7 +10,7 @@ import NoteForm from '../../components/NoteForm'
 import ResponseActions from '../../components/ResponseActions'
 import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
-import { formatElapsed, formatTime, statusLabel } from '../../lib/format'
+import { channelLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
 import { useAuth } from '../../lib/authContext'
 import { responderLabel } from '../../lib/auth'
@@ -84,7 +84,7 @@ export default function IncidentDetailPage() {
             </LiveValue>
           </h1>
           <p className="muted">
-            {incident.channel === 'live-call' ? 'Voice call' : 'Silent tap'} · started {formatTime(incident.sessionStartedAt)}
+            {channelLabel(incident.channel)} · started {formatTime(incident.sessionStartedAt)}
             {incident.response.acknowledgedBy && ` · handled by ${incident.response.acknowledgedBy}`}
           </p>
         </div>

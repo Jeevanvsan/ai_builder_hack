@@ -1,10 +1,11 @@
 import type { Incident } from '../../../shared/incidents/types'
+import { channelLabel } from './format'
 
 export type TimelineEvent = { at: string; label: string; tone?: 'live' | 'high' | 'done' }
 
 export function buildTimeline(i: Incident): TimelineEvent[] {
   const events: (TimelineEvent | null)[] = [
-    { at: i.sessionStartedAt, label: `Session started (${i.channel === 'live-call' ? 'voice call' : 'silent tap'})`, tone: 'live' },
+    { at: i.sessionStartedAt, label: `Session started (${channelLabel(i.channel).toLowerCase()})`, tone: 'live' },
     i.location.rough
       ? {
           at: i.location.rough.capturedAt,

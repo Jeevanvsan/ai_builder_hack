@@ -2,7 +2,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Chip from '../../components/Chip'
 import DataState from '../../components/DataState'
 import Pagination from '../../components/Pagination'
-import { formatElapsed, formatTime } from '../../lib/format'
+import { channelLabel, formatElapsed, formatTime } from '../../lib/format'
 import { useIncidents } from '../../lib/incidentsStore'
 import type { Incident } from '../../../../shared/incidents/types'
 import { useNow } from '../../lib/useNow'
@@ -92,6 +92,7 @@ export default function HistoryPage() {
           <option value="">All channels</option>
           <option value="live-call">Voice call</option>
           <option value="silent-tap">Silent tap</option>
+          <option value="click-order">Coded order</option>
         </select>
         <select className="input" value={handledBy} onChange={(e) => setFilter('by', e.target.value)} aria-label="Handled by">
           <option value="">Anyone</option>
@@ -136,7 +137,7 @@ export default function HistoryPage() {
                   <tr key={i.id} className={`row-${i.severity}`} onClick={() => navigate(`/incident/${i.id}`)}>
                     <td className="mono"><Link to={`/incident/${i.id}`}>{i.id}</Link></td>
                     <td><Chip tone={i.severity} filled>{i.severity}</Chip></td>
-                    <td className="nowrap">{i.channel === 'live-call' ? 'Voice call' : 'Silent tap'}</td>
+                    <td className="nowrap">{channelLabel(i.channel)}</td>
                     <td className="mono">{i.response.resolvedAt ? formatTime(i.response.resolvedAt) : '—'}</td>
                     <td className="mono">{i.response.resolvedAt ? formatElapsed(i.sessionStartedAt, Date.parse(i.response.resolvedAt)) : '—'}</td>
                     <td className="nowrap">{i.response.acknowledgedBy ?? '—'}</td>

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MenuItem } from '../../data/menu'
+import { CODE_BY_ID } from '../../lib/codes'
 import { formatRupees, useCart } from '../../state/cart'
 import { CloseIcon, StarIcon, VegMark } from './icons'
 import { QtyStepper } from './QtyStepper'
@@ -7,6 +8,19 @@ import { QtyStepper } from './QtyStepper'
 export function ItemSheet({ item, onClose }: { item: MenuItem; onClose: () => void }) {
   const cart = useCart()
   const [qty, setQty] = useState(1)
+  // Long-press the image to reveal what a coded item really reports (Epic 8, Story 8.1). Ordinary items have no
+  // code, so nothing is ever revealed for them — the disguise is untouched for a normal customer.
+  const code = item.code ? CODE_BY_ID[item.code] : undefined
+  const [revealed, setRevealed] = useState(false)
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const startPress = () => {
+    if (!code) return
+    pressTimer.current = setTimeout(() => setRevealed(true), 500)
+  }
+  const endPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+  }
+  useEffect(() => () => { if (pressTimer.current) clearTimeout(pressTimer.current) }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -25,7 +39,17 @@ export function ItemSheet({ item, onClose }: { item: MenuItem; onClose: () => vo
         <button type="button" className="sheet-close" onClick={onClose} aria-label="Close">
           <CloseIcon size={18} />
         </button>
-        <img className="sheet-img" src={item.image} alt={item.name} width={640} height={480} />
+        <img
+          className="sheet-img"
+          src={item.image}
+          alt={item.name}
+          width={640}
+          height={480}
+          onPointerDown={startPress}
+          onPointerUp={endPress}
+          onPointerLeave={endPress}
+        />
+        {revealed && code && <p className="code-reveal">{code.meaning}</p>}
         <div className="sheet-body">
           <div className="item-tags">
             <VegMark veg={item.veg} />
