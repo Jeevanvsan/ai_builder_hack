@@ -54,12 +54,12 @@ build (Option B). This is the quickest way to check the app and the dashboard wi
 This produces a real, installable app with the native modules. It builds on Expo's servers and needs a free Expo
 account.
 ```bash
-npm i -g eas-cli
-eas login
+# use npx (no global install / PATH needed)
+npx eas-cli login
 npx expo install @config-plugins/react-native-webrtc   # the WebRTC config plugin app.json needs
-eas init                                                # links/creates the Expo project (first time)
+npx eas-cli init                                                # links/creates the Expo project (first time)
 # Cloud builds don't read native/.env — provide the Firebase values as EAS env vars once:
-eas env:create --environment preview --name EXPO_PUBLIC_FIREBASE_API_KEY --value "..."
+npx eas-cli env:create --environment preview --name EXPO_PUBLIC_FIREBASE_API_KEY --value "..."
 #   ...repeat for AUTH_DOMAIN, PROJECT_ID, APP_ID
 npm run build:preview                                   # = eas build -p android --profile preview
 ```
