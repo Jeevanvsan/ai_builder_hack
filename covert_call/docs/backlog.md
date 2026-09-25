@@ -269,22 +269,22 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 8.1
 **As a person who can't safely talk, I want the menu items and add-ons I pick to carry a meaning, so that an ordinary-looking order tells responders what is happening.**
-- [ ] Move the scenario codes and drill-down codes out of `persona.ts` into one shared code table (e.g. `web/src/lib/codes.ts`) used by both the persona prompt and the menu — one source of truth, so the call and the cart never disagree
-- [ ] Make sure the menu (`data/menu.ts`) contains an item or add-on for every scenario code (extra pepperoni, garlic bread, kids' meal, party platter, cold drinks, dessert …) and for the key drill-downs (quantity = headcount, size, etc.)
-- [ ] Long-press on an item or add-on reveals its real meaning, styled like a normal app hint — reuse the long-press behaviour from `SilentTapPage.tsx`
-- [ ] QA: the menu still reads as a normal restaurant menu; nothing looks like a list of emergencies
+- [x] Scenario codes now live in one shared table (`web/src/lib/codes.ts`); `persona.ts` builds its Step 4 lists from it via `personaCodeList()`, so the call and the cart can't disagree. (Drill-down codes beyond quantity=headcount stay call-only for now — see 8.2 note.)
+- [x] Every scenario code has a menu presence in `data/menu.ts` (4 mapped onto existing items, 7 added as add-ons/items via a new optional `code` field); quantity of a coded item = headcount
+- [x] Long-press the image in the item detail sheet (`ItemSheet.tsx`) reveals a coded item's real meaning; ordinary items reveal nothing (same 500ms long-press pattern as `SilentTapPage.tsx`)
+- [x] QA: coded items read as normal menu entries/add-ons; no visible hint until long-pressed
 
 ### User Story 8.2
 **As a responder, I want a placed order to arrive as a decoded incident, so that I can act on it like any other report.**
-- [ ] Wire "Place order" → `startIncident({ channel: 'click-order' })`, then decode the cart into `updateLiveFields()` (danger indicators from coded items, people count from quantity, urgency from the delivery-time choice, rider note → notes)
-- [ ] Delivery address "Change" → `confirmAddress()`; otherwise the rough GPS/IP location is used
-- [ ] Severity derived from the decoded fields via the existing `deriveSeverity()`
+- [x] `CheckoutPage.tsx` "Place order" → `startIncident({ channel: 'click-order' })` + `decodeOrder()` → `updateLiveFields()` (indicators, people count from qty, urgency from a new delivery-speed selector). Only fires when the cart has coded items — an ordinary order raises no incident.
+- [x] Rough GPS/IP location attached automatically by `startIncident()`. Address "Change" → `confirmAddress()` NOT built yet (the Change button stays inert); rough location is used, per the plan's default.
+- [x] Severity computed by `deriveSeverity()` inside `updateLiveFields()` from the decoded indicators/urgency
 
 ### User Story 8.3
 **As a person placing a coded order, I want to see a normal "order placed" screen, so that anyone watching sees a finished food order.**
-- [ ] Build an "Order placed" / order-tracking screen with a believable ETA, then clear the cart and history the same way as `zeroTraceExit()`
-- [ ] Optional: tracking status mirrors the responder's progress in disguise ("Rider assigned" = acknowledged, "On the way" = response started)
-- [ ] Verify: an order that was sent and one that was backed out of look the same afterwards
+- [x] `OrderPlacedPage.tsx` (`/order-placed`): success + order ID + ETA + status steps; navigates with `replace` and clears the cart, so back doesn't return to checkout
+- [ ] Optional: tracking status mirrors the responder's progress in disguise — not built (optional)
+- [x] A coded order and an ordinary order both land on the identical order-placed screen
 
 ---
 
@@ -422,8 +422,8 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 ### User Story 14.1
 **As a responder, I want SOS and click-order incidents to stand out and read clearly, so that I can tell a silent hostage SOS from an ordinary report at a glance.**
 - [ ] Extend `types.ts` + `firestore.rules` with the Phase 2 fields (see top of this section), agreed with Person A
-- [ ] SOS badge + scenario label ("Hostage") in the live queue and on the detail page; channel labels for `click-order` / `silent-sos`
-- [ ] Include the new channels in the Case history and Analytics filters
+- [~] Channel label for `click-order` ("Coded order") added everywhere via a shared `channelLabel()` in `dashboard/src/lib/format.ts` (queue, detail, history, toasts, alerts, timeline). SOS badge + scenario label + `silent-sos` label still pending (Epic 11).
+- [~] `click-order` added to the Case history channel filter. Analytics channel breakdown + `silent-sos` filter still pending.
 
 ### User Story 14.2
 **As a responder, I want to see what the AI saw, what the caller was told, and the saved video, so that I have the full picture in one place.**

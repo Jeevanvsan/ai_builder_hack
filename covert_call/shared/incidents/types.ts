@@ -1,6 +1,6 @@
 // The Firestore `incidents` document shape (docs/quickbite_plan.md §5b). Shared by the QuickBite app and the dashboard.
 
-export type Channel = 'live-call' | 'silent-tap'
+export type Channel = 'live-call' | 'silent-tap' | 'click-order'
 export type CallState = 'active' | 'ended'
 export type Severity = 'low' | 'medium' | 'high'
 export type ResponseStatus = 'new' | 'acknowledged' | 'in_progress' | 'resolved'

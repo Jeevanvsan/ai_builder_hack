@@ -6,7 +6,7 @@ import Pagination from '../../components/Pagination'
 import { useIncidents } from '../../lib/incidentsStore'
 import { isUnviewed, rankOpenIncidents } from '../../lib/ranking'
 import { usePagination } from '../../lib/usePagination'
-import { formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
+import { channelLabel, formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
 import { useNow } from '../../lib/useNow'
 
 export default function QueuePage() {
@@ -88,7 +88,7 @@ export default function QueuePage() {
                     ) : (
                       <span className="muted-inline">Ended</span>
                     )}
-                    <div className="sub">{i.channel === 'live-call' ? 'Voice call' : 'Silent tap'}</div>
+                    <div className="sub">{channelLabel(i.channel)}</div>
                   </td>
                   <td>{f.peopleCount ?? '—'}</td>
                   <td>

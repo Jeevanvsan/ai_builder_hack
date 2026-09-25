@@ -4,6 +4,7 @@ import { CallPage } from './pages/CallPage'
 import { CartPage } from './pages/CartPage'
 import { CheckoutPage } from './pages/CheckoutPage'
 import { HomePage } from './pages/HomePage'
+import { OrderPlacedPage } from './pages/OrderPlacedPage'
 import { SilentTapPage } from './pages/SilentTapPage'
 
 function ScrollToTop() {
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/order-placed" element={<OrderPlacedPage />} />
         <Route path="/call" element={<CallPage />} />
         <Route path="/delivery-instructions" element={<SilentTapPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
