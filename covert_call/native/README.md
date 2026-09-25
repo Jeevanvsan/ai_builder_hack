@@ -22,29 +22,54 @@ runs under the Firebase JS SDK on React Native. The audio/video pipeline is stub
 - **Alternate home-screen icons** (Epic 13): wire `setIcon()` in `src/lib/appearance.tsx` to a config-plugin lib
   (e.g. `expo-alternate-app-icons`) once icon assets exist; configure it in `app.json`.
 
-## How to test it (on your machine)
+## Test it on your phone by scanning a QR code
 
-You need Node, and either **Android Studio** (an emulator) or a physical device with USB debugging. You must build
-a **dev client** — Expo Go won't work because of `react-native-webrtc`.
-
+First, in every case:
 ```bash
-# 1. Install the workspace (native is a workspace member)
-cd covert_call && npm install
+cd covert_call && npm install          # native is a workspace member
+cd native && npx expo install --fix    # reconcile module versions to the SDK
+```
+Create `native/.env` (Expo uses the `EXPO_PUBLIC_` prefix, **not** `VITE_`):
+```
+EXPO_PUBLIC_FIREBASE_API_KEY=...        # copy the web app's Firebase values
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+EXPO_PUBLIC_FIREBASE_APP_ID=...
+# EXPO_PUBLIC_DRIVE_UPLOAD_URL — only once native recording exists; nothing reads it yet
+```
 
-# 2. Reconcile every Expo/native module to the SDK, and add the WebRTC config plugin app.json needs.
-cd native
-npx expo install --fix
+### Option A — Expo Go (fastest, no install, scan-and-run)
+Install **Expo Go** from the Play Store / App Store on your phone, then:
+```bash
+npm run start:go        # prints a QR code
+```
+Scan the QR with Expo Go (Android) or the Camera app (iOS). The disguise UI and the incident flows work — open the
+live dashboard alongside and watch them land:
+- **Coded order** (add a coded item → Checkout → Place order), **Silent tap**, **Silent SOS** (double-tap heart).
+
+WebRTC is guarded out in Expo Go, so **live video and the Gemini call/observer don't run here** — those need a real
+build (Option B). This is the quickest way to check the app and the dashboard wiring.
+
+### Option B — Installable app via EAS (QR → download + install an APK)
+This produces a real, installable app with the native modules. It builds on Expo's servers and needs a free Expo
+account.
+```bash
+npm i -g eas-cli
+eas login
+npx expo install @config-plugins/react-native-webrtc   # the WebRTC config plugin app.json needs
+eas init                                                # links/creates the Expo project (first time)
+# Cloud builds don't read native/.env — provide the Firebase values as EAS env vars once:
+eas env:create --environment preview --name EXPO_PUBLIC_FIREBASE_API_KEY --value "..."
+#   ...repeat for AUTH_DOMAIN, PROJECT_ID, APP_ID
+npm run build:preview                                   # = eas build -p android --profile preview
+```
+When the build finishes (~10–20 min) EAS prints a **QR code + URL**. Scan it on the phone to download and install
+the APK (allow "install from unknown sources"). This build runs the full app, WebRTC included.
+
+### Option C — local dev client (no Expo account, needs Android Studio)
+```bash
 npx expo install @config-plugins/react-native-webrtc
-
-# 3. Create native/.env (Expo uses the EXPO_PUBLIC_ prefix, NOT VITE_):
-#    EXPO_PUBLIC_FIREBASE_API_KEY=...        (copy the web app's Firebase values)
-#    EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
-#    EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
-#    EXPO_PUBLIC_FIREBASE_APP_ID=...
-#    (EXPO_PUBLIC_DRIVE_UPLOAD_URL — only once native recording exists; nothing reads it yet)
-
-# 4. Generate native projects and run a dev build on a device/emulator:
-npx expo run:android      # or: npx expo run:ios   (macOS + Xcode)
+npx expo run:android      # builds a dev client onto a connected device/emulator, then: npm start → scan QR
 ```
 
 ### Fastest way to see it actually working
