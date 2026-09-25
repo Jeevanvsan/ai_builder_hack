@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import type { Incident } from '../../../shared/incidents/types'
 import { formatTime } from '../lib/format'
-import { useResponder } from '../lib/responderContext'
+import { useAuth } from '../lib/authContext'
+import { responderLabel } from '../lib/auth'
 import { useVideoViewer } from '../lib/useVideoViewer'
 
 export default function LiveVideo({ incident, large = false }: { incident: Incident; large?: boolean }) {
-  const { name } = useResponder()
-  const { state, stream, retry } = useVideoViewer(incident.id, incident.video, name)
+  const { user, responder } = useAuth()
+  const { state, stream, retry } = useVideoViewer(incident.id, incident.video, responderLabel(user, responder))
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {

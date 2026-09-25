@@ -1,25 +1,25 @@
 import { useState } from 'react'
 import { acknowledge, AlreadyClaimedError, resolve, startResponse } from '../lib/responseActions'
-import { useResponder } from '../lib/responderContext'
+import { useAuth } from '../lib/authContext'
+import { responderLabel } from '../lib/auth'
 import type { Incident } from '../../../shared/incidents/types'
 import Modal from './Modal'
-import ResponderNameDialog from './ResponderNameDialog'
 
 type Action = 'acknowledge' | 'start' | 'resolve'
 
 export default function ResponseActions({ incident }: { incident: Incident }) {
-  const { name, setName } = useResponder()
+  const { user, responder } = useAuth()
+  const name = responderLabel(user, responder)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [askName, setAskName] = useState<Action | null>(null)
   const [confirmResolve, setConfirmResolve] = useState(false)
   const status = incident.response.status
 
-  const run = async (action: Action, responder: string) => {
+  const run = async (action: Action, responderName: string) => {
     setBusy(true)
     setError(null)
     try {
-      if (action === 'acknowledge') await acknowledge(incident.id, responder)
+      if (action === 'acknowledge') await acknowledge(incident.id, responderName)
       if (action === 'start') await startResponse(incident.id)
       if (action === 'resolve') await resolve(incident.id, incident.callState === 'active')
     } catch (e) {
@@ -29,9 +29,7 @@ export default function ResponseActions({ incident }: { incident: Incident }) {
     }
   }
 
-  // Every action needs a responder name first, so the record shows who acted.
   const request = (action: Action) => {
-    if (!name) return setAskName(action)
     if (action === 'resolve') return setConfirmResolve(true)
     void run(action, name)
   }
@@ -60,20 +58,6 @@ export default function ResponseActions({ incident }: { incident: Incident }) {
         )}
       </div>
       {error && <p className="action-error" role="alert">{error}</p>}
-
-      {askName && (
-        <ResponderNameDialog
-          initial={name}
-          onClose={() => setAskName(null)}
-          onSave={(n) => {
-            setName(n)
-            const action = askName
-            setAskName(null)
-            if (action === 'resolve') setConfirmResolve(true)
-            else void run(action, n)
-          }}
-        />
-      )}
 
       {confirmResolve && (
         <Modal
