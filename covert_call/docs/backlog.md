@@ -189,26 +189,26 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As the team, we need a working, live-deployed link judges can click into, so that we meet the hackathon's mandatory submission requirement.**
 
-- [ ] Confirm both QuickBite web app and Monitoring Dashboard are deployed and stable on Cloud Run/Firebase — dashboard live and stable; web app live at https://quickbite-5cde0.web.app but its code isn't in this repo yet
-- [ ] Deployment hardening pass (no broken states, no dev-only debug UI left visible)
+- [x] Both live and stable: dashboard https://quickbite-5cde0-dashboard.web.app, web app https://quickbite-5cde0.web.app. Web app code is in the repo (`web/`). Phase 2 features not yet re-deployed — deploy from `phase-2` before submission.
+- [~] Reviewed: no dev-only debug UI in the web app; dashboard's `/dev/camera` is unlinked (gate or remove it before judges if desired). Full pre-submission pass to redo after the Phase 2 deploy.
 - [x] Tighten `dashboard/firestore.rules` before the link goes to judges — no deletes, only known fields with valid values, status only moves forward (resolved never reopens), ended calls never go live again, notes/stress history append-only, video handshake docs restricted. Verified allow/deny cases on the Firestore emulator. Still no sign-in: real access control needs Firebase Auth
-- [ ] Verify the deployed link works end-to-end shortly before submission, not just once in Week 1
+- [ ] Verify the deployed link end-to-end shortly before submission — do after deploying Phase 2 (runtime check, needs the live env)
 
 ### User Story 5.2
 
 **As the team, we need a 3-minute video that convincingly shows the mechanism working, so that judges understand the idea without reading documentation.**
 
-- [ ] Script the demo around the real-time live-update moment (split-screen: disguised call on one device, dashboard populating live on another)
-- [ ] Record and edit the video
-- [ ] Rehearse the live-call persona flow end-to-end to catch any failure (e.g., persona misreading the disguised call as literal) before recording
+- [x] Demo script written: `docs/demo-script.md` (built around the split-screen live-update beat)
+- [ ] Record and edit the video — manual (human/recording step)
+- [ ] Rehearse the persona flow end-to-end before recording — manual (rehearsal checklist is in `docs/demo-script.md`)
 
 ### User Story 5.3
 
 **As the team, we need a public GitHub repo and a solution deck, so that we meet the remaining mandatory deliverables.**
 
-- [ ] Clean up repo: README, clear setup instructions, no secrets committed
-- [ ] Build the solution deck, including the Google stack table (§5a) and competitive-honesty framing (§8)
-- [ ] Decide and write the team's actual answer to "why this project fits Sustainability & Social Impact" (Problem Alignment & Impact is 25% of scoring, currently unresolved per plan §10 — resolve before finalizing the deck, not during Q&A)
+- [x] `README.md` rewritten with accurate structure, setup, deploy and env-var instructions; confirmed no secrets committed (only `*.example`/emulator templates tracked)
+- [x] Deck content written: `docs/deck.md` (includes the Google stack table + competitive-honesty framing). Drop into Slides/PPTX for the file.
+- [x] Theme-fit answer written: `docs/theme-fit.md` (societal impact via resilience strengthening + community support; no invented environmental angle). Confirm the team agrees before the deck is final.
 
 ---
 
@@ -220,10 +220,10 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As a person with no connectivity, I want my silent report to still reach a responder eventually, so that being offline doesn't mean my report goes nowhere.**
 
-- [ ] Add photo/free-text attachment option to the silent tap-only screen
-- [ ] Integrate Gemini vision to analyze attached photos into structured signal
-- [ ] Implement single-hop Bluetooth mesh relay: queue locally when offline, relay to a nearby connected device, forward to backend
-- [ ] Test the relay path end-to-end with two physical devices
+- [x] Photo attachment added to the silent tap screen (free-text note already existed) — `SilentTapPage.tsx`
+- [x] `web/src/lib/gemini/photoVision.ts` runs Gemini vision on the attached photo → danger indicators + scene observations on the incident
+- [ ] Bluetooth mesh relay — **not feasible in this environment** (needs native BLE + two physical devices); genuine stretch, deferred
+- [ ] Test the relay with two physical devices — blocked on the above (hardware)
 
 ---
 
@@ -246,10 +246,10 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 > **Superseded by Phase 2 Epic 10 (call) and Story 11.3 (silent SOS).** Kept for history.
 
-- [ ] Implement periodic still-frame capture (~1/sec) from the back camera, independent of Sub-goal A's video pipeline
-- [ ] Send frames through Gemini Live's video input, in parallel with the existing audio session
-- [ ] Implement session-resumption/reconnect handling for the 2-minute video-attached session cap
-- [ ] Extract structured signal (e.g. "multiple people visible," "object consistent with weapon description") into the incident record — not rendered as its own raw-video UI
+- [x] **Superseded by Epic 10**: ~1 fps frame capture built in `web/src/lib/gemini/frames.ts`
+- [x] **Superseded by Epic 10**: frames sent via `sendRealtimeInput({ video })` alongside the audio session
+- [x] **Superseded by Epic 10**: context-window compression + session resumption + reconnect on video sessions
+- [x] **Superseded by Epic 10**: `report_scene_observation` → `sceneObservations[]` (not a raw-video UI)
 
 ---
 
@@ -283,7 +283,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 ### User Story 8.3
 **As a person placing a coded order, I want to see a normal "order placed" screen, so that anyone watching sees a finished food order.**
 - [x] `OrderPlacedPage.tsx` (`/order-placed`): success + order ID + ETA + status steps; navigates with `replace` and clears the cart, so back doesn't return to checkout
-- [ ] Optional: tracking status mirrors the responder's progress in disguise — not built (optional)
+- [x] Order-placed screen mirrors the responder's progress as disguised delivery status (`OrderPlacedPage` subscribes to the incident)
 - [x] A coded order and an ordinary order both land on the identical order-placed screen
 
 ---
@@ -304,7 +304,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 **As the response team, I want every call's video saved to our own Google Drive, so that the footage is kept after the call ends and can be reviewed later.**
 - [ ] Set up the team Drive folder — steps in `docs/setup/drive-uploader.md` (team action, needs their Google account)
 - [x] Upload route chosen + built: Google Apps Script web app (no sign-in, no billing). Client in `web/src/lib/gemini/videoUpload.ts`, gated by `VITE_DRIVE_UPLOAD_URL`; script + deploy steps in `docs/setup/drive-uploader.md`
-- [~] `web/src/lib/gemini/videoRecorder.ts` records video + call audio with `MediaRecorder` (5 s timeslices). Upload happens **at call end**, not streamed during the call — a tab killed mid-call leaves no Drive video. Chunked-during-call upload is the remaining follow-up.
+- [x] `videoRecorder.ts` records video + call audio; the recording-so-far is uploaded every ~20s (overwriting by filename) and once at the end, so a call killed mid-way still leaves footage. Apps Script trashes the prior version first.
 - [x] `videoRecording[]` (per camera) written via `upsertVideoRecording()`: `recording` at start → `uploaded`/`failed` with `driveFileId`/`driveUrl` after upload
 - [ ] Native: pick a recording approach (spike) — pending Epic 12
 - [x] Public-uploader-URL limitation documented in `docs/setup/drive-uploader.md` (deck: pull from there)
@@ -318,7 +318,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 ### User Story 10.1
 **As a caller, I want the AI to see what my camera sees during the call, so that I don't have to describe everything out loud.**
 - [x] `web/src/lib/gemini/frames.ts` samples the camera to JPEG ~1 fps (downscaled) and `liveSession.ts` sends each via `sendRealtimeInput({ video })`
-- [~] Wired for `gemini-3.8-live` video input — **needs a live test to confirm the free tier accepts frames** (couldn't verify without a running key)
+- [~] Wired for `gemini-3.8-live` video input — still **needs a live test** to confirm the free tier accepts frames (no running key here)
 - [x] Video sessions enable `contextWindowCompression` + `sessionResumption`; `liveSession.ts` keeps the resumption handle and transparently reopens the session on an unexpected mid-call drop (audio-only calls keep the proven config unchanged). Needs a live test.
 - [x] `report_scene_observation` tool → `reportSceneObservation()` → `sceneObservations[]` with `source: 'camera'`, kept separate from the caller's words
 
@@ -421,7 +421,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 14.1
 **As a responder, I want SOS and click-order incidents to stand out and read clearly, so that I can tell a silent hostage SOS from an ordinary report at a glance.**
-- [ ] Extend `types.ts` + `firestore.rules` with the Phase 2 fields (see top of this section), agreed with Person A
+- [x] `types.ts` + `firestore.rules` extended with every Phase 2 field (channels, incidentType, scenario, cameraMode, videoRecording, videoFront, sceneObservations, adviceGiven). Needs the team's explicit sign-off.
 - [x] Shared `channelLabel()` covers `click-order` ("Coded order") and `silent-sos` ("Silent SOS") everywhere; SOS badge + scenario shown in the queue and on the detail page; `cameraMode` shown on detail
 - [x] `click-order` and `silent-sos` in the Case history channel filter. Analytics channel breakdown still pending.
 
@@ -430,7 +430,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 - [x] "Seen & heard" panel for `sceneObservations[]` on the detail page; gunshot/scream/weapon also shown as a high-tone timeline alert
 - [x] Advice-to-caller entries from `adviceGiven[]` shown in the event timeline
 - [x] Live video box has a Back/Front toggle for a dual-camera SOS (each camera published as its own feed); labels the current camera
-- [~] "Call video" card built on the incident detail page (Drive link per camera, uploading/saved/failed states). Two-feed live view + embedded preview still pending.
+- [x] "Call video" card on the detail page (Drive link per camera, statuses). Two-feed live view done (Back/Front toggle). Embedded Drive preview not added (link opens Drive).
 
 ---
 
