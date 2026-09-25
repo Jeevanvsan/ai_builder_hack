@@ -25,7 +25,11 @@ runs under the Firebase JS SDK on React Native. The audio/video pipeline is stub
 ## Run it (on your machine)
 1. `npm install` at the `covert_call/` root (native is a workspace).
 2. `cd native && npx expo install --fix` to align every native module to the installed Expo SDK.
-3. Set `EXPO_PUBLIC_FIREBASE_*` env vars (copy the web app's Firebase values) and, for the call, the Gemini key.
+3. Set env vars in `native/.env` (Expo uses the `EXPO_PUBLIC_` prefix, not `VITE_`):
+   - `EXPO_PUBLIC_FIREBASE_*` — copy the web app's Firebase values.
+   - the Gemini key, for the call.
+   - `EXPO_PUBLIC_DRIVE_UPLOAD_URL` — same Apps Script URL as the web's `VITE_DRIVE_UPLOAD_URL`, **once native video
+     recording is implemented** (it's stubbed today, so nothing reads it yet). See `docs/setup/drive-uploader.md`.
 4. Build a **dev client** (not Expo Go — WebRTC / PCM / alternate icons need native code): `npx expo run:android`.
 
 ## Shared code

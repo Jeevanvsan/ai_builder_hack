@@ -14,6 +14,8 @@ import type { Firestore } from 'firebase/firestore'
 //      same session.sendRealtimeInput({ video }) call the web uses.
 //   4. Live video (Epic 9/11): react-native-webrtc + registerGlobals() (already called in index.ts) lets
 //      shared/video/publisher.ts run unchanged.
+//   5. Drive recording (Epic 9.2): once a native recorder exists, POST the file to the same Apps Script endpoint
+//      as web — read it from process.env.EXPO_PUBLIC_DRIVE_UPLOAD_URL (Expo prefix; web's is VITE_DRIVE_UPLOAD_URL).
 //
 // Everything below the transport — the @google/genai Live session, the persona, the tools, and every
 // shared/incidents write — is identical to the web and should be factored out and reused rather than rewritten.
