@@ -349,30 +349,30 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 11.1
 **As a person being held, I want a hidden double-tap on the heart icon to start a silent SOS, so that I can call for help with one quick, natural gesture.**
-- [ ] Double-tap on the heart in `TopBar.tsx` (within ~400 ms) starts the SOS; a single tap keeps behaving like a normal favourites button
-- [ ] No visible confirmation of any kind; haptics off
-- [ ] Creates the incident immediately: `startIncident({ channel: 'silent-sos', incidentType: 'sos', scenario: 'hostage' })`, starting at critical severity
-- [ ] Same trigger in the native app
+- [x] Double-tap the heart in `TopBar.tsx` (within 400 ms) navigates to `/sos`; a single tap does nothing unusual
+- [x] No visible confirmation; no haptics triggered
+- [x] `SosPage` calls `startIncident({ channel:'silent-sos', incidentType:'sos', scenario:'hostage', severity:'high' })`. (Used 'high' — a new 'critical' level would ripple through severity chips/ranking/rules; deferred. SOS badge distinguishes it.)
+- [ ] Same trigger in the native app — pending Epic 12
 
 ### User Story 11.2
 **As a person being held, I want the phone to look switched off while it keeps recording, so that nobody notices it is working.**
-- [ ] Full-screen black overlay; status bar hidden; all touches swallowed
-- [ ] Keep the device awake so the OS doesn't lock and pause the camera/mic. Web: Screen Wake Lock API + Fullscreen API (the double-tap counts as the user gesture). Native: `expo-keep-awake` + lowest brightness via `expo-brightness`. Web can't dim the screen, so the overlay is black only
-- [ ] As soon as the SOS starts, record from **both the front and the back camera**, plus the mic. The front camera catches whoever is facing the person, the back one the room
-  - Native: run both cameras at once where the phone supports it (iOS multi-camera on newer iPhones, Android concurrent camera on supported devices)
-  - Fallback when both can't run together (most browsers, many phones): switch between front and back every few seconds, so both views are captured
-  - Detect the capability at SOS start and record which mode was used on the incident (`cameraMode: 'dual' | 'alternating' | 'back-only'`)
-- [ ] No preview, flash or shutter sound from either camera; the OS camera indicator is the same disclosed limitation as in 9.1
-- [ ] Secret exit gesture (e.g. triple-tap top-left corner) ends the SOS via `zeroTraceExit()`, stops both cameras, and returns to Home
-- [ ] Test in a dark room: does the screen give off any visible light or flicker?
+- [x] Full-screen black overlay swallows all touches (`SosPage` + `.sos-blackout`). Browser can't hide the OS status bar; the native app can (Epic 12).
+- [x] Screen Wake Lock requested (best-effort) so the OS doesn't pause the camera/mic. Web can't dim the screen (overlay is pure black); native brightness dimming is Epic 12. Fullscreen not force-requested (navigation drops the gesture); the overlay covers the app regardless.
+- [x] Records both cameras + mic where the device allows two streams (`acquireSosMedia`); falls back to back-only otherwise. `cameraMode` ('dual'/'back-only') saved on the incident.
+  - Native: run both cameras at once where supported — pending Epic 12
+  - Time-sliced alternating fallback — native only (Epic 12); web uses dual-or-back-only
+  - [x] Capability detected at SOS start; `cameraMode` recorded
+- [x] No preview/flash/shutter from either camera; OS camera indicator disclosed as unavoidable
+- [x] Three taps in the top-left corner (within 1.5s) end the SOS, stop everything, and `zeroTraceExit()` home
+- [ ] Test in a dark room for any visible light/flicker — pending manual test
 
 ### User Story 11.3
 **As a responder, I want the AI to watch and listen to the silent SOS and fill in the incident live, so that I know what is happening even though nobody is talking to me.**
-- [ ] Silent Gemini Live session: mic + ~1 fps frames from both cameras in (each tagged front or back), no audio played back (text-only response if the model supports it, otherwise the audio is discarded)
-- [ ] "Silent observer" system instruction for the hostage scenario: number of captors and hostages, weapons, injuries, names or demands heard, background sounds (gunshots, shouting, other voices — as in 10.2), location clues, changes over time. It uses the same `report_situation` / `report_scene_observation` / `report_stress_level` tools
-- [ ] Live video to the dashboard (9.1) and recording to Drive (9.2) run for the SOS too, for both cameras (two video tracks or two publishers, one Drive file per camera)
-- [ ] Same session-cap handling as 10.1 (compression + resumption), since an SOS can run long
-- [ ] Post-call consolidation + leakage check run when the SOS ends, as for calls
+- [x] `silentSession.ts`: mic + ~1 fps frames from both cameras in, TEXT response modality so nothing is ever played into the room
+- [x] `SILENT_OBSERVER_INSTRUCTION` covers captor/hostage counts, weapons, injuries, overheard names/demands, background sounds, location clues, changes over time; uses `report_situation`/`report_scene_observation`/`report_stress_level`
+- [~] Back camera streams live to the dashboard; BOTH cameras recorded to Drive (one file per camera). A second *live* feed for the front camera is a follow-up.
+- [x] Compression + session resumption + auto-reconnect in `silentSession.ts`
+- [x] Consolidation + leakage check run on SOS end, same as a call
 
 ---
 
@@ -422,8 +422,8 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 ### User Story 14.1
 **As a responder, I want SOS and click-order incidents to stand out and read clearly, so that I can tell a silent hostage SOS from an ordinary report at a glance.**
 - [ ] Extend `types.ts` + `firestore.rules` with the Phase 2 fields (see top of this section), agreed with Person A
-- [~] Channel label for `click-order` ("Coded order") added everywhere via a shared `channelLabel()` in `dashboard/src/lib/format.ts` (queue, detail, history, toasts, alerts, timeline). SOS badge + scenario label + `silent-sos` label still pending (Epic 11).
-- [~] `click-order` added to the Case history channel filter. Analytics channel breakdown + `silent-sos` filter still pending.
+- [x] Shared `channelLabel()` covers `click-order` ("Coded order") and `silent-sos` ("Silent SOS") everywhere; SOS badge + scenario shown in the queue and on the detail page; `cameraMode` shown on detail
+- [x] `click-order` and `silent-sos` in the Case history channel filter. Analytics channel breakdown still pending.
 
 ### User Story 14.2
 **As a responder, I want to see what the AI saw, what the caller was told, and the saved video, so that I have the full picture in one place.**

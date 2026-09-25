@@ -79,13 +79,16 @@ service cloud.firestore {
     function validIncident(d) {
       return d.keys().hasAll(['sessionStartedAt', 'channel', 'callState', 'location', 'extractedFieldsLive', 'severity', 'response'])
         && d.keys().hasOnly([
-          'sessionStartedAt', 'sessionEndedAt', 'channel', 'callState', 'location', 'extractedFieldsLive',
-          'consolidatedSummary', 'fieldConfidence', 'transcriptSummary', 'voiceStressScore', 'voiceStressTrend',
-          'leakageCheckStatus', 'severity', 'response', 'video', 'hasRecording', 'videoRecording',
-          'sceneObservations', 'adviceGiven'
+          'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
+          'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'transcriptSummary',
+          'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video',
+          'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
         ])
         && d.sessionStartedAt is string
-        && d.channel in ['live-call', 'silent-tap', 'click-order']
+        && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
+        && (!('incidentType' in d) || d.incidentType in ['report', 'sos'])
+        && (!('scenario' in d) || (d.scenario is string && d.scenario.size() <= 40))
+        && (!('cameraMode' in d) || d.cameraMode in ['dual', 'alternating', 'back-only'])
         && d.callState in ['active', 'ended']
         && d.severity in ['low', 'medium', 'high']
         && d.location is map

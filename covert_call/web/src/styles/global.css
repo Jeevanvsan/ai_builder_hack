@@ -1258,3 +1258,24 @@ img {
   background: var(--veg);
   border-color: var(--veg);
 }
+
+/* Silent SOS blackout overlay (Epic 11.2) — looks like the phone is off while recording continues. */
+.sos-blackout {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+.sos-exit-hotspot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 84px;
+  height: 84px;
+  /* Invisible; only the person who knows the gesture uses it. */
+  background: transparent;
+}

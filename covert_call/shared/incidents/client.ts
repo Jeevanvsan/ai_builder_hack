@@ -21,7 +21,14 @@ type LiveFields = Incident['extractedFieldsLive']
 // The returned `located` promise settles once a rough location has been attached (or couldn't be found).
 export async function startIncident(
   db: Firestore,
-  opts: { channel: Channel; id?: string },
+  opts: {
+    channel: Channel
+    id?: string
+    // Epic 11: mark an SOS, its scenario, and its starting severity (an SOS starts high, not low).
+    incidentType?: 'report' | 'sos'
+    scenario?: string
+    severity?: Incident['severity']
+  },
 ): Promise<{ id: string; located: Promise<RoughLocation | null> }> {
   const id = opts.id ?? newIncidentId()
   const startedAt = now()
@@ -29,6 +36,8 @@ export async function startIncident(
     sessionStartedAt: startedAt,
     sessionEndedAt: null,
     channel: opts.channel,
+    ...(opts.incidentType ? { incidentType: opts.incidentType } : {}),
+    ...(opts.scenario ? { scenario: opts.scenario } : {}),
     callState: 'active',
     location: { rough: null, confirmed: null },
     extractedFieldsLive: { peopleCount: null, dangerIndicators: [], urgency: null, notes: null },
@@ -37,7 +46,7 @@ export async function startIncident(
     voiceStressScore: null,
     voiceStressTrend: [],
     leakageCheckStatus: { reviewed: false, redactions: [] },
-    severity: 'low',
+    severity: opts.severity ?? 'low',
     response: { status: 'new', acknowledgedBy: null, acknowledgedAt: null, resolvedAt: null, notes: [], viewedAt: null, viewedBy: null },
   }
   await setDoc(ref(db, id), initial)
@@ -135,6 +144,11 @@ export function endIncident(db: Firestore, id: string): Promise<void> {
 // save itself happens in the caller (web/src/lib/gemini/uploadRecording.ts), this just flags the result.
 export function markHasRecording(db: Firestore, id: string): Promise<void> {
   return updateDoc(ref(db, id), { hasRecording: true })
+}
+
+// Records which cameras an SOS captured (Epic 11.2).
+export function setCameraMode(db: Firestore, id: string, mode: 'dual' | 'alternating' | 'back-only'): Promise<void> {
+  return updateDoc(ref(db, id), { cameraMode: mode })
 }
 
 // A scene observation whose wording signals immediate danger is also promoted to a danger indicator so it lifts

@@ -21,6 +21,8 @@ export function channelLabel(channel: string): string {
       return 'Silent tap'
     case 'click-order':
       return 'Coded order'
+    case 'silent-sos':
+      return 'Silent SOS'
     default:
       return channel
   }

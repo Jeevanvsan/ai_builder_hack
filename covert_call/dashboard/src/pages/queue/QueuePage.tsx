@@ -89,6 +89,9 @@ export default function QueuePage() {
                       <span className="muted-inline">Ended</span>
                     )}
                     <div className="sub">{channelLabel(i.channel)}</div>
+                    {i.incidentType === 'sos' && (
+                      <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>
+                    )}
                   </td>
                   <td>{f.peopleCount ?? '—'}</td>
                   <td>

@@ -1,6 +1,6 @@
 // The Firestore `incidents` document shape (docs/quickbite_plan.md §5b). Shared by the QuickBite app and the dashboard.
 
-export type Channel = 'live-call' | 'silent-tap' | 'click-order'
+export type Channel = 'live-call' | 'silent-tap' | 'click-order' | 'silent-sos'
 export type CallState = 'active' | 'ended'
 export type Severity = 'low' | 'medium' | 'high'
 export type ResponseStatus = 'new' | 'acknowledged' | 'in_progress' | 'resolved'
@@ -18,6 +18,12 @@ export interface Incident {
   sessionStartedAt: string
   sessionEndedAt: string | null
   channel: Channel
+  // 'sos' marks an emergency raised by the silent SOS gesture (Epic 11); ordinary reports omit it or use 'report'.
+  incidentType?: 'report' | 'sos'
+  // Free-form scenario tag for an SOS, e.g. 'hostage' (Epic 11).
+  scenario?: string
+  // Which cameras the SOS captured: both at once, alternating, or back only (Epic 11.2).
+  cameraMode?: 'dual' | 'alternating' | 'back-only'
   callState: CallState
   location: {
     // null for the first moments of a call: the incident is created before location capture finishes.
