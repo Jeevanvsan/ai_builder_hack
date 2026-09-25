@@ -81,7 +81,7 @@ service cloud.firestore {
         && d.keys().hasOnly([
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'callState', 'location', 'extractedFieldsLive',
           'consolidatedSummary', 'fieldConfidence', 'transcriptSummary', 'voiceStressScore', 'voiceStressTrend',
-          'leakageCheckStatus', 'severity', 'response', 'video'
+          'leakageCheckStatus', 'severity', 'response', 'video', 'hasRecording'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap']
@@ -95,6 +95,7 @@ service cloud.firestore {
         && (!('voiceStressTrend' in d) || (d.voiceStressTrend is list && d.voiceStressTrend.size() <= 2000))
         && (!('voiceStressScore' in d) || d.voiceStressScore == null || (d.voiceStressScore is number && d.voiceStressScore >= 0 && d.voiceStressScore <= 100))
         && (!('video' in d) || (d.video is map && d.video.status in ['live', 'ended']))
+        && (!('hasRecording' in d) || d.hasRecording is bool)
         && optionalString(d, 'consolidatedSummary', 5000)
         && optionalString(d, 'transcriptSummary', 5000);
     }
@@ -125,6 +126,21 @@ service cloud.firestore {
       allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
         && (!changesResponderFields(resource.data, request.resource.data) || request.auth != null);
       allow delete: if false;
+
+      // Full call recording (mic + AI voice), base64-encoded — saved here instead of Firebase Storage since
+      // Storage now requires the paid Blaze plan and this project stays on the free tier. Written unauthenticated
+      // by the QuickBite app on call end (same trust model as the incident doc itself); read is restricted to
+      // signed-in responders since raw audio is far more sensitive than the extracted text fields.
+      match /recording/{docId} {
+        allow read: if isSignedIn();
+        allow create: if docId == 'audio'
+          && request.resource.data.keys().hasOnly(['base64', 'mimeType', 'savedAt'])
+          && request.resource.data.base64 is string && request.resource.data.base64.size() < 1400000
+          && request.resource.data.mimeType is string
+          && request.resource.data.savedAt is string;
+        allow update: if false;
+        allow delete: if false;
+      }
 
       // WebRTC handshake for the live camera feed (Epic 7.1). A dashboard creates its offer doc, the phone adds
       // the answer, both add ICE candidates; the dashboard deletes its own doc when it stops watching.
