@@ -68,7 +68,10 @@ export function CallPage() {
           db,
           id,
           { onStatusChange: setStatus, onCallEnd: () => finishCallRef.current() },
-          { micStream: media ? new MediaStream(media.stream.getAudioTracks()) : undefined },
+          {
+            micStream: media ? new MediaStream(media.stream.getAudioTracks()) : undefined,
+            videoStream: media?.hasVideo ? videoOnly(media.stream) : undefined,
+          },
         )
         callRef.current = handle
       } catch {

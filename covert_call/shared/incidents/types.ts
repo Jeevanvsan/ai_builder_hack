@@ -38,6 +38,13 @@ export interface Incident {
   }
   consolidatedSummary: string | null
   fieldConfidence: Record<string, FieldConfidence>
+  // What the AI saw on the camera or heard in the background during the call (Epic 10) — kept separate from what
+  // the caller actually said. `source` is 'camera' (a video frame) or 'sound' (a background noise like a gunshot
+  // or other voices). Absent until the first observation.
+  sceneObservations?: { source: 'camera' | 'sound'; kind: string; detail: string; confidence?: number | null; at: string }[]
+  // Safety advice the persona gave the caller during the call (Epic 10.4), so a responder knows what they were
+  // told. Absent until the first piece of advice.
+  adviceGiven?: { text: string; at: string }[]
   voiceStressScore: number | null
   voiceStressTrend: { timestamp: string; score: number }[]
   leakageCheckStatus: { reviewed: boolean; redactions: string[] }

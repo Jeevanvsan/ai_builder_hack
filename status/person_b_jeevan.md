@@ -156,6 +156,14 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-25 20:13 IST: Epic 10 (Vision- & sound-aware call) built on branch `phase-2`.**
+  - The call now sends ~1 fps camera frames to Gemini (`frames.ts`), so the persona can see the scene and hear the background. Two new tools: `report_scene_observation` (camera/sound → `sceneObservations[]`) and `report_advice` (→ `adviceGiven[]`). Persona updated to watch/listen silently, ask follow-up disguised questions, and give short safety advice — without ever saying aloud that it can see or hear.
+  - Gunshot/scream/fire/etc. now escalate severity (`deriveSeverity()` extended; dangerous scene observations also become danger indicators).
+  - Video sessions turn on `contextWindowCompression` + `sessionResumption` and auto-reconnect on a mid-call drop. **Audio-only calls keep the exact old config** — so your proven audio call flow is unchanged unless a camera is present.
+  - **Data-model (your area): `sceneObservations[]` and `adviceGiven[]`** added to `types.ts` + `firestore.rules`. Dashboard shows a "Seen & heard" panel and advice/alerts in the timeline.
+  - **Needs a live test I couldn't run here**: (1) confirm `gemini-3.8-live` accepts video frames on the free tier, (2) the video-session reconnect path. If video input errors, the fix is isolated to `liveSession.ts` (video config is gated behind a camera being present).
+
+
 - **2026-09-25 20:06 IST: Epic 9 (Live call video + Google Drive) built on branch `phase-2`.**
   - The call now opens the **back camera** alongside the mic (`web/src/lib/gemini/media.ts`), streams it live to the dashboard via the existing `startVideoPublisher()`, and (if configured) records video+audio for the team's Google Drive. Falls back to audio-only if there's no camera. No camera preview on the caller's screen.
   - **Drive**: uploads via a Google Apps Script web app (no billing, no caller sign-in). You need to create the Drive folder + deploy the script, then set `VITE_DRIVE_UPLOAD_URL` in `web/.env.local`. Full steps: `covert_call/docs/setup/drive-uploader.md`. If unset, uploads are skipped and everything else still works. **Please also add `VITE_DRIVE_UPLOAD_URL` to `web/.env.example`** — I couldn't touch `.env*` files (blocked by a local hook).

@@ -160,6 +160,25 @@ export default function IncidentDetailPage() {
           </dl>
         </div>
 
+        {incident.sceneObservations && incident.sceneObservations.length > 0 && (
+          <div className="card scene-card">
+            <h2>Seen &amp; heard</h2>
+            <p className="sub">What the AI observed on camera or in the background — separate from what the caller said.</p>
+            <ul className="scene-list">
+              {incident.sceneObservations.map((o, idx) => (
+                <li key={`${o.at}-${idx}`}>
+                  <span className={`scene-tag scene-${o.source}`}>{o.source === 'sound' ? 'Heard' : 'Seen'}</span>
+                  <span className="scene-kind">{o.kind}</span>
+                  {o.detail && <span className="scene-detail">{o.detail}</span>}
+                  <span className="scene-time mono">
+                    {new Date(o.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="card stress-card">
           <h2>Voice stress</h2>
           <LiveValue value={incident.voiceStressScore}>
