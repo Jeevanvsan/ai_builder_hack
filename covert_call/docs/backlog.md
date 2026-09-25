@@ -294,20 +294,20 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 9.1
 **As a responder, I want to watch the caller's back camera live while the call is happening, so that I can see the situation, not just hear about it.**
-- [ ] On call start, open the back camera (`facingMode: 'environment'`) together with the mic — one `getUserMedia` stream shared with Gemini (Epic 10) and the recorder (9.2)
-- [ ] Call `startVideoPublisher(db, incidentId, stream)` from `shared/video/publisher.ts` in `CallPage.tsx` (and in the heart SOS, Epic 11); stop it on end / zero-trace exit
-- [ ] No camera preview, flash or shutter sound on the caller's screen; the OS camera-in-use indicator is an unavoidable, disclosed limitation
-- [ ] Native: same flow through `react-native-webrtc` + `registerGlobals()` (closes Epic 7.1's open sender task)
-- [ ] Test on a real phone against the live dashboard's video box
+- [x] `web/src/lib/gemini/media.ts` `acquireCallMedia()` opens mic + back camera in one `getUserMedia` (falls back to audio-only if no camera); the audio track feeds Gemini, the video track the feed + recorder
+- [x] `CallPage.tsx` calls `startVideoPublisher()` with a video-only view of the stream and stops it on call end (SOS wiring is Epic 11)
+- [x] No camera preview is ever rendered on the caller's screen; OS camera indicator disclosed as unavoidable
+- [ ] Native: same flow through `react-native-webrtc` + `registerGlobals()` — pending Epic 12 (native app)
+- [ ] Test on a real phone against the live dashboard's video box — pending device test
 
 ### User Story 9.2
 **As the response team, I want every call's video saved to our own Google Drive, so that the footage is kept after the call ends and can be reviewed later.**
-- [ ] Set up the team Drive folder (owned by the team account, shared only with responders)
-- [ ] Choose the upload route (no caller sign-in, no billing): recommended is a small Google Apps Script web app, running as the team account, that receives chunks or opens a Drive resumable-upload session. The fallback is Cloud Run with a service account if billing is turned on
-- [ ] Record the call with `MediaRecorder` (video + mixed call audio) in ~10 s chunks and upload while the call runs, so a killed call still leaves footage
-- [ ] Write `videoRecording { status, driveFileId, driveUrl }` to the incident when the upload starts and finishes
-- [ ] Native: pick a recording approach (spike — `react-native-webrtc` has no MediaRecorder)
-- [ ] Note in the deck: the uploader URL is public in the client, which is accepted for a prototype
+- [ ] Set up the team Drive folder — steps in `docs/setup/drive-uploader.md` (team action, needs their Google account)
+- [x] Upload route chosen + built: Google Apps Script web app (no sign-in, no billing). Client in `web/src/lib/gemini/videoUpload.ts`, gated by `VITE_DRIVE_UPLOAD_URL`; script + deploy steps in `docs/setup/drive-uploader.md`
+- [~] `web/src/lib/gemini/videoRecorder.ts` records video + call audio with `MediaRecorder` (5 s timeslices). Upload happens **at call end**, not streamed during the call — a tab killed mid-call leaves no Drive video. Chunked-during-call upload is the remaining follow-up.
+- [x] `videoRecording[]` (per camera) written via `upsertVideoRecording()`: `recording` at start → `uploaded`/`failed` with `driveFileId`/`driveUrl` after upload
+- [ ] Native: pick a recording approach (spike) — pending Epic 12
+- [x] Public-uploader-URL limitation documented in `docs/setup/drive-uploader.md` (deck: pull from there)
 
 ---
 
@@ -430,7 +430,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 - [ ] "Seen and heard" panel for `sceneObservations[]` (camera and sound entries, e.g. "Gunshot heard 14:02"), kept separate from what the caller said; a gunshot or scream also shows as an alert in the event timeline
 - [ ] "Advice given to caller" entries in the event timeline from `adviceGiven[]`
 - [ ] Live video box shows two feeds (front + back) for an SOS, or labels the current camera when it is alternating
-- [ ] "Call video" card: Drive link or embedded Drive preview from `videoRecording` (one per camera for an SOS), with uploading / saved / failed states
+- [~] "Call video" card built on the incident detail page (Drive link per camera, uploading/saved/failed states). Two-feed live view + embedded preview still pending.
 
 ---
 

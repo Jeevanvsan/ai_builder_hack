@@ -44,6 +44,17 @@ export interface Incident {
   severity: Severity
   // Present once the QuickBite app starts streaming the back camera (Epic 7.1). Absent means no video for this incident.
   video?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
+  // One entry per camera whose footage is being saved to the team Google Drive (Epic 9.2; Epic 11 records two
+  // cameras for the silent SOS). Absent means no Drive recording (e.g. no camera, or the Drive upload URL isn't
+  // configured). driveUrl is filled once the upload finishes.
+  videoRecording?: {
+    camera: 'back' | 'front'
+    status: 'recording' | 'uploaded' | 'failed'
+    driveFileId?: string | null
+    driveUrl?: string | null
+    startedAt: string
+    endedAt?: string | null
+  }[]
   // True once the full call recording (mic + AI voice) has been saved to the incidents/{id}/recording/audio
   // subcollection doc — kept off the main document since Firestore caps a document at 1MiB. Absent/false if
   // recording wasn't supported in the caller's browser, or the call was too long to fit in one document.
