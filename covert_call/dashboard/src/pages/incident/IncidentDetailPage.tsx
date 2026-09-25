@@ -189,6 +189,27 @@ export default function IncidentDetailPage() {
           </div>
         )}
 
+        {incident.videoRecording && incident.videoRecording.length > 0 && (
+          <div className="card recording-card">
+            <h2>Call video</h2>
+            <ul className="drive-videos">
+              {incident.videoRecording.map((v) => (
+                <li key={v.camera}>
+                  <span className="drive-cam">{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>
+                  {v.status === 'uploaded' && v.driveUrl ? (
+                    <a className="btn btn-sm" href={v.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
+                  ) : v.status === 'recording' ? (
+                    <span className="sub">Uploading…</span>
+                  ) : (
+                    <span className="sub">Upload failed</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="sub">Saved to the team's Google Drive for later review.</p>
+          </div>
+        )}
+
         <div className="card summary-card">
           <h2>Consolidated summary</h2>
           {incident.consolidatedSummary ? (

@@ -33,6 +33,9 @@ export async function startLiveCall(
   db: Firestore,
   incidentId: string,
   callbacks: LiveCallCallbacks,
+  // The caller can pass a mic stream it already opened (Epic 9 opens the mic and the back camera together); when
+  // omitted, the mic is opened here as before.
+  opts: { micStream?: MediaStream } = {},
 ): Promise<LiveCallHandle> {
   const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
   if (!apiKey) throw new Error('Gemini Live is not configured')
@@ -180,7 +183,7 @@ export async function startLiveCall(
 
   const mic = await startMicCapture((base64Pcm) => {
     if (!muted) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
-  })
+  }, opts.micStream)
   micStop = mic.stop
 
   const recorder: CallRecorder | null = startCallRecording(mic.stream, player.recordingStream)

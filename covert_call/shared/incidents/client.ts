@@ -137,6 +137,28 @@ export function markHasRecording(db: Firestore, id: string): Promise<void> {
   return updateDoc(ref(db, id), { hasRecording: true })
 }
 
+type VideoRecording = NonNullable<Incident['videoRecording']>[number]
+
+// Upserts one camera's Drive-recording entry by camera name (Epic 9.2 / 11). Transactional so the back and
+// front cameras of a silent SOS, which finish at slightly different times, never clobber each other's entry.
+// A partial patch (e.g. just status + driveUrl at upload time) merges onto the existing entry; a first write for
+// a camera fills sensible defaults.
+export function upsertVideoRecording(
+  db: Firestore,
+  id: string,
+  entry: { camera: 'back' | 'front' } & Partial<Omit<VideoRecording, 'camera'>>,
+): Promise<void> {
+  return runTransaction(db, async (tx) => {
+    const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
+    if (!current) throw new Error(`Incident ${id} not found`)
+    const list = [...(current.videoRecording ?? [])]
+    const i = list.findIndex((r) => r.camera === entry.camera)
+    if (i >= 0) list[i] = { ...list[i], ...entry }
+    else list.push({ status: 'recording', startedAt: now(), ...entry })
+    tx.update(ref(db, id), { videoRecording: list })
+  })
+}
+
 // A second Gemini pass reviews the call for uninvolved third parties mentioned without consent (a bystander, a
 // child) — this just records the result; the review itself happens in the caller (Epic 2.2).
 export function recordLeakageCheck(db: Firestore, id: string, redactions: string[]): Promise<void> {

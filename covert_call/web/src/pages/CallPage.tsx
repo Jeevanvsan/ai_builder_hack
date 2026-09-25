@@ -2,14 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { doc, getDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, markHasRecording } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
+import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
 import { saveCallRecording } from '../lib/gemini/uploadRecording'
+import { acquireCallMedia, videoOnly } from '../lib/gemini/media'
+import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
+import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
 
 const STATUS_LABEL: Record<CallStatus, string> = {
@@ -27,6 +31,11 @@ export function CallPage() {
   const [seconds, setSeconds] = useState(0)
   const incidentIdRef = useRef<string | null>(null)
   const callRef = useRef<LiveCallHandle | null>(null)
+  // Back-camera video (Epic 9): the shared mic+camera stream, the live-feed publisher's stop fn, and the Drive
+  // recorder handle. All optional — the call runs audio-only if there's no camera.
+  const mediaRef = useRef<MediaStream | null>(null)
+  const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
+  const videoRecRef = useRef<VideoRecorderHandle | null>(null)
   // Cart state at the moment this page mounted — later cart changes (e.g. adding items in another tab) must not
   // retrigger the call setup, only the render-time redirect below reacts to those.
   const cartHadItemsOnMount = useRef(cart.count > 0)
@@ -50,14 +59,37 @@ export function CallPage() {
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
 
+      // Open the mic and the back camera together (falls back to audio-only if there's no camera).
+      const media = await acquireCallMedia()
+      mediaRef.current = media?.stream ?? null
+
       try {
-        const handle = await startLiveCall(db, id, {
-          onStatusChange: setStatus,
-          onCallEnd: () => finishCallRef.current(),
-        })
+        const handle = await startLiveCall(
+          db,
+          id,
+          { onStatusChange: setStatus, onCallEnd: () => finishCallRef.current() },
+          { micStream: media ? new MediaStream(media.stream.getAudioTracks()) : undefined },
+        )
         callRef.current = handle
       } catch {
         setStatus('failed')
+      }
+
+      // With a camera: stream it live to the dashboard, and (if Drive is configured) record video + audio for the
+      // team's Drive archive. Both are best-effort and never block the call.
+      if (media?.hasVideo && mediaRef.current) {
+        try {
+          publisherStopRef.current = await startVideoPublisher(db, id, videoOnly(mediaRef.current))
+        } catch {
+          // A blocked WebRTC connection just means no live feed; the call and recording continue.
+        }
+        if (driveConfigured) {
+          const rec = startVideoRecording(mediaRef.current)
+          if (rec) {
+            videoRecRef.current = rec
+            void upsertVideoRecording(db, id, { camera: 'back', status: 'recording', startedAt: new Date().toISOString() })
+          }
+        }
       }
     })()
   }, [])
@@ -74,7 +106,15 @@ export function CallPage() {
     const id = incidentIdRef.current
     const call = callRef.current
     const transcript = call?.getTranscript() ?? ''
+
+    // Stop the Drive video recorder first, while the camera track is still live, so the final chunk is captured.
+    const videoBlob = videoRecRef.current ? await videoRecRef.current.stop() : null
+    const videoMime = videoRecRef.current?.mimeType ?? 'video/webm'
+
     const recording = await call?.end()
+    // Stop the live feed (also marks video ended on the incident) and release the camera + mic.
+    await publisherStopRef.current?.()
+    mediaRef.current?.getTracks().forEach((t) => t.stop())
     setStatus('ended')
 
     if (id) {
@@ -105,6 +145,25 @@ export function CallPage() {
           // Best-effort: losing the recording (e.g. a long call too big for one Firestore document) shouldn't
           // block ending the call — every other piece of the incident (fields, summary, location) is still saved.
         }
+      }
+
+      // Upload the Drive video in the background so the exit stays instant. The videoRecording entry flips from
+      // "recording" to "uploaded" (or "failed") once the upload settles; navigating away doesn't cancel the fetch.
+      if (videoBlob) {
+        void (async () => {
+          try {
+            const result = await uploadCallVideo(videoBlob, { incidentId: id, camera: 'back', mimeType: videoMime })
+            await upsertVideoRecording(db, id, {
+              camera: 'back',
+              status: 'uploaded',
+              driveFileId: result?.driveFileId ?? null,
+              driveUrl: result?.driveUrl ?? null,
+              endedAt: new Date().toISOString(),
+            })
+          } catch {
+            await upsertVideoRecording(db, id, { camera: 'back', status: 'failed', endedAt: new Date().toISOString() }).catch(() => {})
+          }
+        })()
       }
 
       zeroTraceExit(db, id, navigate)

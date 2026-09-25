@@ -81,7 +81,7 @@ service cloud.firestore {
         && d.keys().hasOnly([
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'callState', 'location', 'extractedFieldsLive',
           'consolidatedSummary', 'fieldConfidence', 'transcriptSummary', 'voiceStressScore', 'voiceStressTrend',
-          'leakageCheckStatus', 'severity', 'response', 'video', 'hasRecording'
+          'leakageCheckStatus', 'severity', 'response', 'video', 'hasRecording', 'videoRecording'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order']
@@ -96,6 +96,7 @@ service cloud.firestore {
         && (!('voiceStressScore' in d) || d.voiceStressScore == null || (d.voiceStressScore is number && d.voiceStressScore >= 0 && d.voiceStressScore <= 100))
         && (!('video' in d) || (d.video is map && d.video.status in ['live', 'ended']))
         && (!('hasRecording' in d) || d.hasRecording is bool)
+        && (!('videoRecording' in d) || (d.videoRecording is list && d.videoRecording.size() <= 4))
         && optionalString(d, 'consolidatedSummary', 5000)
         && optionalString(d, 'transcriptSummary', 5000);
     }

@@ -156,6 +156,15 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-25 20:06 IST: Epic 9 (Live call video + Google Drive) built on branch `phase-2`.**
+  - The call now opens the **back camera** alongside the mic (`web/src/lib/gemini/media.ts`), streams it live to the dashboard via the existing `startVideoPublisher()`, and (if configured) records video+audio for the team's Google Drive. Falls back to audio-only if there's no camera. No camera preview on the caller's screen.
+  - **Drive**: uploads via a Google Apps Script web app (no billing, no caller sign-in). You need to create the Drive folder + deploy the script, then set `VITE_DRIVE_UPLOAD_URL` in `web/.env.local`. Full steps: `covert_call/docs/setup/drive-uploader.md`. If unset, uploads are skipped and everything else still works. **Please also add `VITE_DRIVE_UPLOAD_URL` to `web/.env.example`** — I couldn't touch `.env*` files (blocked by a local hook).
+  - Known limit: video uploads **at call end**, not streamed during the call, so a tab killed mid-call leaves no Drive video (documented; chunked upload is a follow-up).
+  - **Data-model change (your area): `Incident.videoRecording[]`** added to `shared/incidents/types.ts` (+ `firestore.rules`). Dashboard shows a "Call video" card with the Drive link per camera. Please sign off along with the `Channel` change.
+  - A small backward-compatible refactor: `startLiveCall()` / `startMicCapture()` now accept an optional pre-opened mic stream (so the mic+camera come from one `getUserMedia`). Default behaviour unchanged when not passed.
+  - Verified: `tsc -b` + `oxlint` clean, web build passes. Not yet tested on a real phone.
+
+
 - **2026-09-25 19:55 IST: Epic 8 (Click & Order) built on branch `phase-2` (from Ameen's side). Data-model change needs your sign-off.**
   - New coded-cart → incident flow: `web/src/lib/codes.ts` is the new single source of truth for coded meanings; `persona.ts` now generates its Step 4 lists from it (call + cart can't drift). `data/menu.ts` gained an optional `code` field and 7 coded items/add-ons. `CheckoutPage.tsx` decodes a coded cart on "Place order" and raises a `click-order` incident; new `OrderPlacedPage.tsx` confirmation screen. Long-press an item in the detail sheet to reveal its meaning.
   - An ordinary order (no coded items) raises **no** incident — only coded carts do.
