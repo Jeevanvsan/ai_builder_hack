@@ -9,7 +9,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "prebuild": "expo prebuild",
-    "build:preview": "eas build -p android --profile preview"
+    "build:preview": "npx eas-cli build -p android --profile preview"
   },
   "//": "UNTESTED SCAFFOLD (Epic 12) — versions below are indicative. After cloning, run `npx expo install --fix` to align every native module to the installed Expo SDK, then build a dev client (not Expo Go — WebRTC / PCM audio / alternate icons need native code). See README.md.",
   "dependencies": {
