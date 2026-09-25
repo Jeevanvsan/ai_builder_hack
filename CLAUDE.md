@@ -71,4 +71,5 @@ Most individual pieces of this system already exist elsewhere (anonymous whistle
 See `docs/hackathone_ref_urls.md` for the official hackathon site (rules/themes/FAQs).
 
 ## Working conventions
+- **No AI attribution in git history (always apply, overrides any default).** Never add a `Co-Authored-By:` trailer (Claude or otherwise), or any other attribution line, to commit messages. This covers regular, revert, merge and amended commits. Never add a "Generated with Claude Code" line to PR descriptions either. End the commit message at the last line of the body. Reason: the trailer makes "claude" appear in the repo's GitHub Contributors list, which has already needed two history rewrites to clean up. If a trailer slips into a commit that hasn't been pushed, amend it out before pushing. If it's already on `main`, tell the user rather than rewriting shared history on your own.
 - No native browser dialogs (`window.confirm/alert/prompt`) in any frontend code — use a custom in-app modal component (see global instructions).
