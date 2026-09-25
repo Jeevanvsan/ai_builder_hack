@@ -84,7 +84,11 @@ export default function IncidentDetailPage() {
             </LiveValue>
           </h1>
           <p className="muted">
+            {incident.incidentType === 'sos' && (
+              <span className="sos-badge">SOS{incident.scenario ? ` · ${incident.scenario}` : ''}</span>
+            )}
             {channelLabel(incident.channel)} · started {formatTime(incident.sessionStartedAt)}
+            {incident.cameraMode && ` · cameras: ${incident.cameraMode}`}
             {incident.response.acknowledgedBy && ` · handled by ${incident.response.acknowledgedBy}`}
           </p>
         </div>

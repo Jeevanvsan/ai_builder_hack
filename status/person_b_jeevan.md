@@ -156,6 +156,15 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-25 20:20 IST: Epic 11 (Heart double-tap silent SOS, hostage) built on branch `phase-2`.**
+  - Double-tap the heart on the home screen → `/sos` (`SosPage`), a full-black "phone is off" overlay that swallows touches while it silently records. Exit with **three taps in the top-left corner**.
+  - It records both cameras + mic where the device allows two camera streams (else back-only; `cameraMode` saved), streams the **back** camera live to the dashboard, records **both** cameras to Drive, and runs a **silent Gemini observer** (`silentSession.ts`, TEXT modality so nothing plays into the room) that reports captors/hostages/weapons/etc. via tools. Consolidation + leakage check run on exit.
+  - **Decision: started SOS at `severity: 'high'`, not a new 'critical' level** — adding 'critical' would ripple through severity chips/ranking/rules/analytics. The SOS badge distinguishes it. Say if you want a real 'critical' tier.
+  - **Data-model (your area): `incidentType`, `scenario`, `cameraMode`** on the incident, and `Channel` gains `'silent-sos'` (types.ts + rules). Dashboard shows an SOS badge + scenario in the queue/detail, `silent-sos` in labels + history filter.
+  - **Needs a real-device test** (couldn't run here): dual-camera capture varies a lot by phone/browser; the wake lock; and whether the OS status bar is acceptably hidden (browser can't hide it — native will, Epic 12).
+  - Reminder from earlier: `covert_call/CLAUDE.md` already notes the SOS front-camera use is an approved exception to the "back camera only" rule.
+
+
 - **2026-09-25 20:13 IST: Epic 10 (Vision- & sound-aware call) built on branch `phase-2`.**
   - The call now sends ~1 fps camera frames to Gemini (`frames.ts`), so the persona can see the scene and hear the background. Two new tools: `report_scene_observation` (camera/sound → `sceneObservations[]`) and `report_advice` (→ `adviceGiven[]`). Persona updated to watch/listen silently, ask follow-up disguised questions, and give short safety advice — without ever saying aloud that it can see or hear.
   - Gunshot/scream/fire/etc. now escalate severity (`deriveSeverity()` extended; dangerous scene observations also become danger indicators).

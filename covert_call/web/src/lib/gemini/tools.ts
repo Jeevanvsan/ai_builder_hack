@@ -88,3 +88,9 @@ export const END_CALL: FunctionDeclaration = {
 export const LIVE_CALL_TOOLS: Tool[] = [
   { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_ADVICE, END_CALL] },
 ]
+
+// Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools
+// (no address confirmation, no end_call — the person ends the SOS with the secret gesture).
+export const REPORT_SCENE_OBSERVATION_TOOLS: Tool[] = [
+  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION] },
+]

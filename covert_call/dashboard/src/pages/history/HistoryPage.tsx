@@ -93,6 +93,7 @@ export default function HistoryPage() {
           <option value="live-call">Voice call</option>
           <option value="silent-tap">Silent tap</option>
           <option value="click-order">Coded order</option>
+          <option value="silent-sos">Silent SOS</option>
         </select>
         <select className="input" value={handledBy} onChange={(e) => setFilter('by', e.target.value)} aria-label="Handled by">
           <option value="">Anyone</option>

@@ -572,3 +572,17 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .scene-kind { font-weight: 600; }
 .scene-detail { color: var(--muted); }
 .scene-time { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+/* SOS badge (Epic 11 / 14.1). */
+.sos-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #b3261e;
+}
