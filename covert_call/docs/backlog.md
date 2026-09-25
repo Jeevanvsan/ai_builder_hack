@@ -4,6 +4,8 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **Legend**: 🔴 Core (non-negotiable) · 🟡 Strong (second AI layer / dashboard) · 🟢 Stretch (only if time remains)
 
+**Status (2026-09-24):** Epic 4 done and live at https://quickbite-5cde0-dashboard.web.app. Epic 3 is 11/14: the write side lives in `shared/incidents/client.ts`; what remains is waiting on Person A's Gemini Live code (3.2, 3.3) and on billing for a backend (3.4). Epic 7.1 dashboard side done and tested with the dev camera (free P2P video); the real sender needs Person A's native app. Epics 1, 2, 5 and 6 not started.
+
 ---
 
 ## EPIC 1 — QuickBite Disguise (Core Mechanism) 🔴
@@ -86,34 +88,34 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As a responder, I want to see a new incident the instant someone starts a QuickBite session, so that I'm already watching before any details are even known.**
 
-- [ ] Backend: create incident document in Firestore the moment a session starts (`callState: "active"`), not when the call ends
-- [ ] Establish real-time channel (websocket or SSE) between backend and dashboard — confirm Cloud Run supports long-lived connections early (de-risk before building on top of it)
-- [ ] Push a "new incident" event to the dashboard at session start, before any fields are extracted
+- [x] Backend: create incident document in Firestore the moment a session starts (`callState: "active"`), not when the call ends — `startIncident()` in `shared/incidents/client.ts`; QuickBite app needs to call it
+- [x] Establish real-time channel between backend and dashboard — decided: Firestore real-time listeners (dashboard subscribes to `incidents` directly; backend only writes to Firestore). Dashboard side built in Story 4.3
+- [x] Push a "new incident" event to the dashboard at session start, before any fields are extracted — the incident is written before location capture, so it appears within ~1s
 
 ### User Story 3.2
 
 **As a responder, I want to watch incident fields populate live while the call is still happening, so that I don't have to wait for the call to end before I can start acting.**
 
-- [ ] Wire incremental Gemini Live function-calling to emit partial extraction results mid-call, not just at the end
-- [ ] Stream each field update to the backend, then broadcast over the real-time channel to all subscribed dashboard clients
-- [ ] Build dashboard-side live-updating incident card UI (field-by-field reveal, not a static reload)
+- [ ] Wire incremental Gemini Live function-calling to emit partial extraction results mid-call, not just at the end — call `updateLiveFields()` / `recordVoiceStress()` from `shared/incidents/client.ts`; needs Person A's Gemini Live code in the repo
+- [x] Stream each field update to the backend, then broadcast over the real-time channel to all subscribed dashboard clients — `updateLiveFields()` / `recordVoiceStress()`
+- [x] Build dashboard-side live-updating incident card UI (field-by-field reveal, not a static reload)
 
 ### User Story 3.3
 
 **As a responder, I want to see the incident's rough location the instant it's created, then a precise address once it's confirmed, so that I have something actionable immediately and better information soon after.**
 
-- [ ] Capture device GPS/browser geolocation instantly at session start (plain device API, no AI)
-- [ ] Attach rough location to the incident document; render an approximate pin on the dashboard immediately
-- [ ] Add IP-based location fallback for devices without GPS (laptop/PC)
-- [ ] Wire the live-call persona's "delivery address" coded question to refine location into a confirmed address
-- [ ] Integrate Google Maps JavaScript API (dashboard pin) and Geocoding API (coordinates → readable address)
+- [x] Capture device GPS/browser geolocation instantly at session start (plain device API, no AI)
+- [x] Attach rough location to the incident document; render an approximate pin on the dashboard immediately
+- [x] Add IP-based location fallback for devices without GPS (laptop/PC) — three free providers tried in order
+- [ ] Wire the live-call persona's "delivery address" coded question to refine location into a confirmed address — `confirmAddress()` ready; needs calling from the Gemini persona flow (Person A)
+- [x] Integrate Google Maps JavaScript API (dashboard pin) and Geocoding API (coordinates → readable address) — Google when a key is set, free OpenStreetMap map + Nominatim geocoding otherwise
 
 ### User Story 3.4
 
 **As a responder reviewing a case after the fact, I want one coherent written summary instead of a pile of raw fields, so that I can understand what happened without reconstructing it myself.**
 
 - [ ] Design the post-call consolidation prompt: full transcript + extracted fields + voice-stress trend + leakage-check result → one incident summary
-- [ ] Trigger consolidation pass when `callState` flips to `"ended"`
+- [ ] Trigger consolidation pass when `callState` flips to `"ended"` — blocked: needs a backend (Cloud Run/Functions), which needs billing enabled on `quickbite-5cde0` by the project owner
 - [ ] Write `consolidatedSummary` and `fieldConfidence` (confirmed/inferred/uncertain per field) to the incident record, replacing the live working state as the permanent record
 
 ---
@@ -126,40 +128,54 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As a response team, I want our own dedicated application, so that we have a real operations tool, not a scaled-down view of the disguise app.**
 
-- [ ] Scaffold the Monitoring Dashboard as its own repo/app — do not fold into the QuickBite frontend project
-- [ ] Deploy a skeleton version live on Cloud Run/Firebase on day 1-2 (mandatory deliverable — de-risk early)
-- [ ] Design for a large monitor/operations-center display, not phone-first
+- [x] Scaffold the Monitoring Dashboard as its own repo/app — do not fold into the QuickBite frontend project
+- [x] Deploy a skeleton version live on Cloud Run/Firebase on day 1-2 (mandatory deliverable — de-risk early) — live at https://quickbite-5cde0-dashboard.web.app
+- [x] Design for a large monitor/operations-center display, not phone-first
 
 ### User Story 4.2
 
 **As a responder, I want a queue of all active incidents ranked by severity, so that I can see at a glance which case needs attention first.**
 
-- [ ] Build multi-case queue view: severity chips, status chips, time-elapsed/time-ago
-- [ ] Implement severity sorting/ranking logic
-- [ ] Design for scanning at a glance on a large display (wide, multi-column — not a single stacked card)
+- [x] Build multi-case queue view: severity chips, status chips, time-elapsed/time-ago — live from Firestore, paginated (10 per page, page kept in the URL)
+- [x] Implement severity sorting/ranking logic — incidents nobody has opened yet are pinned on top (newest first), then severity, unclaimed, live calls, longest waiting (`dashboard/src/lib/ranking.ts`)
+- [x] Design for scanning at a glance on a large display (wide, multi-column — not a single stacked card)
 
 ### User Story 4.3
 
 **As a responder, I want to open one incident and see everything about it — location, extracted fields, timeline — so that I have full context before acting.**
 
-- [ ] Build incident detail panel: location pin, extracted fields grid, timeline of events
-- [ ] Wire detail panel to the real-time channel for live updates during an active call
-- [ ] Transition detail panel from "live" state to consolidated case record once the call ends
+- [x] Build incident detail panel: location pin, extracted fields grid, timeline of events — map uses Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is set, otherwise free OpenStreetMap
+- [x] Wire detail panel to the real-time channel for live updates during an active call — Firestore real-time listeners, verified with `npm run simulate-call`
+- [x] Transition detail panel from "live" state to consolidated case record once the call ends
 
 ### User Story 4.4
 
 **As a responder, I want to claim an incident and mark its progress, so that my team knows who's handling what and nobody works the same case twice.**
 
-- [ ] Add `response` block to the Firestore data model: `status`, `acknowledgedBy`, `acknowledgedAt`, `resolvedAt`, `notes`
-- [ ] Build Acknowledge / Mark Resolved actions in the dashboard UI
-- [ ] Ensure a status change from one responder's screen reflects on every other subscribed dashboard instance in real time
+- [x] Add `response` block to the Firestore data model: `status`, `acknowledgedBy`, `acknowledgedAt`, `resolvedAt`, `notes`
+- [x] Build Acknowledge / Mark Resolved actions in the dashboard UI — plus Start response and team notes; acknowledge is a Firestore transaction so only one responder can claim; responder name set in-app until real auth exists
+- [x] Ensure a status change from one responder's screen reflects on every other subscribed dashboard instance in real time
+- [x] Resolving an incident whose call is still live also ends the call (confirm dialog warns); a resolved case never shows as a live call
 
 ### User Story 4.5
 
 **As a responder, I want to browse past resolved cases, so that I can review history without it cluttering the live queue.**
 
-- [ ] Build case history view (table/list of resolved incidents, filterable)
-- [ ] Query Firestore for `status: "resolved"` incidents, separate from the live queue
+- [x] Build case history view (table/list of resolved incidents, filterable) — search plus severity, channel, handled-by and period filters, kept in the URL
+- [x] Query Firestore for `status: "resolved"` incidents, separate from the live queue — the live queue likewise queries only open statuses
+- [x] Paginate the history list (10 per page, resets to page 1 when filters change)
+
+### User Story 4.6 (added during build — plan §"Monitoring Dashboard": audible/visual alerting)
+
+**As a responder, I want to be alerted the moment a new incident arrives, and keep being alerted until someone picks it up, so that no call goes unnoticed — without being interrupted while I'm working a case.**
+
+- [x] Highlight new incidents in the queue until any responder opens them (`response.viewedAt` / `viewedBy`), and count them in the tab title
+- [x] In-app alert toast with an Open button; clears for everyone once the incident is opened
+- [x] Siren-style alert sound that repeats until every new incident has been opened by someone
+- [x] System (OS) notification when the dashboard tab is in the background — "Enable alerts" button in the header
+- [x] Do not disturb: no sound, toast or notification while the responder is on an incident page; held alerts appear silently when they leave
+- [x] Visible "Sound is off, click anywhere" banner when the browser has audio locked
+- Not included: notifications with the dashboard fully closed (needs Firebase Cloud Messaging + a server, blocked on billing)
 
 ---
 
@@ -171,8 +187,9 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As the team, we need a working, live-deployed link judges can click into, so that we meet the hackathon's mandatory submission requirement.**
 
-- [ ] Confirm both QuickBite web app and Monitoring Dashboard are deployed and stable on Cloud Run/Firebase
+- [ ] Confirm both QuickBite web app and Monitoring Dashboard are deployed and stable on Cloud Run/Firebase — dashboard live and stable; web app live at https://quickbite-5cde0.web.app but its code isn't in this repo yet
 - [ ] Deployment hardening pass (no broken states, no dev-only debug UI left visible)
+- [x] Tighten `dashboard/firestore.rules` before the link goes to judges — no deletes, only known fields with valid values, status only moves forward (resolved never reopens), ended calls never go live again, notes/stress history append-only, video handshake docs restricted. Verified allow/deny cases on the Firestore emulator. Still no sign-in: real access control needs Firebase Auth
 - [ ] Verify the deployed link works end-to-end shortly before submission, not just once in Week 1
 
 ### User Story 5.2
@@ -216,9 +233,9 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As a responder, I want to watch a live video feed from the reporter's back camera like a video call, so that I have direct visual context, not just text.**
 
-- [ ] Evaluate and integrate a managed WebRTC/signaling service (e.g. LiveKit) — do not build signaling from scratch
-- [ ] Implement back-camera capture on the React Native app, streamed via the signaling service
-- [ ] Build the Live Video page on the Monitoring Dashboard (embedded live video player)
+- [x] Evaluate and integrate a managed WebRTC/signaling service (e.g. LiveKit) — do not build signaling from scratch — decided instead: free peer-to-peer WebRTC with Firestore carrying the handshake (managed services need a token server, which needs billing). `shared/video/`
+- [ ] Implement back-camera capture on the React Native app, streamed via the signaling service — call `startVideoPublisher()` from `shared/video/publisher.ts` (Person A)
+- [x] Build the Live Video page on the Monitoring Dashboard (embedded live video player) — medium live-video box in the right column of the incident page + Full screen button to `/incident/:id/video`; connecting / live (only once media flows) / couldn't-connect (retry) / feed lost / ended states. Sender heartbeat every 10s so a feed whose sender vanished shows "Camera feed lost" instead of hanging. Dev test sender at `/dev/camera` (not linked in the UI)
 - [ ] Verify: no flash, no shutter sound, no visible preview on the sender's screen (acknowledge the OS-level camera-in-use indicator as an unavoidable, disclosed limitation — do not claim full invisibility)
 
 ### User Story 7.2 (Sub-goal B)
@@ -235,5 +252,5 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 ## Notes for using this backlog
 
 - **Epics 1, 3, and 5 are the non-negotiable core** — if the 4 weeks run short, everything else (Epics 2, 4-partial, 6, 7) is where scope gets cut first, per the plan's own priority tiers.
-- Epic 4 (Dashboard) got real scope in a later planning pass — don't under-budget it as "just wire up the websocket."
+- Epic 4 (Dashboard) got real scope in a later planning pass — don't under-budget it as "just wire up the data feed."
 - Epics 6 and 7 are explicitly sequential stretch goals (7 only after 6), and within Epic 7, stories 7.1 and 7.2 are parallel, not sequential.

@@ -39,20 +39,20 @@ A single clever disguised-conversation trick, however impressive, reads to a jud
 - **Post-extraction leakage check** — a second Gemini pass reviews the extracted report before it reaches the responder, checking whether the conversation content inadvertently exposes OTHER people mentioned who didn't consent (a named bystander, a child) — flags for redaction. A genuine second-agent-pass architecture, distinct from extraction itself.
 
 ### Real-time response (the strongest demo moment)
-- **Live field-by-field dashboard streaming during the call**: as Gemini extracts each field, it's pushed to the dashboard immediately via websocket/SSE — not batched until the call ends. A judge watches the disguised call happen on one screen while real incident details populate live on another.
+- **Live field-by-field dashboard streaming during the call**: as Gemini extracts each field, it's written to the incident's Firestore document and reaches the dashboard immediately via Firestore real-time listeners — not batched until the call ends. A judge watches the disguised call happen on one screen while real incident details populate live on another.
 - **Dashboard alert at call START**, not call-end or extraction-complete — the incident document is created and the dashboard notified the instant the disguised interaction begins, before any details are known yet.
 - **Two-stage location flow, scoped to the dashboard** (this is a prototype — "notification" means the dashboard's incident card updates, not integration with real-world patrol/field units or emergency services):
   1. **Rough, instant**: device GPS/browser geolocation captured the moment the call starts (plain device capability, not AI) → dashboard shows an immediate alert with an approximate pin.
   2. **Precise, live**: Gemini's "delivery address" coded question gets the person's own spoken description of exactly where they are → refines the pin to a confirmed address, live, on the same dashboard.
   3. **Fallback for non-GPS devices** (laptop/PC — see §5 on why both web and native matter): coarse IP-based location lookup when device GPS is unavailable/denied. Matters less in practice since the realistic QuickBite user is on a phone, but avoids a silent failure.
-  4. **Google Maps JavaScript API** renders the dashboard pin; **Geocoding API** converts coordinates to a readable address. Comfortably free at prototype scale (see §7 cost estimate).
+  4. **Google Maps JavaScript API** renders the dashboard pin (the dashboard falls back to free OpenStreetMap tiles automatically when no Maps key is configured, since Google Maps requires a billing account); **Geocoding API** converts coordinates to a readable address. Comfortably free at prototype scale (see §7 cost estimate).
 - **Post-call consolidation**: once the call ends, a separate Gemini pass writes one coherent incident summary (dispatcher-style case notes) from the full transcript, extracted fields, voice-stress trend, and leakage-check result — replacing the live field-by-field working state with a permanent case record.
 
 ### The Monitoring Dashboard — a separate, dedicated web app (not a phone-sized view)
 
 **Important correction**: the dashboard is NOT a scaled-down companion screen to QuickBite — it's its own, entirely separately hosted web application, designed for a large monitor/operations-center display, not a phone. QuickBite (the disguise) and the Monitoring Dashboard (the responder side) are two independent products sharing only the backend/data layer — different repos or at minimum different deployed apps, different design language (QuickBite must look like a consumer food app; the dashboard should look like a real operations tool), different target device (phone vs. big screen).
 
-**Dashboard tech**: plain React (Vite), same framework family as QuickBite's own web app now that both are React rather than Next.js. The dashboard is a real-time, client-heavy, read/write-over-websocket app with no SEO or server-rendering need, so Next.js's SSR/routing/API-route features were never a meaningful fit here. Still deploys to Cloud Run or Firebase Hosting like any static/SPA build, satisfying the same mandatory live-link requirement.
+**Dashboard tech**: plain React (Vite), same framework family as QuickBite's own web app now that both are React rather than Next.js. The dashboard is a real-time, client-heavy app reading and writing Firestore directly with no SEO or server-rendering need, so Next.js's SSR/routing/API-route features were never a meaningful fit here. Still deploys to Cloud Run or Firebase Hosting like any static/SPA build, satisfying the same mandatory live-link requirement.
 
 **Dashboard feature set**:
 - **Real-time incident notifications** — new incidents appear the instant a call/session starts, with audible/visual alerting appropriate to an operations-center context (not just a quiet UI update)
@@ -82,6 +82,7 @@ User's explicit requirement: both of the following are wanted, and **neither is 
 
 #### Sub-goal A — live video streamed to the Monitoring Dashboard, like a video call
 - A responder watches **continuous, real-time video** on the dashboard during an active QuickBite call, not just text signal or periodic stills.
+- **Decided during build (2026-09-24): free peer-to-peer WebRTC with Firestore as the signaling channel** instead of a managed service like LiveKit. Managed services need a server to mint access tokens, which needs GCP billing; the P2P route needs no server and no billing. Trade-off: no TURN relay, so a few very strict networks can fail to connect (the dashboard shows a clear retry state). Code: `shared/video/` (publisher for the QuickBite app), dashboard viewer on the incident page and `/incident/:id/video`.
 - **This is architecturally a video-calling problem (WebRTC-class), separate from anything Gemini does** — needs its own infrastructure: a signaling/session layer and peer connection handling (e.g. via a managed service like LiveKit or a comparable WebRTC provider, rather than building a signaling server from scratch in 4 weeks) delivering the back-camera feed to the dashboard's incident detail view as an embedded live video player.
 - **Genuinely new infrastructure, not a reuse of anything already planned** — this is the single biggest addition to the stretch-goal tier. Budget real time for it if attempted; don't assume it's a small add-on.
 - Independent of Gemini entirely — this can ship even if the analysis sub-goal below is never built.
@@ -106,7 +107,7 @@ User's explicit requirement: both of the following are wanted, and **neither is 
 
 - **QuickBite web app** (plain React/Vite, Cloud Run/Firebase) — the primary build. Disguised ordering UI, Gemini Live integration via WebSocket from the browser, structured extraction, leakage-check pass. Satisfies the mandatory deployed-link requirement directly, fastest to build, and arguably a MORE convincing disguise than a native app (zero install footprint — just a browser tab). Plain React over Next.js since the app is a client-heavy disguise UI + WebSocket session with no SEO/server-rendering need.
 - **QuickBite native app** (React Native) — built after the web version is proven, for a more convincing "real app" demo feel and to keep the door open for future sensor/mesh features.
-- **Backend** (Cloud Run, FastAPI or Node) — shared by QuickBite (web + native) and the Monitoring Dashboard. Receives streamed partial updates + final consolidated reports. Needs a real-time channel to the dashboard (websocket or SSE) — confirm Cloud Run's long-lived-connection support early, don't discover a limitation late.
+- **Backend** (Cloud Run, FastAPI or Node) — shared by QuickBite (web + native) and the Monitoring Dashboard. Receives streamed partial updates + final consolidated reports and writes them to Firestore. **Real-time channel to the dashboard = Firestore real-time listeners** (decided during Story 4.3): the dashboard subscribes to the `incidents` collection directly, so there is no custom WebSocket/SSE server to build or keep alive on Cloud Run.
 - **Monitoring Dashboard — a separate, dedicated web app** (plain React/Vite, own Cloud Run/Firebase deployment, own repo or at minimum own deployed URL) — built for a **response team**, on a large monitor/operations-center display, not a phone. This is the mandatory live-clickable deliverable. Multiple team members may view/act on it at once — hence the action/response tracking (acknowledged/in-progress/resolved) in the feature set above, and why `Identity Platform / Firebase Auth` (see §5a extensible additions) becomes more plausible here than originally assessed, if there's a real need to know *which* responder acknowledged/resolved an incident. Subscribes to the same real-time channel as QuickBite writes to.
 - **Gen AI**: Gemini Live API (persona conversation + native audio + incremental function-calling for mid-call extraction), Gemini structured output (post-call consolidation + leakage-check passes)
 - **Location**: device GPS/browser geolocation + IP-based fallback; Google Maps JavaScript API (dashboard pin) + Geocoding API (readable address); refined via conversation
@@ -121,7 +122,7 @@ User's explicit requirement: both of the following are wanted, and **neither is 
 |---|---|---|
 | Conversational AI | **Gemini Live API** | The disguised persona conversation — real-time voice, native audio (stress/tone), incremental function-calling for live extraction |
 | Structured AI reasoning | **Gemini API** (text/structured output) | Post-call consolidation pass, leakage-check pass |
-| Compute / hosting | **Cloud Run** | Backend API, real-time websocket/SSE channel to the dashboard |
+| Compute / hosting | **Cloud Run** | Backend API (writes incident updates to Firestore) |
 | Hosting (alt.) | **Firebase Hosting** | Alternative/complement to Cloud Run for the web app + dashboard static assets |
 | Database | **Firestore** | Incident documents, live field updates, consolidated case records |
 | Maps | **Google Maps JavaScript API** | Responder dashboard location pin |
@@ -138,7 +139,7 @@ This set alone satisfies the hackathon's mandatory-tech requirement (Gemini + Cl
 | **Grounding with Google Maps** (a Gemini API tool, distinct from the Maps JS/Geocoding APIs already in use) | Lets Gemini cross-check a claimed location/business against real Maps place data inside the same API call, as a plausibility signal | More relevant to the deferred Covert Notice concept (verifying whistleblower claims) than to QuickBite's location capture, which is already handled directly by GPS + conversation. Worth a one-line mention as a natural extension, not core |
 | **SynthID Detector** | Screening any future photo/video evidence upload for AI-generation | QuickBite currently has no evidence-photo upload path — relevant only if that feature is added later |
 | **Gemini 3 / Gemini 4 Flash** (model upgrade) | Newer, more capable models as they roll out | Not a build decision now — just keep the model choice easily swappable in config, don't hardcode a specific model version deep in the code |
-| **Cloud Logging / Cloud Monitoring** | Observability into the real-time pipeline (useful for debugging the websocket/SSE flow during Week 3 build) | A genuinely useful *development* tool, not a demo-facing feature — worth using informally during build, not something to present to judges as a feature |
+| **Cloud Logging / Cloud Monitoring** | Observability into the real-time pipeline (useful for debugging the incident write path during Week 3 build) | A genuinely useful *development* tool, not a demo-facing feature — worth using informally during build, not something to present to judges as a feature |
 | **Identity Platform / Firebase Auth** | If the responder dashboard needs real login instead of an open/demo URL | Only needed if multiple responders with distinct accounts becomes a real requirement; a single shared demo view is fine for a hackathon |
 | **Google Cloud Text-to-Speech / Speech-to-Text** (standalone, outside Gemini Live) | Alternative if Gemini Live's native audio proves difficult to integrate in the time available | A fallback path, not a primary plan — Gemini Live's integrated approach is strictly better (native tone/stress analysis) if it works; keep this as a "Plan B" mentally, not something to build in parallel |
 
@@ -229,7 +230,7 @@ One practical demo-prep note from that research: real AI-911-dispatch companies 
 - Silent tap-only mode: menu UI with long-press reveal tooltips
 
 **Week 3 — Real-time pipeline + second AI layer**
-- Real-time channel (websocket/SSE) between client and dashboard — confirm Cloud Run long-lived-connection support first
+- Real-time channel between client and dashboard — Firestore real-time listeners (dashboard side already built in Story 4.3); the backend just writes incident updates to Firestore
 - Wire incremental Gemini Live function-calling to push live field updates as they're produced, not batched at the end
 - Incident document created + dashboard notified at call START
 - Two-stage location flow: rough GPS pin instantly, precise address refined live via conversation; Google Maps integration for the dashboard pin
@@ -238,7 +239,7 @@ One practical demo-prep note from that research: real AI-911-dispatch companies 
 
 **Week 4 — Post-call consolidation + Dashboard build-out + polish**
 - Post-call consolidation pass: coherent incident summary once the call ends
-- **Monitoring Dashboard, built out as its own product** (not just wired to the websocket): live incident queue (multi-case, severity-sorted, big-screen layout), incident detail view (live-updating during an active call, transitioning to consolidated case record), action/response tracking UI (acknowledge / in-progress / resolve, per §5b's `response` block)
+- **Monitoring Dashboard, built out as its own product** (not just wired to a data feed): live incident queue (multi-case, severity-sorted, big-screen layout), incident detail view (live-updating during an active call, transitioning to consolidated case record), action/response tracking UI (acknowledge / in-progress / resolve, per §5b's `response` block)
 - Port proven QuickBite web mechanism to React Native
 - End-to-end testing: disguise convincingness (role-play an overhearing bystander), dashboard updates genuinely arrive live during a call, response-status changes reflect back correctly
 - Deck + 3-minute demo video — the real-time live-update moment is likely the strongest single shot: split-screen the disguised call on one device against the dashboard populating live on a separate (ideally larger) screen

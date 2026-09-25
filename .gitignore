@@ -1,0 +1,35 @@
+# Environment and credential files (anywhere in the repo)
+.env
+.env.*
+!.env.example
+!.env.emulator
+*.local
+service-account*.json
+*-service-account*.json
+*credentials*.json
+*.pem
+*.key
+
+# Firebase CLI local state
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Per-machine Claude Code settings (e.g. the allow-git hook marker)
+.claude/
+
+# Logs and OS/editor files
+*.log
+.DS_Store
+Thumbs.db
+.idea/

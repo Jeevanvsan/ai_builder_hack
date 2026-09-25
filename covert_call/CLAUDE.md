@@ -2,6 +2,9 @@
 
 This folder is the active build workspace for **QuickBite**, the current near-term focus of the AI_Builders_26 hackathon project (see the repo-root `CLAUDE.md` for full project context, hackathon rules, and the eventual-goal full-platform plan).
 
+## Team status (mandatory, see repo-root `CLAUDE.md`)
+Always read `../status/person_b_jeevan.md` and `../status/person_a_ameen.md` before starting work. After finishing, update only Jeevan's file (with IST date and time). Never edit Ameen's file: he maintains it himself.
+
 ## The authoritative plan
 **Read `docs/quickbite_plan.md` first, before any implementation work.** It supersedes `docs/standalone_covert_call_plan.md` (kept for history only) and consolidates every design correction made during planning into one place: the feature set, tech stack, data model, cost estimate, competitive verification, and 4-week schedule.
 

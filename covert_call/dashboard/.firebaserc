@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "quickbite-5cde0"
+  },
+  "targets": {
+    "quickbite-5cde0": {
+      "hosting": {
+        "dashboard": ["quickbite-5cde0-dashboard"]
+      }
+    }
+  }
+}
