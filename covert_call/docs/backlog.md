@@ -317,29 +317,29 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 10.1
 **As a caller, I want the AI to see what my camera sees during the call, so that I don't have to describe everything out loud.**
-- [ ] Sample the back-camera stream to JPEG at ~1 fps and send it via `sendRealtimeInput` alongside the mic in `liveSession.ts`
-- [ ] Confirm `gemini-3.8-live` accepts video input on the free tier
-- [ ] Handle the shorter audio+video session cap: turn on context-window compression and session resumption, and reconnect transparently mid-call
-- [ ] New tool `report_scene_observation` (people visible, weapon-like object, injury, smoke/fire, vehicle …) → `sceneObservations[]` on the incident with `source: 'camera'`, kept separate from what the caller said
+- [x] `web/src/lib/gemini/frames.ts` samples the camera to JPEG ~1 fps (downscaled) and `liveSession.ts` sends each via `sendRealtimeInput({ video })`
+- [~] Wired for `gemini-3.8-live` video input — **needs a live test to confirm the free tier accepts frames** (couldn't verify without a running key)
+- [x] Video sessions enable `contextWindowCompression` + `sessionResumption`; `liveSession.ts` keeps the resumption handle and transparently reopens the session on an unexpected mid-call drop (audio-only calls keep the proven config unchanged). Needs a live test.
+- [x] `report_scene_observation` tool → `reportSceneObservation()` → `sceneObservations[]` with `source: 'camera'`, kept separate from the caller's words
 
 ### User Story 10.2
 **As a responder, I want the AI to pick out important background sounds on the call, so that I learn about danger the caller can't or won't describe.**
-- [ ] Persona/system instruction: listen to the background, not just the caller. Report gunshots, screams or crying, other people talking or shouting (roughly how many voices, and the language), breaking glass, banging on a door, sirens, alarms and vehicle noise. Uses Gemini Live's native audio understanding on the same mic stream, with no separate audio model
-- [ ] Report each sound with the same `report_scene_observation` tool, `source: 'sound'`, with the sound type, a short description and a confidence; words overheard from other people go into notes
-- [ ] A gunshot, scream or aggressive shouting raises the danger indicators, and so the severity, through the existing `deriveSeverity()`
-- [ ] Rehearse with played-back sound clips (gunshot, argument in the background, glass breaking) during a test call and check each one shows up on the dashboard without the caller mentioning it
+- [x] Persona now instructed to listen to the background (gunshots, screams, other voices + language, glass, banging, sirens, alarms) using Gemini Live's native audio, no separate model
+- [x] Background sounds reported via `report_scene_observation` `source: 'sound'` (kind + detail + confidence); overheard words go to notes
+- [x] Dangerous observations become danger indicators in the same transaction and lift severity; `deriveSeverity()` now treats gunshot/scream/fire/etc as high
+- [ ] Rehearse with played-back sound clips during a test call — pending manual test
 
 ### User Story 10.3
 **As a caller, I want the AI to ask me about what it sees and hears, so that responders get details I wouldn't think to mention.**
-- [ ] Update the persona: when a frame or a background sound shows something relevant, ask a follow-up coded question about it. RULE 1 still applies, so the real meaning is spoken in the same sentence
-- [ ] Never say aloud what the camera sees or the mic picks up in a way that shows the app is watching or listening (e.g. no "I can see a man with a knife", no "was that a gunshot?")
-- [ ] Rehearse with staged scenes (a person in the frame, a kitchen knife, a closed door) and check the questions change with what's visible
+- [x] Persona asks a follow-up disguised choice about what it sees/hears (RULE 1 + RULE 2 preserved)
+- [x] Persona explicitly forbidden from saying aloud what it sees/hears (no "I can see…", no "was that a gunshot?")
+- [ ] Rehearse with staged scenes — pending manual test
 
 ### User Story 10.4
 **As a caller in danger, I want short, direct safety advice during the call, so that I know what to do while help is on the way.**
-- [ ] Persona gives brief quick-help / precaution lines directly in the call (e.g. stay away from windows, keep the door locked, apply pressure to a wound), one at a time, only when the situation calls for it
-- [ ] Advice is limited to basic safety and first aid, with no diagnosis and no promises about arrival time
-- [ ] Log each piece of advice with its time via a tool call → `adviceGiven[]`, so the responder knows what the caller was told
+- [x] Persona gives brief disguised safety advice in-call, one at a time, only when relevant
+- [x] Advice limited to basic safety/first aid; no diagnosis, no arrival-time promises (in the persona)
+- [x] `report_advice` tool → `recordAdvice()` → `adviceGiven[]`; shown in the dashboard timeline
 
 ---
 
@@ -427,8 +427,8 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 14.2
 **As a responder, I want to see what the AI saw, what the caller was told, and the saved video, so that I have the full picture in one place.**
-- [ ] "Seen and heard" panel for `sceneObservations[]` (camera and sound entries, e.g. "Gunshot heard 14:02"), kept separate from what the caller said; a gunshot or scream also shows as an alert in the event timeline
-- [ ] "Advice given to caller" entries in the event timeline from `adviceGiven[]`
+- [x] "Seen & heard" panel for `sceneObservations[]` on the detail page; gunshot/scream/weapon also shown as a high-tone timeline alert
+- [x] Advice-to-caller entries from `adviceGiven[]` shown in the event timeline
 - [ ] Live video box shows two feeds (front + back) for an SOS, or labels the current camera when it is alternating
 - [~] "Call video" card built on the incident detail page (Drive link per camera, uploading/saved/failed states). Two-feed live view + embedded preview still pending.
 

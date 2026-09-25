@@ -137,6 +137,41 @@ export function markHasRecording(db: Firestore, id: string): Promise<void> {
   return updateDoc(ref(db, id), { hasRecording: true })
 }
 
+// A scene observation whose wording signals immediate danger is also promoted to a danger indicator so it lifts
+// severity through the normal path — a gunshot the AI hears must escalate the incident, not just get logged.
+const DANGEROUS_OBSERVATION = /weapon|gun|firearm|knife|gunshot|shot|scream|explosion|blast|fire|smoke|stab|blood|fight|attack|assault|chok|strangl/i
+
+// Records something the AI saw on the camera or heard in the background (Epic 10). Appends to sceneObservations
+// and, if it reads as dangerous, also adds a danger indicator and re-derives severity in the same transaction.
+export function reportSceneObservation(
+  db: Firestore,
+  id: string,
+  obs: { source: 'camera' | 'sound'; kind: string; detail?: string; confidence?: number },
+): Promise<void> {
+  return runTransaction(db, async (tx) => {
+    const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
+    if (!current) throw new Error(`Incident ${id} not found`)
+    const detail = obs.detail?.trim() ?? ''
+    const entry = { source: obs.source, kind: obs.kind, detail, confidence: obs.confidence ?? null, at: now() }
+    const update: Record<string, unknown> = {
+      sceneObservations: [...(current.sceneObservations ?? []), entry],
+    }
+    if (DANGEROUS_OBSERVATION.test(`${obs.kind} ${detail}`)) {
+      const indicator = detail ? `${obs.kind}: ${detail}` : obs.kind
+      const di = [...new Set([...current.extractedFieldsLive.dangerIndicators, indicator])]
+      update['extractedFieldsLive.dangerIndicators'] = di
+      const merged = { ...current.extractedFieldsLive, dangerIndicators: di }
+      update.severity = maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore))
+    }
+    tx.update(ref(db, id), update)
+  })
+}
+
+// Records a piece of safety advice the persona gave the caller (Epic 10.4).
+export function recordAdvice(db: Firestore, id: string, text: string): Promise<void> {
+  return updateDoc(ref(db, id), { adviceGiven: arrayUnion({ text: text.trim(), at: now() }) })
+}
+
 type VideoRecording = NonNullable<Incident['videoRecording']>[number]
 
 // Upserts one camera's Drive-recording entry by camera name (Epic 9.2 / 11). Transactional so the back and
