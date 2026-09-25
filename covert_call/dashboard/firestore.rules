@@ -1,11 +1,72 @@
 rules_version = '2';
 
-// Hackathon prototype: there is no sign-in yet, so these rules can't tell a responder from the QuickBite app or a
-// stranger. Instead they only accept well-formed, forward-moving changes: no deletes, only known fields with valid
-// values, statuses that never go backwards, append-only notes. Admin operations (seed --reset) go through the
-// Firebase CLI, which is not subject to these rules. Add Firebase Auth before handling any real data.
+// Two writers hit `incidents`: the (unauthenticated) QuickBite app creating/updating a live call, and signed-in
+// dashboard responders acting on it. `create` and the call's own live fields stay open to an anonymous caller;
+// responder-only fields (status, acknowledgedBy, notes, viewedBy) require Firebase Auth once a status change or
+// note is present in the write. Still no deletes, only known fields with valid values, statuses that never go
+// backwards. Admin operations (seed --reset) go through the Firebase CLI, which is not subject to these rules.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myResponderDoc() {
+      return get(/databases/$(database)/documents/responders/$(myResponderId()));
+    }
+
+    function myResponderId() {
+      return request.auth.token.email;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/responders/$(myResponderId()))
+        && myResponderDoc().data.role == 'admin'
+        && myResponderDoc().data.status == 'active';
+    }
+
+    function validResponder(d) {
+      return d.keys().hasOnly(['name', 'email', 'role', 'status', 'createdAt', 'createdBy'])
+        && d.keys().hasAll(['name', 'email', 'role', 'status'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+        && d.email is string && d.email.size() > 0
+        && d.role in ['admin', 'responder']
+        && d.status in ['active', 'disabled'];
+    }
+
+    // Bootstrap: the two hardcoded founding admins may create their own doc once, as an admin, if it doesn't
+    // exist yet. Every other create/update/delete on this collection requires an existing active admin.
+    function isBootstrapAdmin(email) {
+      return isSignedIn()
+        && request.auth.token.email == email
+        && email in ['jeevan@quickbite.com', 'ameen@quickbite.com']
+        && !exists(/databases/$(database)/documents/responders/$(email));
+    }
+
+    // Document id = responder's email (stable, known upfront by whoever adds them; no Admin SDK UID lookup needed).
+    match /responders/{email} {
+      allow read: if isSignedIn();
+      allow create: if validResponder(request.resource.data) && request.resource.data.email == email
+        && (isAdmin() || (isBootstrapAdmin(email) && request.resource.data.role == 'admin' && request.resource.data.status == 'active'));
+      allow update: if isAdmin() && validResponder(request.resource.data) && request.resource.data.email == email;
+      allow delete: if isAdmin();
+    }
+
+    // Shared cache for the Analytics page's "AI Insights" tab — one Gemini result read by every responder,
+    // regenerated at most once a day by whoever clicks Refresh (the app enforces the once-a-day cadence, the
+    // rule just validates shape so this stays a plain text/insights cache, not an arbitrary write target).
+    function validAiInsights(d) {
+      return d.keys().hasOnly(['immediateActions', 'recommendations', 'suggestions', 'generatedAt', 'generatedBy'])
+        && d.immediateActions is list && d.recommendations is list && d.suggestions is list
+        && d.generatedAt is string && d.generatedBy is string;
+    }
+
+    match /analytics/aiInsights {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && validAiInsights(request.resource.data);
+    }
 
     function statusRank(s) {
       return s == 'new' ? 0 : s == 'acknowledged' ? 1 : s == 'in_progress' ? 2 : 3;
@@ -49,10 +110,20 @@ service cloud.firestore {
         && (!('voiceStressTrend' in before) || after.voiceStressTrend.size() >= before.voiceStressTrend.size());
     }
 
+    // A responder action touches status, who acknowledged/viewed it, or adds a note — only a signed-in
+    // responder may change these. The QuickBite app's own live-call writes never touch this block.
+    function changesResponderFields(before, after) {
+      return before.response.status != after.response.status
+        || before.response.notes != after.response.notes
+        || before.response.get('acknowledgedBy', null) != after.response.get('acknowledgedBy', null)
+        || before.response.get('viewedAt', null) != after.response.get('viewedAt', null);
+    }
+
     match /incidents/{incidentId} {
       allow read: if true;
       allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data);
-      allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data);
+      allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
+        && (!changesResponderFields(resource.data, request.resource.data) || request.auth != null);
       allow delete: if false;
 
       // WebRTC handshake for the live camera feed (Epic 7.1). A dashboard creates its offer doc, the phone adds

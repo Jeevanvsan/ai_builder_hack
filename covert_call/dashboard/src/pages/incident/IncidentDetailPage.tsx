@@ -11,7 +11,8 @@ import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
 import { formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
-import { useResponder } from '../../lib/responderContext'
+import { useAuth } from '../../lib/authContext'
+import { responderLabel } from '../../lib/auth'
 import { markViewed } from '../../lib/responseActions'
 import { buildTimeline } from '../../lib/timeline'
 import type { FieldConfidence } from '../../../../shared/incidents/types'
@@ -26,7 +27,8 @@ export default function IncidentDetailPage() {
   const { id } = useParams()
   const { data: incident, loading, error } = useIncident(id)
   const now = useNow()
-  const { name } = useResponder()
+  const { user, responder } = useAuth()
+  const name = responderLabel(user, responder)
 
   // Opening the incident clears its "new" highlight on every dashboard.
   const incidentId = incident?.id
