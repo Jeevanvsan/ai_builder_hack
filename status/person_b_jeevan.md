@@ -142,9 +142,16 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   (dashboard code only, **not deployed** to the dashboard site). Firestore rules were redeployed for the recording subcollection.
 - 2026-09-25 ~6:15 pm IST: the tool description and prompt now tell the model to send only new facts, each as
   its own specific danger tag, instead of repeating one general tag or rephrasing old notes. Deployed to the web site.
+- **2026-09-25 ~6:30 pm IST: opened PR for `epic-1-2-3-gemini-live` → `main`, requested Ameen as reviewer.**
+  All of the above (initial Gemini Live build + the follow-up fix round) is now in one commit (`6d510c2`) on top
+  of the original (`ccc23aa`). Checked `main` first — it hasn't moved since this branch was cut off it
+  (`c765f59`), so there's no merge conflict; `git merge-tree` came back clean. Also removed a stale
+  `covert_call/web/firebase.json` reference to a `storage.rules` file that no longer exists (leftover from the
+  abandoned Firebase Storage approach — recording lives in Firestore instead). Updated `covert_call/docs/backlog.md`
+  to check off Epic 1, 2 and 3's stories to match what's actually built. **Still not merged — waiting on Ameen's review, since this is his ownership area.**
 
 ## Next up for Jeevan
-- Get Ameen's sign-off before pushing/opening a PR for `epic-1-2-3-gemini-live` — it's his scope, picked up while he's busy, not something to merge without his review.
+- Follow up with Ameen on the `epic-1-2-3-gemini-live` PR review.
 - Raise a PR for `ep-5-dashboard-auth` → `main` (now includes auth, responder management, analytics, responder performance, and AI Insights — a bigger PR than usual, worth flagging to Ameen before he reviews).
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
