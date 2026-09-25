@@ -1,7 +1,7 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-25 15:40 IST — Branch `ep-5-dashboard-auth`: Firebase Auth sign-in, a Responder Management page (add/edit/disable/remove), a full incident Analytics page and a Responder Performance page (both with ECharts visuals — maps, trends, gauges, scatter), and an AI Insights tab on Analytics that has Gemini turn the incident stats into Immediate actions / Recommendations / Suggestions, auto-refreshed once a day. All live and tested end-to-end.
+**Last updated:** 2026-09-25 16:20 IST — Branch `ep-5-dashboard-auth`: Firebase Auth sign-in, a Responder Management page (add/edit/disable/remove), a full incident Analytics page and a Responder Performance page (both with ECharts visuals — maps, trends, gauges, scatter), and an AI Insights tab on Analytics that has Gemini turn the incident stats into Immediate actions / Recommendations / Suggestions, auto-refreshed once a day. All live and tested end-to-end. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. **Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer (it was showing "claude" as a GitHub contributor) and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone before pulling/pushing anything.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
 
 ## Snapshot
@@ -90,6 +90,13 @@
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **⚠️ IMPORTANT — git history was rewritten on 2026-09-25, force-pushed to `main`, `ep-4`, and `ep-5-dashboard-auth`.** This was to remove a "Co-Authored-By: Claude" line from some commit messages (it was making "claude" show up in the repo's Contributors list). Commit hashes on those three branches changed. **Before you next `git pull` or `git push` on any of them**, run this for each branch you have locally:
+  ```
+  git fetch origin
+  git checkout <branch-name>
+  git reset --hard origin/<branch-name>
+  ```
+  If you have uncommitted work on one of those branches, commit it to a new branch or `git stash` it first — `reset --hard` discards uncommitted changes. If you're not sure, ping Jeevan before running this. Sorry for the disruption — it won't happen again for routine work, this was a one-off cleanup.
 - **Dashboard now needs sign-in:** the live dashboard at https://quickbite-5cde0-dashboard.web.app requires a login. Your account is `ameen@quickbite.com` — ask Jeevan for the password, or reset it yourself from the Firebase console (Authentication → Users). This doesn't affect the QuickBite app's own Firestore writes at all — no login needed on your side, only the dashboard changed.
 - **You're a founding admin:** the first time you sign in, you automatically get admin rights (roster entry created for you). Admin unlocks two extra pages: Responder management (add/edit/disable other responders) and Responder performance.
 - **AI Insights needs a Gemini API key:** if you want to test/regenerate it yourself, add your own `VITE_GEMINI_API_KEY` to `covert_call/dashboard/.env.local` (free key from Google AI Studio) and rebuild — otherwise it just shows "not set up" and doesn't break anything else.
