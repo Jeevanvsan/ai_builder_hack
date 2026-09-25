@@ -586,3 +586,8 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
   color: #fff;
   background: #b3261e;
 }
+
+/* Back/Front camera toggle on the live video (Epic 11 / 14.2). */
+.video-cam-toggle { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 2; display: flex; gap: 0.4rem; }
+.video-cam-toggle .btn { background: rgba(17, 20, 24, 0.75); color: #fff; border: 1px solid rgba(255,255,255,0.25); }
+.video-cam-toggle .btn.active { background: #fff; color: #111418; }

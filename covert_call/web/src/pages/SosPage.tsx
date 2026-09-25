@@ -31,7 +31,7 @@ export function SosPage() {
 
   const incidentIdRef = useRef<string | null>(null)
   const observerRef = useRef<SilentObserverHandle | null>(null)
-  const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
+  const publisherStopsRef = useRef<(() => Promise<void>)[]>([])
   const recordersRef = useRef<{ facing: 'back' | 'front'; rec: VideoRecorderHandle }[]>([])
   const streamsRef = useRef<MediaStream[]>([])
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
@@ -78,13 +78,14 @@ export function SosPage() {
         }
       }
 
-      // Live video to the dashboard: back camera (front-camera live feed is a follow-up; both are recorded below).
-      const back = media.cameras.find((c) => c.facing === 'back')
-      if (back) {
+      // Live video to the dashboard: publish EVERY camera so a responder can switch between front and back (Epic
+      // 11 / 14.2). Each camera signals independently under its own feed.
+      for (const cam of media.cameras) {
         try {
-          publisherStopRef.current = await startVideoPublisher(db, id, videoOnly(back.stream))
+          const stop = await startVideoPublisher(db, id, videoOnly(cam.stream), { camera: cam.facing })
+          publisherStopsRef.current.push(stop)
         } catch {
-          // Blocked WebRTC just means no live feed.
+          // Blocked WebRTC for one camera just means no live feed for it; the others still stream.
         }
       }
 
@@ -113,7 +114,7 @@ export function SosPage() {
     )
     const transcript = observerRef.current?.getTranscript() ?? ''
     await observerRef.current?.end()
-    await publisherStopRef.current?.()
+    await Promise.all(publisherStopsRef.current.map((stop) => stop().catch(() => {})))
     streamsRef.current.forEach((s) => s.getTracks().forEach((t) => t.stop()))
     await wakeLockRef.current?.release().catch(() => {})
 

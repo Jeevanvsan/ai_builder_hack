@@ -370,7 +370,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 **As a responder, I want the AI to watch and listen to the silent SOS and fill in the incident live, so that I know what is happening even though nobody is talking to me.**
 - [x] `silentSession.ts`: mic + ~1 fps frames from both cameras in, TEXT response modality so nothing is ever played into the room
 - [x] `SILENT_OBSERVER_INSTRUCTION` covers captor/hostage counts, weapons, injuries, overheard names/demands, background sounds, location clues, changes over time; uses `report_situation`/`report_scene_observation`/`report_stress_level`
-- [~] Back camera streams live to the dashboard; BOTH cameras recorded to Drive (one file per camera). A second *live* feed for the front camera is a follow-up.
+- [x] Both cameras stream live to the dashboard (switchable Back/Front) and both are recorded to Drive (one file per camera)
 - [x] Compression + session resumption + auto-reconnect in `silentSession.ts`
 - [x] Consolidation + leakage check run on SOS end, same as a call
 
@@ -429,7 +429,7 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 **As a responder, I want to see what the AI saw, what the caller was told, and the saved video, so that I have the full picture in one place.**
 - [x] "Seen & heard" panel for `sceneObservations[]` on the detail page; gunshot/scream/weapon also shown as a high-tone timeline alert
 - [x] Advice-to-caller entries from `adviceGiven[]` shown in the event timeline
-- [ ] Live video box shows two feeds (front + back) for an SOS, or labels the current camera when it is alternating
+- [x] Live video box has a Back/Front toggle for a dual-camera SOS (each camera published as its own feed); labels the current camera
 - [~] "Call video" card built on the incident detail page (Drive link per camera, uploading/saved/failed states). Two-feed live view + embedded preview still pending.
 
 ---
