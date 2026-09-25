@@ -156,6 +156,13 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-25 21:11 IST: Phase 2 DEPLOYED to Firebase (from the `phase-2` branch, before merge).**
+  - Firestore rules deployed (compiled clean), dashboard + web app both rebuilt and deployed; both return 200.
+  - Live: web https://quickbite-5cde0.web.app · dashboard https://quickbite-5cde0-dashboard.web.app.
+  - Note: the live sites are now **ahead of `main`** (PR #8 not merged yet). Merge PR #8 to keep `main` in sync with what's deployed.
+  - **Mobile app is NOT deployed** — EAS isn't logged in here; it needs an interactive `eas login` (Expo account). Steps are in `native/README.md` (Option B). Nothing about mobile blocks the web/dashboard submission.
+
+
 - **2026-09-25 20:54 IST: swept the rest of the backlog — every code-doable item on `phase-2` is now done.**
   - **Analytics (Epic 14):** channel donut + AI-insights prompt now count all four channels + an SOS total.
   - **Order tracking (8.3):** the order-placed screen mirrors responder progress as disguised delivery status.
