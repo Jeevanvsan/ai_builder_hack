@@ -44,6 +44,16 @@ export interface Incident {
   }
   consolidatedSummary: string | null
   fieldConfidence: Record<string, FieldConfidence>
+  // Live confidence per field, updated as the call progresses (Epic 16.2) — distinct from `fieldConfidence`,
+  // which is only written once at consolidation. Lets the dashboard show a field sharpening from "uncertain" to
+  // "confirmed" during the call itself, not just after it ends.
+  fieldConfidenceLive?: Record<string, FieldConfidence>
+  // Short, plain-language lines explaining why severity/urgency changed, appended whenever they actually change
+  // (Epic 16.1) — not on every field write. Gives a responder a live "why", not just the resulting chip.
+  reasoningTrace?: { text: string; at: string }[]
+  // One derived, human-readable recommended action (Epic 16.3), computed alongside severity from the same
+  // inputs — deterministic and explainable, not a separate Gemini call.
+  recommendation?: string | null
   // What the AI saw on the camera or heard in the background during the call (Epic 10) — kept separate from what
   // the caller actually said. `source` is 'camera' (a video frame) or 'sound' (a background noise like a gunshot
   // or other voices). Absent until the first observation.

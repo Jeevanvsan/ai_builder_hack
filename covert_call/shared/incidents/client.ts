@@ -1,7 +1,7 @@
 import { arrayUnion, doc, getDoc, runTransaction, setDoc, updateDoc, type Firestore } from 'firebase/firestore'
 import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
-import { deriveSeverity, maxSeverity } from './severity.ts'
+import { deriveSeverity, deriveRecommendation, describeSeverityChange, maxSeverity } from './severity.ts'
 import type { Channel, FieldConfidence, Incident, RoughLocation } from './types.ts'
 
 // Write side of the incident pipeline (Epic 3), called by the QuickBite app. The dashboard only reads.
@@ -92,10 +92,30 @@ export function updateLiveFields(db: Firestore, id: string, patch: Partial<LiveF
     }
 
     const merged = { ...existing, ...mergedPatch }
-    const update: Record<string, unknown> = {
-      severity: maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore)),
-    }
+    const newSeverity = maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore))
+    const update: Record<string, unknown> = { severity: newSeverity }
     for (const [key, value] of Object.entries(mergedPatch)) update[`extractedFieldsLive.${key}`] = value
+
+    // Epic 16.2: live confidence per field — a direct report is confirmed as soon as it's said; dangerIndicators
+    // start inferred and are promoted to confirmed once the same indicator is reported again (a repeat/elaboration).
+    const liveConfidence = { ...current.fieldConfidenceLive }
+    if (typeof patch.peopleCount === 'number') liveConfidence.peopleCount = 'confirmed'
+    if (typeof patch.urgency === 'string') liveConfidence.urgency = 'confirmed'
+    if (typeof patch.notes === 'string' && patch.notes.trim()) liveConfidence.notes = 'confirmed'
+    if (patch.dangerIndicators?.length) {
+      const repeated = patch.dangerIndicators.some((d) => existing.dangerIndicators.includes(d))
+      liveConfidence.dangerIndicators = repeated || liveConfidence.dangerIndicators === 'confirmed' ? 'confirmed' : 'inferred'
+    }
+    update.fieldConfidenceLive = liveConfidence
+
+    // Epic 16.3/16.1: recompute the recommendation whenever fields change, and log a reasoning-trace line only
+    // when severity actually moved — keeps the trace a meaningful escalation log, not noise on every write.
+    update.recommendation = deriveRecommendation(merged, newSeverity)
+    if (newSeverity !== current.severity) {
+      const line = describeSeverityChange(current.severity, newSeverity, merged, current.voiceStressScore)
+      update.reasoningTrace = [...(current.reasoningTrace ?? []), { text: line, at: now() }]
+    }
+
     tx.update(ref(db, id), update)
   })
 }
@@ -104,11 +124,18 @@ export function recordVoiceStress(db: Firestore, id: string, score: number): Pro
   return runTransaction(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
-    tx.update(ref(db, id), {
+    const newSeverity = maxSeverity(current.severity, deriveSeverity(current.extractedFieldsLive, score))
+    const update: Record<string, unknown> = {
       voiceStressScore: score,
       voiceStressTrend: arrayUnion({ timestamp: now(), score }),
-      severity: maxSeverity(current.severity, deriveSeverity(current.extractedFieldsLive, score)),
-    })
+      severity: newSeverity,
+      recommendation: deriveRecommendation(current.extractedFieldsLive, newSeverity),
+    }
+    if (newSeverity !== current.severity) {
+      const line = describeSeverityChange(current.severity, newSeverity, current.extractedFieldsLive, score)
+      update.reasoningTrace = [...(current.reasoningTrace ?? []), { text: line, at: now() }]
+    }
+    tx.update(ref(db, id), update)
   })
 }
 
