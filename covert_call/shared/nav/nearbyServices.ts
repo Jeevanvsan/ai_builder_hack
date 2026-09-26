@@ -43,7 +43,11 @@ async function queryOverpass(url: string, query: string): Promise<{ elements: Ov
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      // Overpass rejects requests without a User-Agent; browsers send one, Node (simulate-call script) doesn't.
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        ...(typeof window === 'undefined' ? { 'User-Agent': 'QuickBite-hackathon-prototype' } : {}),
+      },
       body: `data=${encodeURIComponent(query)}`,
       signal: controller.signal,
     })
@@ -54,6 +58,29 @@ async function queryOverpass(url: string, query: string): Promise<{ elements: Ov
   } finally {
     clearTimeout(timer)
   }
+}
+
+const NOMINATIM_TYPES: Record<ServiceKind, string> = { police: 'police', fire: 'fire_station', hospital: 'hospital' }
+
+async function viaNominatim(near: { lat: number; lng: number }): Promise<{ elements: OverpassElement[] } | null> {
+  const d = 0.045 // ~5 km box
+  const viewbox = [near.lng - d, near.lat + d, near.lng + d, near.lat - d].join(',')
+  const headers: Record<string, string> = typeof window === 'undefined' ? { 'User-Agent': 'QuickBite-hackathon-prototype' } : {}
+  const elements: OverpassElement[] = []
+  for (const [kind, amenity] of Object.entries(NOMINATIM_TYPES)) {
+    try {
+      const params = new URLSearchParams({ amenity, format: 'jsonv2', viewbox, bounded: '1', limit: '5', extratags: '1' })
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers })
+      if (!res.ok) continue
+      const hits = (await res.json()) as { lat: string; lon: string; name?: string; extratags?: Record<string, string> }[]
+      for (const h of hits) {
+        elements.push({ lat: Number(h.lat), lon: Number(h.lon), tags: { amenity: NOMINATIM_TYPES[kind as ServiceKind], name: h.name ?? '', phone: h.extratags?.phone ?? '' } })
+      }
+    } catch {
+      // try the next kind
+    }
+  }
+  return elements.length ? { elements } : null
 }
 
 // One Overpass query covering all three service kinds at once, to stay within the free public instance's rate
@@ -69,7 +96,10 @@ export async function nearbyServices(near: { lat: number; lng: number }): Promis
     data = await queryOverpass(url, query)
     if (data) break
   }
-  if (!data) return []
+  // The free Overpass instances time out (504) under load — fall back to Nominatim's amenity search, which is
+  // separate infrastructure and far more reliable, rather than reporting "no stations" that do exist.
+  if (!data) data = await viaNominatim(near)
+  if (!data) throw new Error('No station lookup service reachable')
 
   const results: NearbyService[] = (data.elements ?? [])
     .map((el: OverpassElement) => {

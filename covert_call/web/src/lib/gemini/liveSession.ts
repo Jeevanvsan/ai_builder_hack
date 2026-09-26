@@ -6,6 +6,7 @@ import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
 import { startCallRecording, type CallRecorder } from './recorder.ts'
 import { LIVE_CALL_TOOLS } from './tools.ts'
+import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
 
 // The @google/genai SDK's own doc comment names gemini-live-2.5-flash-preview, but that model returned
 // "not found for API version v1beta" (error 1008) against a real key — gemini-3.8-live is the current default
@@ -42,6 +43,8 @@ export async function startLiveCall(
   if (!apiKey) throw new Error('Gemini Live is not configured')
 
   const client = new GoogleGenAI({ apiKey })
+  // Live GPS + route to safety; started once the session is open (turn notes are sent into it).
+  let tracker: LiveTracker | null = null
   const player = createAudioPlayer()
   let muted = false
   let micStop: (() => void) | null = null
@@ -190,10 +193,21 @@ export async function startLiveCall(
 
     const calls = message.toolCall?.functionCalls
     if (calls?.length) {
-      for (const call of calls) handleToolCall(call)
-      void session.sendToolResponse({
-        functionResponses: calls.map((call) => ({ id: call.id, name: call.name, response: { output: 'ok' } })),
-      })
+      const routeCalls = calls.filter((c) => c.name === 'get_route_guidance')
+      const others = calls.filter((c) => c.name !== 'get_route_guidance')
+      for (const call of others) handleToolCall(call)
+      if (others.length) {
+        void session.sendToolResponse({
+          functionResponses: others.map((call) => ({ id: call.id, name: call.name, response: { output: 'ok' } })),
+        })
+      }
+      // Route guidance needs a real answer (live GPS + routing), so it's answered once the tracker resolves.
+      for (const call of routeCalls) {
+        const args = (call.args ?? {}) as { situation?: string; landmark?: string }
+        void (tracker ? tracker.guidance(args.situation, args.landmark) : Promise.resolve('No GPS yet — ask for the nearest landmark.'))
+          .catch(() => 'Routing is unavailable right now — ask for the nearest landmark and keep them moving somewhere busy and lit.')
+          .then((output) => session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response: { output } }] }))
+      }
     }
   }
 
@@ -262,6 +276,13 @@ export async function startLiveCall(
   // answering greets the caller, not the other way round.
   session.sendClientContent({ turns: 'The call has just connected. Greet the caller now, as instructed.' })
 
+  tracker = startLiveTracking(db, incidentId, (note) => {
+    if (finished) return
+    session.sendClientContent({
+      turns: `(System note, not the caller — live navigation: ${note} If you are guiding the caller to safety, relay the next instruction now, phrased for the situation per your GETTING TO SAFETY rules.)`,
+    })
+  })
+
   const mic = await startMicCapture((base64Pcm) => {
     if (!muted) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
   }, opts.micStream)
@@ -319,6 +340,7 @@ export async function startLiveCall(
       finished = true
       flushTranscript(true)
       clearInterval(silenceTimer)
+      tracker?.stop()
       clearInterval(transcriptFlushTimer)
       frameSampler?.stop()
       micStop?.()

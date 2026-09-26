@@ -79,6 +79,22 @@ export const REPORT_ADVICE: FunctionDeclaration = {
   },
 }
 
+export const GET_ROUTE_GUIDANCE: FunctionDeclaration = {
+  name: 'get_route_guidance',
+  description:
+    "Get live turn-by-turn directions from the caller's current GPS position to the best place of safety (police for " +
+    'chasing/threats, hospital for injury, fire station for fire). Call it when the caller is being chased, is moving, ' +
+    'is in the road, or is unsafe where they are, and again whenever they say they reached a junction or landmark. ' +
+    'Returns the destination, distance, and the next instruction.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      situation: { type: Type.STRING, description: 'Short reason, e.g. "being chased by a car", "injured", "fire nearby"' },
+      landmark: { type: Type.STRING, description: 'Where the caller says they are now, e.g. "at a junction near a petrol pump"' },
+    },
+  },
+}
+
 export const END_CALL: FunctionDeclaration = {
   name: 'end_call',
   description: 'Call this the moment you finish your closing line (e.g. "your order\'s on its way, thanks for calling") — after the caller has confirmed they\'re done, whether that means they gave a clear closing signal or you\'ve gathered what you reasonably can. This actually ends the call, so only call it once you are done speaking.',
@@ -86,7 +102,7 @@ export const END_CALL: FunctionDeclaration = {
 }
 
 export const LIVE_CALL_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_ADVICE, END_CALL] },
+  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_ADVICE, GET_ROUTE_GUIDANCE, END_CALL] },
 ]
 
 // Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools

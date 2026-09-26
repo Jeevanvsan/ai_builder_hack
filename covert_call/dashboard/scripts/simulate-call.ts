@@ -9,7 +9,10 @@ import {
   recordVoiceStress,
   startIncident,
   updateLiveFields,
+  appendTrackPoint,
+  setSafeRoute,
 } from '../../shared/incidents/client.ts'
+import { bestSafeRoute, progressOnRoute } from '../../shared/nav/route.ts'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const stressCurve = [38, 44, 52, 61, 66, 72, 79, 84, 81, 86, 83, 77, 70, 64]
@@ -36,6 +39,31 @@ const steps: Record<number, () => Promise<unknown>> = {
 }
 
 void located.then((rough) => console.log('  rough location:', rough))
+
+// --moving: the caller flees along real streets while the route to safety updates live (route-to-safety feature).
+if (process.argv.includes('--moving')) {
+  const start = { lat: 12.9121, lng: 77.6446 }
+  await updateLiveFields(db, id, { dangerIndicators: ['someone following or chasing caller', 'attacker in a car'], urgency: 'high' })
+  let route = await bestSafeRoute(start, 'police', 'being chased by a car', 'ai')
+  if (!route) throw new Error('Could not compute a route (Overpass/OSRM unreachable?)')
+  await setSafeRoute(db, id, route)
+  console.log(`  route to ${route.destination.name}: ${route.distanceM} m, ${route.durationS} s, ${route.steps.length} steps`)
+  const path = route.geometry.filter((_, i) => i % 3 === 0)
+  for (const [lat, lng] of path) {
+    await sleep(2000)
+    await appendTrackPoint(db, id, { lat, lng, speed: 8 })
+    const prog = progressOnRoute({ lat, lng }, route)
+    if (prog.stepIndex !== route.stepIndex) {
+      route = { ...route, stepIndex: prog.stepIndex }
+      await setSafeRoute(db, id, route)
+      console.log(`  next: ${prog.next?.instruction}`)
+    }
+  }
+  await endIncident(db, id)
+  console.log(`Arrived. ${id} ended.`)
+  await terminate(db)
+  process.exit(0)
+}
 
 for (let t = 1; t <= 30; t++) {
   await sleep(1000)

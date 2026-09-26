@@ -15,7 +15,10 @@ export function buildTimeline(i: Incident): TimelineEvent[] {
         }
       : null,
     i.location.confirmed ? { at: i.location.confirmed.confirmedAt, kind: 'address', label: `Address confirmed: ${i.location.confirmed.address}` } : null,
-    i.response.acknowledgedAt ? { at: i.response.acknowledgedAt, kind: 'ack', label: `Acknowledged by ${i.response.acknowledgedBy ?? 'responder'}` } : null,
+    i.safeRoute
+      ? { at: i.safeRoute.updatedAt, kind: 'address' as const, label: `Route to ${i.safeRoute.destination.name} (${Math.max(1, Math.round(i.safeRoute.durationS / 60))} min) — ${i.safeRoute.requestedBy === 'responder' ? 'set by dispatcher' : 'chosen by AI'}` }
+      : null,
+    i.response.acknowledgedAt ?{ at: i.response.acknowledgedAt, kind: 'ack', label: `Acknowledged by ${i.response.acknowledgedBy ?? 'responder'}` } : null,
     i.sessionEndedAt ? { at: i.sessionEndedAt, kind: 'end', label: 'Call ended' } : null,
     i.response.resolvedAt ? { at: i.response.resolvedAt, kind: 'resolved', label: 'Resolved', tone: 'done' } : null,
     ...i.response.notes.map((n) => ({ at: n.at, kind: 'note' as const, label: `${n.responderId}: ${n.text}` })),
