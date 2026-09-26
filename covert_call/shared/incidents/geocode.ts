@@ -59,6 +59,27 @@ function lastPlacePart(address: string): string | null {
   return last && last.length >= 3 ? last : null
 }
 
+// Last structured attempt before the bare-town fallback: callers join the town onto the road ("Alappuzha-
+// Vazhicherry Market Road, Alappuzha") and add filler words, and Nominatim needs every word to match, so these
+// fail outright even though "Vazhicherry Market, Alappuzha" resolves to the right neighbourhood. Clean up
+// separators and the repeated town, then try progressively shorter phrases, then each distinctive word + town.
+const FILLER = /^(road|rd|street|st|lane|junction|jn|near|nearby|opposite|opp|board|signboard|the|at|by|in|on|area|side|of)$/i
+function relaxedQueries(address: string): string[] {
+  const parts = address.replace(/[-/]+/g, ' ').split(',').map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  if (parts.length < 2) return []
+  const town = parts.at(-1)!.replace(/\s*\d{5,6}\s*$/, '').trim()
+  const townRe = new RegExp(`\\b${town.replace(/[.*+?^${}()|[\]\\]/g, '')}\\b`, 'gi')
+  const words = parts.slice(0, -1).join(' ').replace(townRe, ' ').split(/\s+/).filter(Boolean)
+  if (!words.length || !town) return []
+  const out: string[] = []
+  const add = (w: string[]) => { const q = `${w.join(' ')}, ${town}`; if (w.length && !out.includes(q) && q !== address) out.push(q) }
+  for (let n = words.length; n >= 1; n--) add(words.slice(0, n))
+  const distinctive = words.filter((w) => !FILLER.test(w) && w.length > 3)
+  add(distinctive)
+  for (const w of distinctive) add([w])
+  return out.slice(0, 6)
+}
+
 // Nominatim requires every query token to roughly match — ONE mis-transcribed comma-separated segment (a street
 // or area name misheard, e.g. "Vaisheri" for "Vazhicherry") can silently sink the whole query to zero hits, even
 // when the OTHER segments include something specific and correct (a named landmark like "St George Auditorium").
@@ -115,7 +136,7 @@ async function viaNominatim(address: string, near: Coordinates | null): Promise<
   // Try dropping one mis-transcribed segment at a time before falling back to just the town — this can still
   // land on the exact landmark (a specific place, not just a general area) even when one part of what the
   // caller said didn't come through clearly.
-  for (const variant of droppingOneSegment(address)) {
+  for (const variant of [...droppingOneSegment(address), ...relaxedQueries(address)]) {
     const hit = await nominatimSearch(variant, null)
     if (hit) return { ...hit, precision: 'approximate' }
   }
