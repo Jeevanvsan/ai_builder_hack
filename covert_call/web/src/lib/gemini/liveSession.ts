@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { EndSensitivity, GoogleGenAI, Modality, StartSensitivity, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
 import { appendTranscriptLine, confirmAddress, recordAdvice, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
@@ -232,6 +232,17 @@ export async function startLiveCall(
         // even on calls where the audio itself worked fine, breaking consolidation/leakage-check downstream.
         inputAudioTranscription: {},
         outputAudioTranscription: {},
+        // Scared callers pause mid-answer. Low end-sensitivity + a longer silence window stop Gemini from taking its
+        // turn in those pauses; low start-sensitivity keeps Mia's own voice leaking from the speaker (noise
+        // suppression is off) from counting as the caller barging in and making her restart her sentence.
+        realtimeInputConfig: {
+          automaticActivityDetection: {
+            startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_LOW,
+            endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
+            prefixPaddingMs: 200,
+            silenceDurationMs: 1200,
+          },
+        },
         systemInstruction: PERSONA_SYSTEM_INSTRUCTION,
         tools: LIVE_CALL_TOOLS,
         // Only for video calls (Epic 10): compression stretches the shorter audio+video session, and resumption

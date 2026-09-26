@@ -272,3 +272,7 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - The silence watchdog kept firing while the caller was mid-answer (it only reset on the transcript, which arrives late), so Mia repeated questions. `audio.ts` now passes a mic RMS level, and `liveSession.ts` counts speech above 0.02 as activity. `SILENCE_MS` went from 8 s to 12 s, and the nudge says to ignore it if the caller just answered.
   - Persona: one question per turn, then wait, never chained; accept several answers at once; never re-ask answered things. "Menu" switches to open mode from the very next sentence. "The usual"/calm reports skip the danger drill-down and stay short.
   - Web app redeployed.
+- 2026-09-26 (IST, ~21:00): **Notes for Ameen (web call + persona, please review):**
+  - `liveSession.ts` sets `realtimeInputConfig.automaticActivityDetection`: start and end sensitivity LOW, `silenceDurationMs` 1200, `prefixPaddingMs` 200. This gives callers time to pause without Mia jumping in, and stops her own voice from the speaker counting as a barge-in (she was restarting sentences).
+  - Persona: the greeting now asks straight away "can you talk freely, or shall we keep it like a normal food order? say 'talk' or 'order'" (the old "quick order or menu" step is merged into it). New rules: speak slowly and calmly, never repeat a question just asked (only after a silence note), wait for fragments to finish, and act at once on plain words ("I'm being chased") even mid-order.
+  - Web app redeployed.
