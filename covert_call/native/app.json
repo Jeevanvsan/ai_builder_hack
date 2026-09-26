@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "QuickBite",
+    "slug": "quickbite",
+    "scheme": "quickbite",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.quickbite.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "QuickBite uses your camera for order support.",
+        "NSMicrophoneUsageDescription": "QuickBite uses your microphone for calls to the order desk."
+      },
+      "bitcode": false
+    },
+    "android": {
+      "package": "com.quickbite.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "android.permission.WRITE_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
+      ]
+    },
+    "plugins": [
+      "expo-brightness",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "QuickBite uses your camera for order support.",
+          "microphonePermission": "QuickBite uses your microphone for calls to the order desk."
+        }
+      ]
+    ],
+    "extra": {
+      "//": "Epic 13 — alternate app icons are configured with a config plugin (e.g. expo-alternate-app-icons) once the icon assets exist; see src/lib/appearance.ts and README.md.",
+      "eas": {
+        "projectId": "d31b71ff-8472-4920-985c-ede5eb1b13b4"
+      }
+    },
+    "owner": "ameen1999"
+  }
+}

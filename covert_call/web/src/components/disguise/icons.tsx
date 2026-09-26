@@ -123,6 +123,12 @@ export const SpeakerIcon = (p: IconProps) => (
   </Svg>
 )
 
+export const CheckIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 6 9 17l-5-5" />
+  </Svg>
+)
+
 export function VegMark({ veg }: { veg: boolean }) {
   return (
     <span className={`veg-mark ${veg ? 'is-veg' : 'is-nonveg'}`} aria-label={veg ? 'Vegetarian' : 'Non-vegetarian'} role="img">

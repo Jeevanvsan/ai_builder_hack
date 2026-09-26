@@ -893,6 +893,18 @@ img {
   color: inherit;
 }
 
+/* Meaning revealed on long-press of a coded item in the detail sheet (Epic 8). */
+.code-reveal {
+  margin: 0;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--accent) 7%, var(--card));
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
 .tap-textarea {
   resize: vertical;
 }
@@ -1181,4 +1193,89 @@ img {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Order-placed confirmation screen (Epic 8, Story 8.3). */
+.order-placed .order-hero {
+  text-align: center;
+  padding: 28px 16px 12px;
+}
+.order-check {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--veg);
+}
+.order-placed .order-hero h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+.order-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.order-meta-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.order-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.order-steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+}
+.order-steps li.is-done {
+  color: var(--ink);
+  font-weight: 600;
+}
+.order-step-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: #fff;
+  flex: none;
+}
+.order-steps li.is-done .order-step-dot {
+  background: var(--veg);
+  border-color: var(--veg);
+}
+
+/* Silent SOS blackout overlay (Epic 11.2) — looks like the phone is off while recording continues. */
+.sos-blackout {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+.sos-exit-hotspot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 84px;
+  height: 84px;
+  /* Invisible; only the person who knows the gesture uses it. */
+  background: transparent;
 }

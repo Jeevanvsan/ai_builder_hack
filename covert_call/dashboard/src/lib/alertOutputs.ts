@@ -1,4 +1,5 @@
 import type { Incident } from '../../../shared/incidents/types'
+import { channelLabel } from './format'
 
 let audio: AudioContext | null = null
 let current: { osc: OscillatorNode; gain: GainNode } | null = null
@@ -105,7 +106,7 @@ export function showSystemNotification(incident: Incident, onOpen: () => void): 
   if (!notificationsSupported() || Notification.permission !== 'granted') return
   if (document.visibilityState === 'visible' && document.hasFocus()) return
   const n = new Notification(`New incident ${incident.id}`, {
-    body: `${incident.channel === 'live-call' ? 'Voice call' : 'Silent tap'} just started. Open the dashboard to respond.`,
+    body: `${channelLabel(incident.channel)} just started. Open the dashboard to respond.`,
     tag: incident.id,
     requireInteraction: true,
   })

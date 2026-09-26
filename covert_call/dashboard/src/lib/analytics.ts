@@ -30,7 +30,8 @@ export type IncidentAnalytics = {
   open: number
   resolved: number
   bySeverity: Record<Severity, number>
-  byChannel: { liveCall: number; silentTap: number }
+  byChannel: { liveCall: number; silentTap: number; clickOrder: number; silentSos: number }
+  sosCount: number
   avgTimeToAcknowledgeMin: number | null
   avgTimeToResolveMin: number | null
   avgVoiceStress: number | null
@@ -49,6 +50,9 @@ export function computeIncidentAnalytics(incidents: Incident[]): IncidentAnalyti
   const bySeverity: Record<Severity, number> = { low: 0, medium: 0, high: 0 }
   let liveCall = 0
   let silentTap = 0
+  let clickOrder = 0
+  let silentSos = 0
+  let sosCount = 0
   const ackTimes: number[] = []
   const resolveTimes: number[] = []
   const stressScores: number[] = []
@@ -71,7 +75,10 @@ export function computeIncidentAnalytics(incidents: Incident[]): IncidentAnalyti
   for (const i of incidents) {
     bySeverity[i.severity]++
     if (i.channel === 'live-call') liveCall++
-    else silentTap++
+    else if (i.channel === 'silent-tap') silentTap++
+    else if (i.channel === 'click-order') clickOrder++
+    else if (i.channel === 'silent-sos') silentSos++
+    if (i.incidentType === 'sos') sosCount++
 
     if (i.response.acknowledgedAt) ackTimes.push(minutesBetween(i.sessionStartedAt, i.response.acknowledgedAt))
     if (i.response.resolvedAt) resolveTimes.push(minutesBetween(i.sessionStartedAt, i.response.resolvedAt))
@@ -123,7 +130,8 @@ export function computeIncidentAnalytics(incidents: Incident[]): IncidentAnalyti
     open: incidents.length - resolved,
     resolved,
     bySeverity,
-    byChannel: { liveCall, silentTap },
+    byChannel: { liveCall, silentTap, clickOrder, silentSos },
+    sosCount,
     avgTimeToAcknowledgeMin: average(ackTimes),
     avgTimeToResolveMin: average(resolveTimes),
     avgVoiceStress: average(stressScores),

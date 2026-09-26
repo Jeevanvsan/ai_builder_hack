@@ -189,26 +189,26 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As the team, we need a working, live-deployed link judges can click into, so that we meet the hackathon's mandatory submission requirement.**
 
-- [ ] Confirm both QuickBite web app and Monitoring Dashboard are deployed and stable on Cloud Run/Firebase — dashboard live and stable; web app live at https://quickbite-5cde0.web.app but its code isn't in this repo yet
-- [ ] Deployment hardening pass (no broken states, no dev-only debug UI left visible)
+- [x] Both live and stable: dashboard https://quickbite-5cde0-dashboard.web.app, web app https://quickbite-5cde0.web.app. Web app code is in the repo (`web/`). Phase 2 features not yet re-deployed — deploy from `phase-2` before submission.
+- [~] Reviewed: no dev-only debug UI in the web app; dashboard's `/dev/camera` is unlinked (gate or remove it before judges if desired). Full pre-submission pass to redo after the Phase 2 deploy.
 - [x] Tighten `dashboard/firestore.rules` before the link goes to judges — no deletes, only known fields with valid values, status only moves forward (resolved never reopens), ended calls never go live again, notes/stress history append-only, video handshake docs restricted. Verified allow/deny cases on the Firestore emulator. Still no sign-in: real access control needs Firebase Auth
-- [ ] Verify the deployed link works end-to-end shortly before submission, not just once in Week 1
+- [ ] Verify the deployed link end-to-end shortly before submission — do after deploying Phase 2 (runtime check, needs the live env)
 
 ### User Story 5.2
 
 **As the team, we need a 3-minute video that convincingly shows the mechanism working, so that judges understand the idea without reading documentation.**
 
-- [ ] Script the demo around the real-time live-update moment (split-screen: disguised call on one device, dashboard populating live on another)
-- [ ] Record and edit the video
-- [ ] Rehearse the live-call persona flow end-to-end to catch any failure (e.g., persona misreading the disguised call as literal) before recording
+- [x] Demo script written: `docs/demo-script.md` (built around the split-screen live-update beat)
+- [ ] Record and edit the video — manual (human/recording step)
+- [ ] Rehearse the persona flow end-to-end before recording — manual (rehearsal checklist is in `docs/demo-script.md`)
 
 ### User Story 5.3
 
 **As the team, we need a public GitHub repo and a solution deck, so that we meet the remaining mandatory deliverables.**
 
-- [ ] Clean up repo: README, clear setup instructions, no secrets committed
-- [ ] Build the solution deck, including the Google stack table (§5a) and competitive-honesty framing (§8)
-- [ ] Decide and write the team's actual answer to "why this project fits Sustainability & Social Impact" (Problem Alignment & Impact is 25% of scoring, currently unresolved per plan §10 — resolve before finalizing the deck, not during Q&A)
+- [x] `README.md` rewritten with accurate structure, setup, deploy and env-var instructions; confirmed no secrets committed (only `*.example`/emulator templates tracked)
+- [x] Deck content written: `docs/deck.md` (includes the Google stack table + competitive-honesty framing). Drop into Slides/PPTX for the file.
+- [x] Theme-fit answer written: `docs/theme-fit.md` (societal impact via resilience strengthening + community support; no invented environmental angle). Confirm the team agrees before the deck is final.
 
 ---
 
@@ -220,10 +220,10 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **As a person with no connectivity, I want my silent report to still reach a responder eventually, so that being offline doesn't mean my report goes nowhere.**
 
-- [ ] Add photo/free-text attachment option to the silent tap-only screen
-- [ ] Integrate Gemini vision to analyze attached photos into structured signal
-- [ ] Implement single-hop Bluetooth mesh relay: queue locally when offline, relay to a nearby connected device, forward to backend
-- [ ] Test the relay path end-to-end with two physical devices
+- [x] Photo attachment added to the silent tap screen (free-text note already existed) — `SilentTapPage.tsx`
+- [x] `web/src/lib/gemini/photoVision.ts` runs Gemini vision on the attached photo → danger indicators + scene observations on the incident
+- [ ] Bluetooth mesh relay — **not feasible in this environment** (needs native BLE + two physical devices); genuine stretch, deferred
+- [ ] Test the relay with two physical devices — blocked on the above (hardware)
 
 ---
 
@@ -246,10 +246,10 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 > **Superseded by Phase 2 Epic 10 (call) and Story 11.3 (silent SOS).** Kept for history.
 
-- [ ] Implement periodic still-frame capture (~1/sec) from the back camera, independent of Sub-goal A's video pipeline
-- [ ] Send frames through Gemini Live's video input, in parallel with the existing audio session
-- [ ] Implement session-resumption/reconnect handling for the 2-minute video-attached session cap
-- [ ] Extract structured signal (e.g. "multiple people visible," "object consistent with weapon description") into the incident record — not rendered as its own raw-video UI
+- [x] **Superseded by Epic 10**: ~1 fps frame capture built in `web/src/lib/gemini/frames.ts`
+- [x] **Superseded by Epic 10**: frames sent via `sendRealtimeInput({ video })` alongside the audio session
+- [x] **Superseded by Epic 10**: context-window compression + session resumption + reconnect on video sessions
+- [x] **Superseded by Epic 10**: `report_scene_observation` → `sceneObservations[]` (not a raw-video UI)
 
 ---
 
@@ -269,22 +269,22 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 8.1
 **As a person who can't safely talk, I want the menu items and add-ons I pick to carry a meaning, so that an ordinary-looking order tells responders what is happening.**
-- [ ] Move the scenario codes and drill-down codes out of `persona.ts` into one shared code table (e.g. `web/src/lib/codes.ts`) used by both the persona prompt and the menu — one source of truth, so the call and the cart never disagree
-- [ ] Make sure the menu (`data/menu.ts`) contains an item or add-on for every scenario code (extra pepperoni, garlic bread, kids' meal, party platter, cold drinks, dessert …) and for the key drill-downs (quantity = headcount, size, etc.)
-- [ ] Long-press on an item or add-on reveals its real meaning, styled like a normal app hint — reuse the long-press behaviour from `SilentTapPage.tsx`
-- [ ] QA: the menu still reads as a normal restaurant menu; nothing looks like a list of emergencies
+- [x] Scenario codes now live in one shared table (`web/src/lib/codes.ts`); `persona.ts` builds its Step 4 lists from it via `personaCodeList()`, so the call and the cart can't disagree. (Drill-down codes beyond quantity=headcount stay call-only for now — see 8.2 note.)
+- [x] Every scenario code has a menu presence in `data/menu.ts` (4 mapped onto existing items, 7 added as add-ons/items via a new optional `code` field); quantity of a coded item = headcount
+- [x] Long-press the image in the item detail sheet (`ItemSheet.tsx`) reveals a coded item's real meaning; ordinary items reveal nothing (same 500ms long-press pattern as `SilentTapPage.tsx`)
+- [x] QA: coded items read as normal menu entries/add-ons; no visible hint until long-pressed
 
 ### User Story 8.2
 **As a responder, I want a placed order to arrive as a decoded incident, so that I can act on it like any other report.**
-- [ ] Wire "Place order" → `startIncident({ channel: 'click-order' })`, then decode the cart into `updateLiveFields()` (danger indicators from coded items, people count from quantity, urgency from the delivery-time choice, rider note → notes)
-- [ ] Delivery address "Change" → `confirmAddress()`; otherwise the rough GPS/IP location is used
-- [ ] Severity derived from the decoded fields via the existing `deriveSeverity()`
+- [x] `CheckoutPage.tsx` "Place order" → `startIncident({ channel: 'click-order' })` + `decodeOrder()` → `updateLiveFields()` (indicators, people count from qty, urgency from a new delivery-speed selector). Only fires when the cart has coded items — an ordinary order raises no incident.
+- [x] Rough GPS/IP location attached automatically by `startIncident()`. Address "Change" → `confirmAddress()` NOT built yet (the Change button stays inert); rough location is used, per the plan's default.
+- [x] Severity computed by `deriveSeverity()` inside `updateLiveFields()` from the decoded indicators/urgency
 
 ### User Story 8.3
 **As a person placing a coded order, I want to see a normal "order placed" screen, so that anyone watching sees a finished food order.**
-- [ ] Build an "Order placed" / order-tracking screen with a believable ETA, then clear the cart and history the same way as `zeroTraceExit()`
-- [ ] Optional: tracking status mirrors the responder's progress in disguise ("Rider assigned" = acknowledged, "On the way" = response started)
-- [ ] Verify: an order that was sent and one that was backed out of look the same afterwards
+- [x] `OrderPlacedPage.tsx` (`/order-placed`): success + order ID + ETA + status steps; navigates with `replace` and clears the cart, so back doesn't return to checkout
+- [x] Order-placed screen mirrors the responder's progress as disguised delivery status (`OrderPlacedPage` subscribes to the incident)
+- [x] A coded order and an ordinary order both land on the identical order-placed screen
 
 ---
 
@@ -294,20 +294,20 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 9.1
 **As a responder, I want to watch the caller's back camera live while the call is happening, so that I can see the situation, not just hear about it.**
-- [ ] On call start, open the back camera (`facingMode: 'environment'`) together with the mic — one `getUserMedia` stream shared with Gemini (Epic 10) and the recorder (9.2)
-- [ ] Call `startVideoPublisher(db, incidentId, stream)` from `shared/video/publisher.ts` in `CallPage.tsx` (and in the heart SOS, Epic 11); stop it on end / zero-trace exit
-- [ ] No camera preview, flash or shutter sound on the caller's screen; the OS camera-in-use indicator is an unavoidable, disclosed limitation
-- [ ] Native: same flow through `react-native-webrtc` + `registerGlobals()` (closes Epic 7.1's open sender task)
-- [ ] Test on a real phone against the live dashboard's video box
+- [x] `web/src/lib/gemini/media.ts` `acquireCallMedia()` opens mic + back camera in one `getUserMedia` (falls back to audio-only if no camera); the audio track feeds Gemini, the video track the feed + recorder
+- [x] `CallPage.tsx` calls `startVideoPublisher()` with a video-only view of the stream and stops it on call end (SOS wiring is Epic 11)
+- [x] No camera preview is ever rendered on the caller's screen; OS camera indicator disclosed as unavoidable
+- [ ] Native: same flow through `react-native-webrtc` + `registerGlobals()` — pending Epic 12 (native app)
+- [ ] Test on a real phone against the live dashboard's video box — pending device test
 
 ### User Story 9.2
 **As the response team, I want every call's video saved to our own Google Drive, so that the footage is kept after the call ends and can be reviewed later.**
-- [ ] Set up the team Drive folder (owned by the team account, shared only with responders)
-- [ ] Choose the upload route (no caller sign-in, no billing): recommended is a small Google Apps Script web app, running as the team account, that receives chunks or opens a Drive resumable-upload session. The fallback is Cloud Run with a service account if billing is turned on
-- [ ] Record the call with `MediaRecorder` (video + mixed call audio) in ~10 s chunks and upload while the call runs, so a killed call still leaves footage
-- [ ] Write `videoRecording { status, driveFileId, driveUrl }` to the incident when the upload starts and finishes
-- [ ] Native: pick a recording approach (spike — `react-native-webrtc` has no MediaRecorder)
-- [ ] Note in the deck: the uploader URL is public in the client, which is accepted for a prototype
+- [ ] Set up the team Drive folder — steps in `docs/setup/drive-uploader.md` (team action, needs their Google account)
+- [x] Upload route chosen + built: Google Apps Script web app (no sign-in, no billing). Client in `web/src/lib/gemini/videoUpload.ts`, gated by `VITE_DRIVE_UPLOAD_URL`; script + deploy steps in `docs/setup/drive-uploader.md`
+- [x] `videoRecorder.ts` records video + call audio; the recording-so-far is uploaded every ~20s (overwriting by filename) and once at the end, so a call killed mid-way still leaves footage. Apps Script trashes the prior version first.
+- [x] `videoRecording[]` (per camera) written via `upsertVideoRecording()`: `recording` at start → `uploaded`/`failed` with `driveFileId`/`driveUrl` after upload
+- [ ] Native: pick a recording approach (spike) — pending Epic 12
+- [x] Public-uploader-URL limitation documented in `docs/setup/drive-uploader.md` (deck: pull from there)
 
 ---
 
@@ -317,29 +317,29 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 10.1
 **As a caller, I want the AI to see what my camera sees during the call, so that I don't have to describe everything out loud.**
-- [ ] Sample the back-camera stream to JPEG at ~1 fps and send it via `sendRealtimeInput` alongside the mic in `liveSession.ts`
-- [ ] Confirm `gemini-3.8-live` accepts video input on the free tier
-- [ ] Handle the shorter audio+video session cap: turn on context-window compression and session resumption, and reconnect transparently mid-call
-- [ ] New tool `report_scene_observation` (people visible, weapon-like object, injury, smoke/fire, vehicle …) → `sceneObservations[]` on the incident with `source: 'camera'`, kept separate from what the caller said
+- [x] `web/src/lib/gemini/frames.ts` samples the camera to JPEG ~1 fps (downscaled) and `liveSession.ts` sends each via `sendRealtimeInput({ video })`
+- [~] Wired for `gemini-3.8-live` video input — still **needs a live test** to confirm the free tier accepts frames (no running key here)
+- [x] Video sessions enable `contextWindowCompression` + `sessionResumption`; `liveSession.ts` keeps the resumption handle and transparently reopens the session on an unexpected mid-call drop (audio-only calls keep the proven config unchanged). Needs a live test.
+- [x] `report_scene_observation` tool → `reportSceneObservation()` → `sceneObservations[]` with `source: 'camera'`, kept separate from the caller's words
 
 ### User Story 10.2
 **As a responder, I want the AI to pick out important background sounds on the call, so that I learn about danger the caller can't or won't describe.**
-- [ ] Persona/system instruction: listen to the background, not just the caller. Report gunshots, screams or crying, other people talking or shouting (roughly how many voices, and the language), breaking glass, banging on a door, sirens, alarms and vehicle noise. Uses Gemini Live's native audio understanding on the same mic stream, with no separate audio model
-- [ ] Report each sound with the same `report_scene_observation` tool, `source: 'sound'`, with the sound type, a short description and a confidence; words overheard from other people go into notes
-- [ ] A gunshot, scream or aggressive shouting raises the danger indicators, and so the severity, through the existing `deriveSeverity()`
-- [ ] Rehearse with played-back sound clips (gunshot, argument in the background, glass breaking) during a test call and check each one shows up on the dashboard without the caller mentioning it
+- [x] Persona now instructed to listen to the background (gunshots, screams, other voices + language, glass, banging, sirens, alarms) using Gemini Live's native audio, no separate model
+- [x] Background sounds reported via `report_scene_observation` `source: 'sound'` (kind + detail + confidence); overheard words go to notes
+- [x] Dangerous observations become danger indicators in the same transaction and lift severity; `deriveSeverity()` now treats gunshot/scream/fire/etc as high
+- [ ] Rehearse with played-back sound clips during a test call — pending manual test
 
 ### User Story 10.3
 **As a caller, I want the AI to ask me about what it sees and hears, so that responders get details I wouldn't think to mention.**
-- [ ] Update the persona: when a frame or a background sound shows something relevant, ask a follow-up coded question about it. RULE 1 still applies, so the real meaning is spoken in the same sentence
-- [ ] Never say aloud what the camera sees or the mic picks up in a way that shows the app is watching or listening (e.g. no "I can see a man with a knife", no "was that a gunshot?")
-- [ ] Rehearse with staged scenes (a person in the frame, a kitchen knife, a closed door) and check the questions change with what's visible
+- [x] Persona asks a follow-up disguised choice about what it sees/hears (RULE 1 + RULE 2 preserved)
+- [x] Persona explicitly forbidden from saying aloud what it sees/hears (no "I can see…", no "was that a gunshot?")
+- [ ] Rehearse with staged scenes — pending manual test
 
 ### User Story 10.4
 **As a caller in danger, I want short, direct safety advice during the call, so that I know what to do while help is on the way.**
-- [ ] Persona gives brief quick-help / precaution lines directly in the call (e.g. stay away from windows, keep the door locked, apply pressure to a wound), one at a time, only when the situation calls for it
-- [ ] Advice is limited to basic safety and first aid, with no diagnosis and no promises about arrival time
-- [ ] Log each piece of advice with its time via a tool call → `adviceGiven[]`, so the responder knows what the caller was told
+- [x] Persona gives brief disguised safety advice in-call, one at a time, only when relevant
+- [x] Advice limited to basic safety/first aid; no diagnosis, no arrival-time promises (in the persona)
+- [x] `report_advice` tool → `recordAdvice()` → `adviceGiven[]`; shown in the dashboard timeline
 
 ---
 
@@ -349,49 +349,49 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 11.1
 **As a person being held, I want a hidden double-tap on the heart icon to start a silent SOS, so that I can call for help with one quick, natural gesture.**
-- [ ] Double-tap on the heart in `TopBar.tsx` (within ~400 ms) starts the SOS; a single tap keeps behaving like a normal favourites button
-- [ ] No visible confirmation of any kind; haptics off
-- [ ] Creates the incident immediately: `startIncident({ channel: 'silent-sos', incidentType: 'sos', scenario: 'hostage' })`, starting at critical severity
-- [ ] Same trigger in the native app
+- [x] Double-tap the heart in `TopBar.tsx` (within 400 ms) navigates to `/sos`; a single tap does nothing unusual
+- [x] No visible confirmation; no haptics triggered
+- [x] `SosPage` calls `startIncident({ channel:'silent-sos', incidentType:'sos', scenario:'hostage', severity:'high' })`. (Used 'high' — a new 'critical' level would ripple through severity chips/ranking/rules; deferred. SOS badge distinguishes it.)
+- [ ] Same trigger in the native app — pending Epic 12
 
 ### User Story 11.2
 **As a person being held, I want the phone to look switched off while it keeps recording, so that nobody notices it is working.**
-- [ ] Full-screen black overlay; status bar hidden; all touches swallowed
-- [ ] Keep the device awake so the OS doesn't lock and pause the camera/mic. Web: Screen Wake Lock API + Fullscreen API (the double-tap counts as the user gesture). Native: `expo-keep-awake` + lowest brightness via `expo-brightness`. Web can't dim the screen, so the overlay is black only
-- [ ] As soon as the SOS starts, record from **both the front and the back camera**, plus the mic. The front camera catches whoever is facing the person, the back one the room
-  - Native: run both cameras at once where the phone supports it (iOS multi-camera on newer iPhones, Android concurrent camera on supported devices)
-  - Fallback when both can't run together (most browsers, many phones): switch between front and back every few seconds, so both views are captured
-  - Detect the capability at SOS start and record which mode was used on the incident (`cameraMode: 'dual' | 'alternating' | 'back-only'`)
-- [ ] No preview, flash or shutter sound from either camera; the OS camera indicator is the same disclosed limitation as in 9.1
-- [ ] Secret exit gesture (e.g. triple-tap top-left corner) ends the SOS via `zeroTraceExit()`, stops both cameras, and returns to Home
-- [ ] Test in a dark room: does the screen give off any visible light or flicker?
+- [x] Full-screen black overlay swallows all touches (`SosPage` + `.sos-blackout`). Browser can't hide the OS status bar; the native app can (Epic 12).
+- [x] Screen Wake Lock requested (best-effort) so the OS doesn't pause the camera/mic. Web can't dim the screen (overlay is pure black); native brightness dimming is Epic 12. Fullscreen not force-requested (navigation drops the gesture); the overlay covers the app regardless.
+- [x] Records both cameras + mic where the device allows two streams (`acquireSosMedia`); falls back to back-only otherwise. `cameraMode` ('dual'/'back-only') saved on the incident.
+  - Native: run both cameras at once where supported — pending Epic 12
+  - Time-sliced alternating fallback — native only (Epic 12); web uses dual-or-back-only
+  - [x] Capability detected at SOS start; `cameraMode` recorded
+- [x] No preview/flash/shutter from either camera; OS camera indicator disclosed as unavoidable
+- [x] Three taps in the top-left corner (within 1.5s) end the SOS, stop everything, and `zeroTraceExit()` home
+- [ ] Test in a dark room for any visible light/flicker — pending manual test
 
 ### User Story 11.3
 **As a responder, I want the AI to watch and listen to the silent SOS and fill in the incident live, so that I know what is happening even though nobody is talking to me.**
-- [ ] Silent Gemini Live session: mic + ~1 fps frames from both cameras in (each tagged front or back), no audio played back (text-only response if the model supports it, otherwise the audio is discarded)
-- [ ] "Silent observer" system instruction for the hostage scenario: number of captors and hostages, weapons, injuries, names or demands heard, background sounds (gunshots, shouting, other voices — as in 10.2), location clues, changes over time. It uses the same `report_situation` / `report_scene_observation` / `report_stress_level` tools
-- [ ] Live video to the dashboard (9.1) and recording to Drive (9.2) run for the SOS too, for both cameras (two video tracks or two publishers, one Drive file per camera)
-- [ ] Same session-cap handling as 10.1 (compression + resumption), since an SOS can run long
-- [ ] Post-call consolidation + leakage check run when the SOS ends, as for calls
+- [x] `silentSession.ts`: mic + ~1 fps frames from both cameras in, TEXT response modality so nothing is ever played into the room
+- [x] `SILENT_OBSERVER_INSTRUCTION` covers captor/hostage counts, weapons, injuries, overheard names/demands, background sounds, location clues, changes over time; uses `report_situation`/`report_scene_observation`/`report_stress_level`
+- [x] Both cameras stream live to the dashboard (switchable Back/Front) and both are recorded to Drive (one file per camera)
+- [x] Compression + session resumption + auto-reconnect in `silentSession.ts`
+- [x] Consolidation + leakage check run on SOS end, same as a call
 
 ---
 
 ## EPIC 12 — Native App Foundation (React Native) 🔴
 
-*`covert_call/native/` is empty. Phase 2 is built in web and native in parallel, so native first needs to reach parity with the web disguise.*
+*Native foundation scaffolded on branch `phase-2` — **UNTESTED** (no Expo toolchain/device in the build env). See `native/README.md`. UI + incident-writing ported; Gemini AV + WebRTC stubbed.*
 
 ### User Story 12.1
 **As a developer, I want a React Native app that shares the incident and video code with web, so that both apps write the same incidents to the same dashboard.**
-- [ ] Scaffold with Expo using a **development build** (not Expo Go — WebRTC, PCM audio streaming and alternate icons all need native modules)
-- [ ] Add `native` to the npm workspace; import `shared/incidents` and `shared/video` directly
-- [ ] Firebase config via env, matching `web/.env.example`
+- [x] Expo dev-build scaffold: `package.json`, `app.json`, `tsconfig`, `babel.config.js`, `index.ts` (registers WebRTC globals), `App.tsx` (React Navigation). Untested.
+- [x] `native` added to the workspace; screens import `../../../shared/incidents`, `shared/video`, `shared/codes` directly (codes.ts moved to `shared/` so all three apps share it)
+- [x] `native/src/lib/firebase.ts` reads `EXPO_PUBLIC_FIREBASE_*` (copy the web values)
 
 ### User Story 12.2
 **As a person using the phone app, I want the same disguise and the same two forks as the web app, so that it looks like an ordinary installed delivery app.**
-- [ ] Port Home, cart, checkout, call screen and silent-tap screen from `web/src/pages/`
-- [ ] Gemini Live in React Native: mic PCM16 16 kHz streaming out, 24 kHz playback in (needs a native audio-streaming module), with the same persona and tools
-- [ ] Zero-trace exit on native: reset the navigation stack, leaving no back history
-- [ ] Test on a real Android phone against the live dashboard
+- [~] Ported: Home (with heart-double-tap SOS), Cart, Checkout (coded-order), OrderPlaced, Silent tap, Settings. Call + SOS screens are shells (AV pending).
+- [ ] Gemini Live on RN (PCM capture/playback + camera frames) — **stubbed** in `native/src/lib/nativeCall.ts` with the exact plan; reuses the web conversation logic. Not implemented.
+- [x] Zero-trace exit uses `navigation.reset()` to Home (no back history)
+- [ ] Test on a real Android phone — pending (couldn't build/run in this env)
 
 ---
 
@@ -401,17 +401,17 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 13.1
 **As a person using QuickBite, I want to change the app's icon and name, so that it blends in with the other apps on my phone.**
-- [ ] "App appearance" screen reached from Account, styled like a normal app setting
-- [ ] Preset icon set (~6: food, grocery, pharmacy, cab, notes …) switched with the OS alternate-icon mechanism (iOS alternate icons, Android activity-alias, via an Expo config plugin)
-- [ ] App name: free text, shown everywhere inside the app (top bar, splash, call screen "… Order Desk", and the persona's spoken greeting)
-- [ ] OS limitation, stated plainly: the home-screen label under the icon can only be one of the preset names (Android), and can't be changed at all on iOS. The free-text name applies inside the app
-- [ ] Put all brand strings in one place (today they're hard-coded in `TopBar`, `CallPage`, `menu.ts`, `persona.ts`)
+- [x] `SettingsScreen` ("App appearance"), reached from the Account button, styled as a normal setting
+- [~] 6 icon presets in the UI (`ICON_PRESETS`); the OS alternate-icon switch is stubbed in `appearance.tsx setIcon()` (needs icon assets + a config plugin)
+- [x] Free-text app name shown across the native app (home top bar, call screen "… Order Desk") via `useAppearance()`
+- [x] OS limitation stated in the Settings screen + README
+- [~] Native reads the name from one place (`appearance.tsx`). The **web** app's brand strings are still hard-coded — centralising those is outstanding.
 
 ### User Story 13.2
 **As a person who customised the app, I want my icon and name to stay the same after I close or restart the app, so that it never flips back to "QuickBite".**
-- [ ] Persist the choice on the device (AsyncStorage or MMKV)
-- [ ] Load it before the first screen renders, so "QuickBite" never flashes on launch
-- [ ] Test: change it, kill the app, reboot the phone, then check the icon, name and greeting all stay
+- [x] Persisted with AsyncStorage (`appearance.tsx`)
+- [x] Loaded in `AppearanceProvider` before the first screen renders (`ready` gate)
+- [ ] Test across kill/reboot on a device — pending
 
 ---
 
@@ -421,16 +421,16 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 ### User Story 14.1
 **As a responder, I want SOS and click-order incidents to stand out and read clearly, so that I can tell a silent hostage SOS from an ordinary report at a glance.**
-- [ ] Extend `types.ts` + `firestore.rules` with the Phase 2 fields (see top of this section), agreed with Person A
-- [ ] SOS badge + scenario label ("Hostage") in the live queue and on the detail page; channel labels for `click-order` / `silent-sos`
-- [ ] Include the new channels in the Case history and Analytics filters
+- [x] `types.ts` + `firestore.rules` extended with every Phase 2 field (channels, incidentType, scenario, cameraMode, videoRecording, videoFront, sceneObservations, adviceGiven). Needs the team's explicit sign-off.
+- [x] Shared `channelLabel()` covers `click-order` ("Coded order") and `silent-sos` ("Silent SOS") everywhere; SOS badge + scenario shown in the queue and on the detail page; `cameraMode` shown on detail
+- [x] `click-order` and `silent-sos` in the Case history channel filter. Analytics channel breakdown still pending.
 
 ### User Story 14.2
 **As a responder, I want to see what the AI saw, what the caller was told, and the saved video, so that I have the full picture in one place.**
-- [ ] "Seen and heard" panel for `sceneObservations[]` (camera and sound entries, e.g. "Gunshot heard 14:02"), kept separate from what the caller said; a gunshot or scream also shows as an alert in the event timeline
-- [ ] "Advice given to caller" entries in the event timeline from `adviceGiven[]`
-- [ ] Live video box shows two feeds (front + back) for an SOS, or labels the current camera when it is alternating
-- [ ] "Call video" card: Drive link or embedded Drive preview from `videoRecording` (one per camera for an SOS), with uploading / saved / failed states
+- [x] "Seen & heard" panel for `sceneObservations[]` on the detail page; gunshot/scream/weapon also shown as a high-tone timeline alert
+- [x] Advice-to-caller entries from `adviceGiven[]` shown in the event timeline
+- [x] Live video box has a Back/Front toggle for a dual-camera SOS (each camera published as its own feed); labels the current camera
+- [x] "Call video" card on the detail page (Drive link per camera, statuses). Two-feed live view done (Back/Front toggle). Embedded Drive preview not added (link opens Drive).
 
 ---
 
