@@ -293,3 +293,8 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - Dashboard: the replay now shows after every ended call (it used to need the AI summary, which also fails on quota). The call recording has a Download button.
   - **Notes for Ameen (persona):** new "LOCATION FIRST, THEN THE RIGHT DESTINATION" section. Mia gets the real location before any route; a place the caller mentions (petrol pump) is where they are, not the destination, so she still guides to the police station/hospital. She may suggest a manned petrol pump only as a temporary safe spot if the station is over ~2 km away and danger is immediate.
   - Web app and dashboard redeployed.
+- 2026-09-26 (IST, ~23:00): **Notes for Ameen (web call + persona, please review):**
+  - Transcript bug: the 5 s periodic flush marked the open line as finished, so the rest of the caller's sentence was never written (lines cut off like "I feel lik"). `liveSession.ts` now tracks how much of each line has been written and completes it when the speaker switches. The dashboard shows only the newest version of a growing line (no more "That's g" / "That's good…" pairs).
+  - `confirm_address` now rejects vague places ("petrol pump", "green sign post", "near the market"): the tool answer tells Mia to ask for area/road and town. Before, "petrol pump" was geocoded to a pump in Mattancherry, Kochi. A saved address now tells her to call `get_route_guidance` if the caller is followed or chased.
+  - Persona: mandatory sequence — exact location (area/road + town), then confirm_address, then route to the police station. A petrol pump is never the destination.
+  - Web app and dashboard redeployed.
