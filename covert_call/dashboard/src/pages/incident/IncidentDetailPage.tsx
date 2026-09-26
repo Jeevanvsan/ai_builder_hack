@@ -5,9 +5,11 @@ import Chip from '../../components/Chip'
 import DataState from '../../components/DataState'
 import IncidentMap from '../../components/IncidentMap'
 import LiveValue from '../../components/LiveValue'
+import LiveTranscript from '../../components/LiveTranscript'
 import LiveVideo from '../../components/LiveVideo'
 import NearbyServicesCard from '../../components/NearbyServicesCard'
 import NoteForm from '../../components/NoteForm'
+import ReplayScrubber from '../../components/ReplayScrubber'
 import ResponseActions from '../../components/ResponseActions'
 import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
@@ -207,6 +209,10 @@ export default function IncidentDetailPage() {
           <NearbyServicesCard location={{ lat: confirmed.lat, lng: confirmed.lng }} dangerIndicators={f.dangerIndicators} />
         )}
 
+        {live && incident.transcriptLines && incident.transcriptLines.length > 0 && (
+          <LiveTranscript lines={incident.transcriptLines} />
+        )}
+
         {incident.reasoningTrace && incident.reasoningTrace.length > 0 && (
           <div className="card reasoning-card">
             <h2>Why this severity</h2>
@@ -292,6 +298,8 @@ export default function IncidentDetailPage() {
             <p className="sub">Saved to the team's Google Drive for later review.</p>
           </div>
         )}
+
+        {!live && incident.consolidatedSummary && <ReplayScrubber incident={incident} />}
 
         {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} />}
 

@@ -81,7 +81,7 @@ service cloud.firestore {
         && d.keys().hasOnly([
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
           'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
-          'transcriptSummary', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
+          'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
           'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
         ])
@@ -107,6 +107,8 @@ service cloud.firestore {
         && (!('adviceGiven' in d) || (d.adviceGiven is list && d.adviceGiven.size() <= 500))
         && (!('fieldConfidenceLive' in d) || d.fieldConfidenceLive is map)
         && (!('reasoningTrace' in d) || (d.reasoningTrace is list && d.reasoningTrace.size() <= 500))
+        && (!('transcriptLines' in d) || (d.transcriptLines is list && d.transcriptLines.size() <= 3000))
+        && (!('fieldHistory' in d) || (d.fieldHistory is list && d.fieldHistory.size() <= 500))
         && (!('bulletin' in d) || d.bulletin is map)
         && optionalString(d, 'recommendation', 200)
         && optionalString(d, 'groundedContext', 300)
@@ -123,7 +125,8 @@ service cloud.firestore {
         && after.channel == before.channel
         && after.response.notes.size() >= before.response.notes.size()
         && (!('voiceStressTrend' in before) || after.voiceStressTrend.size() >= before.voiceStressTrend.size())
-        && (!('reasoningTrace' in before) || after.reasoningTrace.size() >= before.reasoningTrace.size());
+        && (!('reasoningTrace' in before) || after.reasoningTrace.size() >= before.reasoningTrace.size())
+        && (!('transcriptLines' in before) || after.transcriptLines.size() >= before.transcriptLines.size());
     }
 
     // A responder action touches status, who acknowledged/viewed it, or adds a note — only a signed-in

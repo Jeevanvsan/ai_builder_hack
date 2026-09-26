@@ -342,18 +342,20 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "map fields stress" "map nearby nearby" "map reasoning reasoning" "map timeline timeline" "recording recording recording" "bulletin bulletin bulletin" "summary summary summary";
+  grid-template-areas: "map fields stress" "map nearby nearby" "map transcript transcript" "map reasoning reasoning" "map timeline timeline" "recording recording recording" "replay replay replay" "bulletin bulletin bulletin" "summary summary summary";
   gap: 1rem;
 }
 /* With a camera feed: medium video box in the right column; Full screen opens the large view. */
-.detail-grid.has-video { grid-template-areas: "map fields video" "map stress video" "nearby nearby nearby" "reasoning reasoning reasoning" "timeline timeline timeline" "recording recording recording" "bulletin bulletin bulletin" "summary summary summary"; }
+.detail-grid.has-video { grid-template-areas: "map fields video" "map stress video" "nearby nearby nearby" "transcript transcript transcript" "reasoning reasoning reasoning" "timeline timeline timeline" "recording recording recording" "replay replay replay" "bulletin bulletin bulletin" "summary summary summary"; }
 .map-card { grid-area: map; display: flex; flex-direction: column; }
 .fields-card { grid-area: fields; }
 .stress-card { grid-area: stress; }
 .nearby-card { grid-area: nearby; }
+.transcript-card { grid-area: transcript; }
 .reasoning-card { grid-area: reasoning; }
 .timeline-card { grid-area: timeline; }
 .recording-card { grid-area: recording; }
+.replay-card { grid-area: replay; }
 .bulletin-card { grid-area: bulletin; }
 .summary-card { grid-area: summary; }
 .video-card { grid-area: video; display: flex; flex-direction: column; }
@@ -393,8 +395,26 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .summary { font-size: 1.05rem; line-height: 1.6; margin: 0 0 0.5rem; }
 
 @media (max-width: 1100px) {
-  .detail-grid { grid-template-columns: 1fr; grid-template-areas: "map" "fields" "stress" "nearby" "reasoning" "timeline" "bulletin" "summary"; }
-  .detail-grid.has-video { grid-template-areas: "video" "map" "fields" "stress" "nearby" "reasoning" "timeline" "bulletin" "summary"; }
+  .detail-grid { grid-template-columns: 1fr; grid-template-areas: "map" "fields" "stress" "nearby" "transcript" "reasoning" "timeline" "replay" "bulletin" "summary"; }
+  .detail-grid.has-video { grid-template-areas: "video" "map" "fields" "stress" "nearby" "transcript" "reasoning" "timeline" "replay" "bulletin" "summary"; }
+}
+
+/* Epic 17.2: live annotated transcript */
+.transcript-lines { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.5rem; max-height: 300px; overflow-y: auto; }
+.transcript-line { display: grid; grid-template-columns: 4.5rem 1fr; gap: 0.5rem; }
+.transcript-speaker { font-weight: 700; font-size: 0.82rem; color: var(--muted); }
+.transcript-mia .transcript-speaker { color: var(--accent); }
+.transcript-coded { position: relative; }
+.transcript-coded s { color: var(--muted); }
+.transcript-meaning { display: inline-block; margin-left: 0.35rem; font-weight: 700; color: var(--high); font-size: 0.85rem; }
+
+/* Epic 17.3: replay scrubber */
+.replay-slider { width: 100%; margin: 0.75rem 0 0.35rem; }
+.replay-time { color: var(--muted); margin-bottom: 0.75rem; }
+.replay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.replay-transcript { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; max-height: 220px; overflow-y: auto; font-size: 0.9rem; }
+@media (max-width: 700px) {
+  .replay-grid { grid-template-columns: 1fr; }
 }
 
 .grounded-context { font-style: italic; margin-top: 0.2rem; }

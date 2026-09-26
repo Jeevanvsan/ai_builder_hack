@@ -138,6 +138,11 @@ export function updateLiveFields(db: Firestore, id: string, patch: Partial<LiveF
       update.reasoningTrace = [...(current.reasoningTrace ?? []), { text: line, at: now() }]
     }
 
+    // Epic 17.3: snapshot the merged fields so the replay scrubber can show "what was known at time T", not just
+    // the final picture. Capped at 500 entries (a call firing this every few seconds would take hours to hit it).
+    const history = [...(current.fieldHistory ?? []), { fields: merged, at: now() }]
+    update.fieldHistory = history.length > 500 ? history.slice(-500) : history
+
     tx.update(ref(db, id), update)
   })
 }
@@ -159,6 +164,16 @@ export function recordVoiceStress(db: Firestore, id: string, score: number): Pro
     }
     tx.update(ref(db, id), update)
   })
+}
+
+// Epic 17.1: writes a completed transcript line live during the call — plain arrayUnion, no transaction, since
+// a transcript line never needs to read the current document first (it only ever appends, never conditionally
+// changes based on existing state). This deliberately avoids the read-modify-write contention that the other
+// live-write functions above need retry hardening for for: appending each line is naturally the caller's own
+// speaker+text data, ordering is only cosmetic (display sorts by `at`), and Firestore's own write ordering per
+// client is already sufficient.
+export function appendTranscriptLine(db: Firestore, id: string, speaker: 'Caller' | 'Mia', text: string): Promise<void> {
+  return updateDoc(ref(db, id), { transcriptLines: arrayUnion({ speaker, text, at: now() }) })
 }
 
 // Turns the caller's spoken "delivery address" into a pinned location. If geocoding fails, the spoken address is
