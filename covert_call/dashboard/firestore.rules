@@ -82,7 +82,7 @@ service cloud.firestore {
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
           'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
           'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
-          'correlatedIncidentIds',
+          'correlatedIncidentIds', 'safeRoute',
           'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
         ])
@@ -94,6 +94,8 @@ service cloud.firestore {
         && d.callState in ['active', 'ended']
         && d.severity in ['low', 'medium', 'high']
         && d.location is map
+        && (!('track' in d.location) || (d.location.track is list && d.location.track.size() <= 2000))
+        && (!('safeRoute' in d) || d.safeRoute is map)
         && d.extractedFieldsLive is map
         && d.response is map
         && d.response.status in ['new', 'acknowledged', 'in_progress', 'resolved']

@@ -176,6 +176,19 @@ export function appendTranscriptLine(db: Firestore, id: string, speaker: 'Caller
   return updateDoc(ref(db, id), { transcriptLines: arrayUnion({ speaker, text, at: now() }) })
 }
 
+// Live GPS point while the call is open; also keeps location.rough on the latest fix so maps follow the caller.
+export function appendTrackPoint(db: Firestore, id: string, p: { lat: number; lng: number; speed?: number | null }): Promise<void> {
+  const at = now()
+  return updateDoc(ref(db, id), {
+    'location.track': arrayUnion({ lat: p.lat, lng: p.lng, at, speed: p.speed ?? null }),
+    'location.rough': { lat: p.lat, lng: p.lng, source: 'gps', capturedAt: at },
+  })
+}
+
+export function setSafeRoute(db: Firestore, id: string, route: NonNullable<Incident['safeRoute']>): Promise<void> {
+  return updateDoc(ref(db, id), { safeRoute: route })
+}
+
 // Turns the caller's spoken "delivery address" into a pinned location. If geocoding fails, the spoken address is
 // still stored (it's what a responder most needs) against the rough coordinates, marked uncertain.
 export async function confirmAddress(

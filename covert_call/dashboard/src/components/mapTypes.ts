@@ -6,4 +6,7 @@ export type MapProps = {
   target: { lat: number; lng: number }
   // Non-interactive board backdrop: no drag/zoom/controls, so the incident pin stays centred under the case hub.
   backdrop?: boolean
+  // Live GPS trail and route to safety (drawn on the OSM map).
+  track?: { lat: number; lng: number }[]
+  route?: Incident['safeRoute']
 }

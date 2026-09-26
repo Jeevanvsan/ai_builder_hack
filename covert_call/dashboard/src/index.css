@@ -690,14 +690,18 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
    fixed slots linked to the hub) beside the conversation/case panel,
    then the timeline rail. Light theme throughout.
    ============================================================ */
-.content:has(.case-page) { padding-top: 1rem; padding-bottom: 1rem; }
+.content:has(.case-page) { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+/* Fills exactly the space under the sticky header so the page itself never scrolls. */
 .case-page {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 0.75rem;
-  height: calc(100dvh - 9rem);
-  min-height: 640px;
+  height: calc(100dvh - 10.25rem);
+  min-height: 560px;
 }
+.panel-body { scrollbar-width: thin; scrollbar-color: #cfd7e3 transparent; }
+.panel-body::-webkit-scrollbar { width: 6px; }
+.panel-body::-webkit-scrollbar-thumb { background: #cfd7e3; border-radius: 999px; }
 .case-page .diff-banner { margin: 0; }
 .case-page > .diff-banner:empty { display: none; }
 
@@ -761,14 +765,14 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   box-shadow: 0 1px 2px rgba(20, 30, 50, 0.05), 0 18px 40px -24px rgba(20, 30, 50, 0.3);
 }
 .board-map { position: absolute; inset: 0; }
-.board-map .map { height: 100%; min-height: 0; border: 0; border-radius: 0; filter: saturate(0.5) contrast(0.95) brightness(1.05); }
+.board-map .map { height: 100%; min-height: 0; border: 0; border-radius: 0; filter: grayscale(0.85) contrast(0.85) brightness(1.1) opacity(0.75); }
 .board-map .leaflet-control-attribution { font-size: 10px; background: rgba(255, 255, 255, 0.7); }
 /* Softens the map towards the edges so tiles read clearly, while the area around the hub stays sharp. */
 .board-veil {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(244, 247, 251, 0) 0%, rgba(244, 247, 251, 0) 22%, rgba(244, 247, 251, 0.55) 58%, rgba(244, 247, 251, 0.82) 100%);
+  background: radial-gradient(ellipse at center, rgba(244, 247, 251, 0) 0%, rgba(244, 247, 251, 0.15) 20%, rgba(244, 247, 251, 0.6) 50%, rgba(244, 247, 251, 0.85) 100%);
 }
 .light-links { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
 .board-grid {
@@ -852,11 +856,9 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   padding: 0.8rem 0.95rem 0.8rem 1.05rem;
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(12px) saturate(1.2);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  border: 1px solid color-mix(in srgb, var(--tone) 28%, var(--border));
-  box-shadow: 0 1px 2px rgba(20, 30, 50, 0.05), 0 14px 30px -16px color-mix(in srgb, var(--tone) 45%, rgba(20, 30, 50, 0.3));
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--tone) 40%, #d5dce7);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.7), 0 2px 4px rgba(20, 30, 50, 0.08), 0 18px 36px -14px rgba(20, 30, 50, 0.35);
 }
 .evidence-tile::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--tone); }
 .evidence-tile.is-pending { border-style: dashed; }
@@ -889,6 +891,27 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .tile-call { flex: none; padding: 0.1rem 0.45rem; border-radius: 6px; font-size: 0.74rem; font-weight: 700; color: var(--live); background: color-mix(in srgb, var(--live) 12%, #fff); }
 .tile-call:hover { text-decoration: none; background: color-mix(in srgb, var(--live) 20%, #fff); }
 
+.tile-route { border: 0; font: inherit; font-size: 0.74rem; cursor: pointer; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, #fff); }
+.route-tile { display: flex; flex-direction: column; gap: 0.35rem; }
+.route-dest { display: flex; align-items: center; gap: 0.4rem; min-width: 0; font-weight: 700; font-size: 0.86rem; }
+.route-eta { font-size: 0.8rem; color: var(--muted); }
+.route-eta strong { color: var(--live); font-size: 1rem; }
+.route-next { display: flex; align-items: baseline; gap: 0.45rem; padding: 0.4rem 0.55rem; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, #fff); font-weight: 700; font-size: 0.86rem; }
+.route-next-label { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.map-dest-label { font-weight: 700; }
+/* Scene sketch (side panel "Scene" tab) */
+.scene-svg { width: 100%; height: 160px; margin-top: 0.5rem; }
+.scene-svg line, .scene-svg circle, .scene-svg rect, .scene-svg polygon { stroke: var(--text); fill: none; stroke-width: 2; }
+.scene-svg circle { fill: var(--surface-solid); }
+.scene-svg .sketch-person.sketch-danger circle, .scene-svg .sketch-person.sketch-danger line { stroke: var(--high); }
+.scene-svg .sketch-weapon line { stroke: var(--high); }
+.scene-svg .sketch-vehicle rect, .scene-svg .sketch-vehicle circle { stroke: var(--medium); }
+.scene-svg .sketch-motion line, .scene-svg .sketch-motion polygon { stroke: var(--muted); fill: var(--muted); stroke-dasharray: 4 4; }
+.scene-svg .sketch-label { font-size: 10px; fill: var(--muted); stroke: none; }
+.scene-svg .sketch-danger-text { fill: var(--high); }
+.map-turn-label { font-weight: 700; color: #1a73e8; }
+.board-map .leaflet-control-zoom { margin: 0 0 1.25rem 1.25rem; }
+.board-map .leaflet-top.leaflet-left { top: auto; bottom: 0; }
 .stress-wave { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.6rem; }
 .stress-wave-value { min-width: 2.2ch; font-size: 1.6rem; font-weight: 800; color: var(--tone); font-variant-numeric: tabular-nums; }
 .stress-wave-canvas { display: block; width: 100%; height: 44px; }

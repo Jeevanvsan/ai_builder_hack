@@ -9,8 +9,9 @@ import ReplayScrubber from '../ReplayScrubber'
 import { channelLabel } from '../../lib/format'
 import Conversation from './Conversation'
 import DecodeText from './DecodeText'
+import SceneSketch from './SceneSketch'
 
-type Tab = 'conversation' | 'case'
+type Tab = 'conversation' | 'scene' | 'case'
 const SUMMARY_WAIT_MS = 90_000
 
 // Right-hand panel: the live conversation while the call runs, the case file once it ends. It follows the call
@@ -20,7 +21,8 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
   const tab: Tab = chosen && chosen.whileLive === live ? chosen.tab : live ? 'conversation' : 'case'
   const pick = (t: Tab) => setChosen({ tab: t, whileLive: live })
 
-  const hasVideo = Boolean(incident.video || incident.videoFront)
+  // Only while a feed is live — an ended feed is just a big black "feed ended" box taking the panel's space.
+  const hasVideo = incident.video?.status === 'live' || incident.videoFront?.status === 'live'
   const summaryPending = !live && !incident.consolidatedSummary && incident.sessionEndedAt
     && now - Date.parse(incident.sessionEndedAt) < SUMMARY_WAIT_MS
 
@@ -37,13 +39,18 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
         <button type="button" role="tab" aria-selected={tab === 'conversation'} className={tab === 'conversation' ? 'active' : ''} onClick={() => pick('conversation')}>
           {live && <span className="live-dot" />}Conversation
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'scene'} className={tab === 'scene' ? 'active' : ''} onClick={() => pick('scene')}>
+          Scene
+        </button>
         <button type="button" role="tab" aria-selected={tab === 'case'} className={tab === 'case' ? 'active' : ''} onClick={() => pick('case')}>
           Case file
         </button>
       </div>
 
       <div className="panel-body">
-        {tab === 'conversation' ? (
+        {tab === 'scene' ? (
+          <SceneSketch incident={incident} />
+        ) : tab === 'conversation' ? (
           <Conversation
             lines={incident.transcriptLines ?? []}
             emptyText={incident.channel === 'live-call'

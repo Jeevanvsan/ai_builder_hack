@@ -35,7 +35,12 @@ export interface Incident {
       confidence: FieldConfidence
       confirmedAt: string
     } | null
+    // Live GPS trail while the call is open (route-to-safety): lets the dashboard follow a moving caller.
+    track?: { lat: number; lng: number; at: string; speed?: number | null }[]
   }
+  // Route to the best-fit station (police/hospital/fire), kept current as the caller moves. Set by the AI during the
+  // call or by a responder picking a station on the dashboard.
+  safeRoute?: import('../nav/route.ts').SafeRoute
   extractedFieldsLive: {
     peopleCount: number | null
     dangerIndicators: string[]
