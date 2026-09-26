@@ -109,14 +109,21 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                       ) : (
                         <a className="btn btn-sm" href={incident.audioRecording.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
                       )
+                    ) : incident.audioRecording.status === 'recording' ? (
+                      <span className="sub">Uploading…</span>
+                    ) : incident.hasRecording ? (
+                      <span className="sub">Drive upload failed — backup copy below</span>
                     ) : (
-                      <span className="sub">{incident.audioRecording.status === 'recording' ? 'Uploading…' : 'Upload failed — see below'}</span>
+                      <span className="sub">Upload failed</span>
                     )}
                   </div>
                 ) : (
                   incident.hasRecording && <CallRecordingPlayer incidentId={incident.id} />
                 )}
-                {!incident.hasRecording && !incident.audioRecording && incident.recordingFailed && !live && (
+                {/* Shown whenever saving failed outright, including when Drive ALSO failed first — previously the
+                    `!audioRecording` guard hid the reason in exactly the case it mattered most (Drive failed, then
+                    the backup did too), leaving "Upload failed — see below" pointing at nothing. */}
+                {!incident.hasRecording && incident.recordingFailed && !live && (
                   <p className="panel-empty">No audio recording — saving it failed ({incident.recordingFailed}).</p>
                 )}
                 {incident.audioRecording?.status === 'failed' && incident.hasRecording && <CallRecordingPlayer incidentId={incident.id} />}
