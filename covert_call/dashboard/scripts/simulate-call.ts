@@ -49,7 +49,7 @@ if (process.argv.includes('--moving')) {
   await setSafeRoute(db, id, route)
   console.log(`  route to ${route.destination.name}: ${route.distanceM} m, ${route.durationS} s, ${route.steps.length} steps`)
   const path = route.geometry.filter((_, i) => i % 3 === 0)
-  for (const [lat, lng] of path) {
+  for (const { lat, lng } of path) {
     await sleep(2000)
     await appendTrackPoint(db, id, { lat, lng, speed: 8 })
     const prog = progressOnRoute({ lat, lng }, route)
