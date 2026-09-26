@@ -6,7 +6,8 @@ import DecodeText from './DecodeText'
 import { Link } from 'react-router-dom'
 import type { Incident } from '../../../../shared/incidents/types'
 import IncidentMap from '../IncidentMap'
-import { deriveEvidence, SLOT_OF, type Evidence, type EvidenceKind } from '../../lib/evidence'
+import { useIncidents } from '../../lib/incidentsStore'
+import { nearbyIncidentIds, deriveEvidence, SLOT_OF, type Evidence, type EvidenceKind } from '../../lib/evidence'
 import { nearbyServices, suggestedServiceKind, type NearbyService } from '../../../../shared/nav/nearbyServices.ts'
 import CaseHub from './CaseHub'
 import EvidenceTile from './EvidenceTile'
@@ -43,7 +44,8 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
   const tileEls = useRef(new Map<string, HTMLElement>())
   const nearby = useNearby(incident.location.confirmed)
 
-  const evidence = deriveEvidence(incident, now)
+  const { data: allIncidents } = useIncidents('all')
+  const evidence = deriveEvidence(incident, now, nearbyIncidentIds(incident, allIncidents))
   if (nearby === 'pending') {
     evidence.nearby = { kind: 'nearby', label: 'Nearby help', values: [], tone: 'neutral', pending: 'Finding nearby police, fire and hospital…' }
   } else if (Array.isArray(nearby)) {
@@ -105,7 +107,7 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
       return (
         <ul className="tile-list">
           {e.values.map((id) => (
-            <li key={id}><Link to={`/incident/${id}`} className="mono">{id}</Link><span className="sub">same person, vehicle or place</span></li>
+            <li key={id}><Link to={`/incident/${id}`} className="mono">{id}</Link><span className="sub">{incident.correlatedIncidentIds?.includes(id) ? 'AI: same person or vehicle' : 'same place, last 7 days'}</span></li>
           ))}
         </ul>
       )
