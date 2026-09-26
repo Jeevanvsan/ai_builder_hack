@@ -7,6 +7,15 @@ async function viaGoogle(address: string, key: string): Promise<Coordinates | nu
   return loc ? { lat: loc.lat, lng: loc.lng } : null
 }
 
+// Nominatim's place_rank is coarser the bigger the area: countries/states are ~4-8, districts ~10-12, a
+// town/city/village lands at 14+, a street or POI higher still. A district-or-larger "hit" is a real place, but
+// its lat/lng is the CENTROID OF ITS WHOLE BOUNDING BOX — for a district the size of Alappuzha (45km x 65km) that
+// centroid can be a rural point tens of km from the caller, from the town itself, from anything they mentioned.
+// Confirmed in testing: bare "Alappuzha" resolves to the district boundary (place_rank 10), landing nowhere near
+// the actual town. Never trust a hit this coarse as a pin — it looks like a normal, confident result but isn't
+// one at the precision an emergency pin needs.
+const MIN_USABLE_PLACE_RANK = 14
+
 async function nominatimSearch(query: string, near: Coordinates | null): Promise<Coordinates | null> {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1' })
   // Bias (not restrict) results toward the caller's rough location so "12th Main Road" resolves in the right city.
@@ -16,7 +25,9 @@ async function nominatimSearch(query: string, near: Coordinates | null): Promise
   const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers })
   if (!res.ok) return null
   const [hit] = await res.json()
-  return hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null
+  if (!hit) return null
+  if (typeof hit.place_rank === 'number' && hit.place_rank < MIN_USABLE_PLACE_RANK) return null
+  return { lat: Number(hit.lat), lng: Number(hit.lon) }
 }
 
 function distanceKm(a: Coordinates, b: Coordinates): number {

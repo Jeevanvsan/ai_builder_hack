@@ -207,6 +207,25 @@ service cloud.firestore {
           allow delete: if true;
         }
       }
+
+      // Third live feed's handshake — the caller-mic listen-in audio channel (Epic 16). Same rules as videoViewers.
+      match /audioViewers/{viewerId} {
+        allow read: if true;
+        allow create: if request.resource.data.keys().hasOnly(['offer', 'createdAt', 'viewerName'])
+          && request.resource.data.offer is map
+          && request.resource.data.createdAt is string;
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answer'])
+          && request.resource.data.answer is map;
+        allow delete: if true;
+
+        match /{side}/{candidateId} {
+          allow read: if true;
+          allow create: if side in ['viewerCandidates', 'publisherCandidates']
+            && request.resource.data.keys().hasOnly(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment']);
+          allow update: if false;
+          allow delete: if true;
+        }
+      }
     }
   }
 }
