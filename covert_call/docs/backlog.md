@@ -486,6 +486,11 @@ fields except where noted.*
 - [ ] Add Round 2+ drill-down questions specific to this code: still happening / can still see or hear them / which direction / which floor or unit
 - [ ] Rehearse: describing "I can see my neighbor's argument through the window right now" routes to these ongoing-observation questions, not the past-tense witnessed-crime ones
 
+### User Story 15.5
+**As a caller in danger, I want safety advice that's anchored to what I've actually described, not a generic canned line, so that it's actually useful to my specific situation.**
+- [ ] Tighten Epic 10.4's existing advice-giving instructions in `persona.ts` so every piece of advice explicitly references a detail already reported in that specific call (the caller's own described environment — near a door, in a specific room, a specific injury) rather than being picked from a fixed list regardless of context
+- [ ] Rehearse: staged scenarios describing a specific environment (e.g. "near the front door") get advice referencing that specific detail, not a generic safety line
+
 ---
 
 ## EPIC 16 — Responder Decision Support (Reasoning, Confidence, Bulletin) 🟡
@@ -539,6 +544,18 @@ fields except where noted.*
 - [ ] New banner on `IncidentDetailPage.tsx` summarizing the delta on reopen (e.g. "Since you last checked: address confirmed, urgency raised to high, 2 new notes")
 - [ ] Test: a responder who viewed an incident, left, and returns after new fields were reported sees a one-line summary of exactly what changed
 
+### User Story 16.9
+**As a responder who isn't currently watching an incident, I want to be re-alerted when something material changes, not just when it's first created, so that I don't miss an escalation while looking elsewhere.**
+- [ ] Extend Epic 4.6's alert logic to distinguish "a new fact was added" from "the situation just materially changed" — specifically: address confirmed for the first time, a new dangerIndicator added after the incident is already at least medium severity, or urgency escalating past its previous recorded level
+- [ ] On any of these, re-trigger the same alert path Epic 4.6 built for new incidents (toast + siren-style sound + tab title count), scoped to responders not currently on that incident's detail page — Epic 4.6's existing "do not disturb while on an incident page" rule still applies here (contrast with 16.7, which deliberately overrides that rule for a responder already on the page)
+- [ ] Test: a responder on the live queue (not the detail page) gets a second alert when a weapon indicator is added mid-call, distinct from the initial "new incident" alert
+
+### User Story 16.10
+**As a responder, I want factual, non-personal context (like weather near the incident), so that I have a fuller picture without looking it up myself.**
+- [ ] Use Gemini's Search grounding tool (available on the free tier, same `@google/genai` client already used for `consolidate.ts`/`leakageCheck.ts`), narrowly scoped to non-personal facts only — weather/road conditions near the confirmed location, or a sanity check that an address corresponds to a real location. Never pass a person's name into this — scope the prompt tightly enough that it can't be repurposed as a people-search tool, consistent with this document's explicit rejection of identity lookups
+- [ ] Wire into the consolidation pass or a standalone helper, triggered once location is confirmed
+- [ ] Test: a consolidated test incident's detail page shows a one-line grounded fact (e.g. current weather near the location) sourced from a real Search grounding call, not a hardcoded value
+
 ---
 
 ## EPIC 17 — Live Transcript & Replay 🟡
@@ -580,6 +597,24 @@ fields except where noted.*
 - [ ] At consolidation time, generate one finished schematic composite (reusing 18.1's layout approach) — new field on the incident record, new card on `IncidentDetailPage.tsx`
 - [ ] Explicitly document (in the deck/video, not just code comments) that this is iconographic only, never a real-likeness depiction — this framing must travel with the feature anywhere it's described publicly
 
+### User Story 18.3
+**As a responder, I want to feel the caller's stress rise, not just read a number, so that a live demo or a live case has an immediate emotional read, not just a data point.**
+- [ ] Replace or augment the existing `StressMeter`/`StressSparkline` components with an animated waveform, pulse, or color-shifting visual synced to `report_stress_level` updates (already fired every ~15-20s per `persona.ts`) — amplitude/color intensifying as the score rises
+- [ ] Stretch: tap the raw mic audio stream directly via the Web Audio API's analyser node on `player.recordingStream`/mic stream (already available in `audio.ts`) for a continuous live waveform, rather than animating only between periodic score updates
+- [ ] Test: during a live test call, the stress visualization visibly changes in real time, not just updating a number every 15-20 seconds
+
+### User Story 18.4
+**As a judge/demo audience watching a call happen, I want to see what the AI is currently doing internally, so that the mechanism is narrated visually without talking over the live call audio.**
+- [ ] Build a demo-only status line ("Listening for danger signals... / Confirming address... / Assessing urgency...") inferred from which tool calls have fired so far in `liveSession.ts` (e.g. `confirm_address` called → now past the address step) — no new tool-calling overhead purely for this
+- [ ] Gate this strictly behind a demo-mode flag or a separate demo build, rendered only on a second screen mirroring the call (for a judge or camera) — **must never appear on the real caller-facing `CallPage.tsx`**, since it would immediately break the disguise if visible to anyone glancing at the caller's phone
+- [ ] Test: a separate demo-mode view shows a live-updating status line during a test call; confirm the real `CallPage.tsx` shows nothing of the kind
+
+### User Story 18.5
+**As a responder, I want to see multiple incidents clustered on one map by severity, so that the system reads as monitoring infrastructure, not a single clever call.**
+- [ ] Add a map view mode showing severity-colored clustering across multiple incidents at once, reusing the existing `IncidentMap.tsx` component (Google Maps or free OpenStreetMap) with multiple incidents passed in instead of one
+- [ ] Tie into Epic 19.1 (cross-incident correlation) — visually link correlated incidents on this same view where practical
+- [ ] Test: with 2-3 seeded/simulated incidents active, the map view shows them clustered and colored by severity
+
 ---
 
 ## EPIC 19 — Cross-Case Intelligence 🟢
@@ -592,3 +627,60 @@ fields except where noted.*
 - [ ] Write `correlatedIncidentIds: string[]` (or similar) to the incident record via a new `shared/incidents/client.ts` function
 - [ ] Small "Possibly related" card on `IncidentDetailPage.tsx` linking to matched incidents
 - [ ] Test: two test incidents seeded with the same address or vehicle description show a "possibly related" link to each other once consolidation runs on the second one
+
+### User Story 19.2
+**As a responder, I want to see a moving target's trail on the map, not just a growing list of address strings, so that a possible-abduction scenario's pattern of movement is legible at a glance.**
+- [ ] Extend `IncidentMap.tsx` with an annotation layer (Leaflet, matching the existing free OpenStreetMap path, or the Google Maps JS API — both support drawing polylines/markers on top of an existing map) — start manual: a responder clicks/drags to mark a direction or waypoint as they read new landmarks off the notes feed
+- [ ] Stretch, only if time allows: auto-plot the trail by geocoding every intermediate landmark mention (not just the final confirmed address) as the persona's "MOVING?" drill-down (`persona.ts`, Step 5) gathers them, connecting successive points with an animated polyline as they arrive
+- [ ] Test: during a test call flagged as possible abduction, the responder can mark or see a visual trail on the map reflecting the reported direction of travel, not just a single static pin
+
+---
+
+## EPIC 20 — Live Responder Workflow Speed 🟡
+
+*Small, high-leverage additions to how fast a responder can act during a live incident — distinct from Epic 16's decision-support content, this epic is about interaction speed.*
+
+### User Story 20.1
+**As a responder, I want a single keypress to jump to the most urgent open incident, so that I don't have to click through the queue and visually scan every time I finish one case.**
+- [ ] Add a global keydown listener (dashboard's top-level layout/`App.tsx`) for a hotkey (e.g. spacebar or `N`) that navigates to whichever open, unacknowledged incident ranks highest per the existing `dashboard/src/lib/ranking.ts` sort — no new prioritization logic, just a shortcut to its result
+- [ ] Small, non-intrusive discovery hint (a shown-once tooltip or corner label) so responders learn the shortcut exists
+- [ ] Test: with several open test incidents at different severities, pressing the hotkey from anywhere in the dashboard jumps to the same incident that sits first in the live queue's own ranking
+
+---
+
+## EPIC 21 — Bigger Bets (reference only, not yet sized) 🟢
+
+*The largest, most speculative items from the brainstorm doc — deliberately not broken into buildable sub-tasks yet, since each needs a scoping/feasibility decision before that's useful. Attempt only after Epics 15-20 are solid, and only if time remains. See `covert_call/docs/extended_feature_brainstorm.md` for full detail on each.*
+
+### User Story 21.1 — Second-voice detection, in-character extraction, and second-party stress reading
+**As a responder, I want to know if someone other than the original caller has taken the phone, so that Mia can adapt and extract more instead of continuing to address someone who's no longer there.**
+- [ ] Prototype voice-change detection in isolation first (a throwaway test call where a second person deliberately joins mid-call) before committing further — false positives here are actively harmful, so do not build anything on top of this until detection is shown to be reliable
+- [ ] If reliable: persona instructions for staying in character and extracting useful information from a suspected second speaker (`persona.ts`), plus a distinct second-party stress reading (extending `report_stress_level`'s pattern, stored separately from the original caller's `voiceStressScore`/`voiceStressTrend`)
+- [ ] Cut this bundle entirely rather than ship it half-working if detection isn't reliable in rehearsal — a confidently-wrong "second voice detected" signal is worse than no signal
+
+### User Story 21.2 — Responder live-nudge channel
+**As a responder, I want to inject a short instruction into an in-progress call, so that I can intervene the moment I see something the AI should ask about right now.**
+- [ ] New Firestore subcollection (e.g. `incidents/{id}/nudges`) + rules, written from a small input UI on `IncidentDetailPage.tsx`
+- [ ] `liveSession.ts` listens for new nudges and injects them via `session.sendClientContent()`, reusing the same `(System note, not the caller: ...)` pattern the existing silence-watchdog already uses
+- [ ] Careful phrasing review so an injected nudge can never break the caller's disguise cover
+- [ ] The single largest engineering lift in this document — treat as a stretch to attempt only after everything else here is solid
+
+### User Story 21.3 — AI-drawn abduction trail
+**As a responder, I want the system to draw the movement trail automatically, so that I don't have to plot it by hand.**
+- [ ] Depends on 19.2 existing first (same `IncidentMap.tsx` annotation layer) and requires geocoding every landmark mention, not just the final address — the harder variant already flagged as a stretch under 19.2
+
+### User Story 21.4 — Live Gemini-narrated "responder co-pilot" text stream
+**As a responder, I want a running synthesis of how separately-reported facts connect, not just a log of what changed, so that I catch connections I might miss on my own.**
+- [ ] A distinct, lightweight periodic Gemini text call (every 20-30s, fed current extracted fields + recent history) producing short connective observations, only when something is actually worth saying
+- [ ] Consider whether this and 21.5 (disguise-integrity meter) could share one periodic call rather than running as two separate timers, for cost/latency reasons
+
+### User Story 21.5 — Live "disguise integrity" self-monitoring meter
+**As a responder, I want to know if the call has ever risked blowing its own cover, so that a slipped disguise is caught, not silently missed.**
+- [ ] A lighter, continuously-running variant of the existing leakage-check logic (Epic 2.2), checking the model's own recent responses against the same "does this sound like it's blowing its own cover" criteria, surfaced as a live green/amber/red indicator
+- [ ] Needs real rehearsal-time validation before trusting it — must not cry wolf on ordinary in-character lines, or the indicator itself becomes noise
+- [ ] Test: the indicator stays calm through normal in-character conversation, and visibly flags a deliberately staged in-call break-of-character line introduced during rehearsal
+
+### User Story 21.6 — Living "case constellation" correlation graph
+**As a responder, I want correlated incidents shown as a connected, pulsing graph, so that cross-case intelligence reads as alive, not a static text link.**
+- [ ] Depends entirely on 19.1 (correlation data) and 18.5 (multi-incident map/overview) already existing — not worth attempting before those are solid
+- [ ] Render correlated incidents as connected nodes with an animated pulse/glow the instant a new correlation is detected, as a separate mode alongside 18.5's map view
