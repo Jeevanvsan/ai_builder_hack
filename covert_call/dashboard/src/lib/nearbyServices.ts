@@ -13,8 +13,11 @@ export type NearbyService = {
   distanceKm: number
 }
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+// The free public Overpass instance occasionally rate-limits or times out — try a second mirror before giving up,
+// rather than leaving the card permanently stuck on "couldn't load" for what's often a transient issue.
+const OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
 const RADIUS_M = 5_000
+const REQUEST_TIMEOUT_MS = 10_000
 
 const QUERY_TAGS: Record<ServiceKind, string> = {
   police: 'amenity=police',
@@ -32,20 +35,44 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
   return R * 2 * Math.asin(Math.sqrt(h))
 }
 
+type OverpassElement = { tags?: Record<string, string>; lat: number; lon: number }
+
+async function queryOverpass(url: string, query: string): Promise<{ elements: OverpassElement[] } | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `data=${encodeURIComponent(query)}`,
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // One Overpass query covering all three service kinds at once, to stay within the free public instance's rate
-// limits rather than firing three separate requests per incident view.
+// limits rather than firing three separate requests per incident view. Tries each mirror in turn.
 export async function nearbyServices(near: { lat: number; lng: number }): Promise<NearbyService[]> {
   const filters = Object.values(QUERY_TAGS)
     .map((tag) => `node[${tag}](around:${RADIUS_M},${near.lat},${near.lng});`)
     .join('')
   const query = `[out:json][timeout:15];(${filters});out body;`
 
-  const res = await fetch(OVERPASS_URL, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
-  if (!res.ok) return []
-  const data = await res.json()
+  let data: { elements: OverpassElement[] } | null = null
+  for (const url of OVERPASS_URLS) {
+    data = await queryOverpass(url, query)
+    if (data) break
+  }
+  if (!data) return []
 
   const results: NearbyService[] = (data.elements ?? [])
-    .map((el: { tags?: Record<string, string>; lat: number; lon: number }) => {
+    .map((el: OverpassElement) => {
       const tags = el.tags ?? {}
       const kind: ServiceKind | null = tags.amenity === 'police' ? 'police' : tags.amenity === 'fire_station' ? 'fire' : tags.amenity === 'hospital' ? 'hospital' : null
       if (!kind) return null
