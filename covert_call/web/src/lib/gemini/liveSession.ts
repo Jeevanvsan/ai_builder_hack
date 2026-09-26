@@ -91,7 +91,8 @@ export async function startLiveCall(
 
   // Gemini Live only takes a turn after it hears the caller, so silence never makes it speak on its own.
   // This watchdog nudges it to re-ask after a quiet gap, and hangs up itself if the model doesn't after 3 tries.
-  const SILENCE_MS = 8_000
+  const SILENCE_MS = 12_000
+  const SPEAKING_LEVEL = 0.02
   let lastActivityAt = Date.now()
   let silentNudges = 0
   let finished = false
@@ -283,7 +284,9 @@ export async function startLiveCall(
     })
   })
 
-  const mic = await startMicCapture((base64Pcm) => {
+  const mic = await startMicCapture((base64Pcm, level) => {
+    // The caller is speaking (transcripts arrive late, after they finish): don't treat a long answer as silence.
+    if (level > SPEAKING_LEVEL && !player.isPlaying()) lastActivityAt = Date.now()
     if (!muted) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
   }, opts.micStream)
   micStop = mic.stop
@@ -316,7 +319,7 @@ export async function startLiveCall(
     silentNudges += 1
     if (silentNudges <= 3) {
       session.sendClientContent({
-        turns: `(System note, not the caller: the caller has been silent. Silence attempt ${silentNudges} of 3 — follow your SILENCE rule and gently repeat your last question with its meaning.)`,
+        turns: `(System note, not the caller: the caller has been silent. Silence attempt ${silentNudges} of 3 — follow your SILENCE rule and gently repeat your last question with its meaning. If the caller has just answered it, ignore this note and continue.)`,
       })
     } else if (silentNudges === 4) {
       session.sendClientContent({
