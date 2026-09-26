@@ -20,13 +20,21 @@ function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
 
 // Zooms out just enough to show the whole route (plus the caller) when it doesn't fit the current view, once per
 // new route — so a route is never silently off-screen.
+// The case board overlays a fixed ring of info tiles (vehicle/location/subjects/threat/stress/etc.) around every
+// edge of the map, leaving only the centre "hub" clear. A uniform fitBounds padding only controls zoom, not WHERE
+// content lands — the route/destination/police-station label could end up anywhere, including directly under a
+// tile (seen in testing: the destination marker and its label stacked under the Threat and Route-to-safety
+// tiles). Asymmetric padding reserves real screen margins approximating the tile ring's footprint on every side,
+// so fitBounds keeps the route inside the empty centre instead of wherever the raw bounds happen to fall.
 function FitRoute({ route, target }: { route: NonNullable<MapProps['route']>; target: { lat: number; lng: number } }) {
   const map = useMap()
   const key = `${route.destination.name}|${route.updatedAt}`
   useEffect(() => {
     const pts = [...route.geometry.map((p) => [p.lat, p.lng] as [number, number]), [target.lat, target.lng] as [number, number]]
     const bounds = L.latLngBounds(pts)
-    if (!map.getBounds().contains(bounds)) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 })
+    if (!map.getBounds().contains(bounds)) {
+      map.fitBounds(bounds, { paddingTopLeft: [140, 110], paddingBottomRight: [140, 130], maxZoom: 16 })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, key])
   return null
