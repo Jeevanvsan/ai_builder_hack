@@ -73,7 +73,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     if (prog.next && prog.toNextM < TURN_NOTICE_M && notedStep !== prog.stepIndex) {
       notedStep = prog.stepIndex
       const r0 = route, next = prog.next, toNext = prog.toNextM, toDest = prog.toDestinationM
-      void landmarkAt(next).then((lm) => onTurnNote(`Next: ${next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(toNext)}. ${fmtM(toDest)} to ${r0.destination.name}. Relay it in the caller's language, with the landmark if there is one, then one calming line.`))
+      void landmarkAt(next).then((lm) => onTurnNote(`Heading to ${r0.destination.name} (${r0.destination.kind}), ${fmtM(toDest)} to go. Next: ${next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(toNext)}. Tell the caller ALL of it in their language — where they're going and how far, the turn with its road/landmark, and the distance to the turn — then one calming line.`))
     }
   }
 
