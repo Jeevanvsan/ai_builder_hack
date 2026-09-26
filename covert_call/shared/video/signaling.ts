@@ -6,20 +6,30 @@ import { INCIDENTS } from '../incidents/client.ts'
 // (that costs money), so a few very strict networks may fail to connect.
 export const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
 
-// incidents/{id}/videoViewers/{viewerId}                      { offer, answer?, createdAt, viewerName }
-// incidents/{id}/videoViewers/{viewerId}/viewerCandidates     ICE candidates from the dashboard
-// incidents/{id}/videoViewers/{viewerId}/publisherCandidates  ICE candidates from the phone
-export const viewersCollection = (db: Firestore, incidentId: string) =>
-  collection(db, INCIDENTS, incidentId, 'videoViewers')
+// A single incident can carry two live feeds at once (Epic 11: front + back cameras), so each camera gets its own
+// signaling collection and its own status field on the incident. The back camera keeps the original names, so the
+// existing single-camera call path (Epic 9) is completely unchanged.
+export type Camera = 'back' | 'front'
 
-export const viewerDoc = (db: Firestore, incidentId: string, viewerId: string) =>
-  doc(db, INCIDENTS, incidentId, 'videoViewers', viewerId)
+// Which incident field holds a camera's live status.
+export const videoField = (camera: Camera = 'back'): 'video' | 'videoFront' => (camera === 'front' ? 'videoFront' : 'video')
 
-export const viewerCandidates = (db: Firestore, incidentId: string, viewerId: string) =>
-  collection(db, INCIDENTS, incidentId, 'videoViewers', viewerId, 'viewerCandidates')
+const viewersName = (camera: Camera): string => (camera === 'front' ? 'videoViewersFront' : 'videoViewers')
 
-export const publisherCandidates = (db: Firestore, incidentId: string, viewerId: string) =>
-  collection(db, INCIDENTS, incidentId, 'videoViewers', viewerId, 'publisherCandidates')
+// incidents/{id}/{videoViewers|videoViewersFront}/{viewerId}                      { offer, answer?, createdAt, viewerName }
+// incidents/{id}/.../{viewerId}/viewerCandidates     ICE candidates from the dashboard
+// incidents/{id}/.../{viewerId}/publisherCandidates  ICE candidates from the phone
+export const viewersCollection = (db: Firestore, incidentId: string, camera: Camera = 'back') =>
+  collection(db, INCIDENTS, incidentId, viewersName(camera))
+
+export const viewerDoc = (db: Firestore, incidentId: string, viewerId: string, camera: Camera = 'back') =>
+  doc(db, INCIDENTS, incidentId, viewersName(camera), viewerId)
+
+export const viewerCandidates = (db: Firestore, incidentId: string, viewerId: string, camera: Camera = 'back') =>
+  collection(db, INCIDENTS, incidentId, viewersName(camera), viewerId, 'viewerCandidates')
+
+export const publisherCandidates = (db: Firestore, incidentId: string, viewerId: string, camera: Camera = 'back') =>
+  collection(db, INCIDENTS, incidentId, viewersName(camera), viewerId, 'publisherCandidates')
 
 export const HEARTBEAT_MS = 10_000
 // A feed marked live whose heartbeat is older than this is treated as lost (sender closed or went offline).

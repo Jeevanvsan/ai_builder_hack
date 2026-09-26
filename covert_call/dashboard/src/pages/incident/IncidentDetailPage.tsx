@@ -10,7 +10,7 @@ import NoteForm from '../../components/NoteForm'
 import ResponseActions from '../../components/ResponseActions'
 import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
-import { formatElapsed, formatTime, statusLabel } from '../../lib/format'
+import { channelLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
 import { useAuth } from '../../lib/authContext'
 import { responderLabel } from '../../lib/auth'
@@ -84,7 +84,11 @@ export default function IncidentDetailPage() {
             </LiveValue>
           </h1>
           <p className="muted">
-            {incident.channel === 'live-call' ? 'Voice call' : 'Silent tap'} · started {formatTime(incident.sessionStartedAt)}
+            {incident.incidentType === 'sos' && (
+              <span className="sos-badge">SOS{incident.scenario ? ` · ${incident.scenario}` : ''}</span>
+            )}
+            {channelLabel(incident.channel)} · started {formatTime(incident.sessionStartedAt)}
+            {incident.cameraMode && ` · cameras: ${incident.cameraMode}`}
             {incident.response.acknowledgedBy && ` · handled by ${incident.response.acknowledgedBy}`}
           </p>
         </div>
@@ -106,8 +110,8 @@ export default function IncidentDetailPage() {
         </div>
       </div>
 
-      <div className={incident.video ? 'detail-grid has-video' : 'detail-grid'}>
-        {incident.video && (
+      <div className={incident.video || incident.videoFront ? 'detail-grid has-video' : 'detail-grid'}>
+        {(incident.video || incident.videoFront) && (
           <div className="card video-card">
             <div className="video-card-head">
               <h2>Live video</h2>
@@ -160,6 +164,25 @@ export default function IncidentDetailPage() {
           </dl>
         </div>
 
+        {incident.sceneObservations && incident.sceneObservations.length > 0 && (
+          <div className="card scene-card">
+            <h2>Seen &amp; heard</h2>
+            <p className="sub">What the AI observed on camera or in the background — separate from what the caller said.</p>
+            <ul className="scene-list">
+              {incident.sceneObservations.map((o, idx) => (
+                <li key={`${o.at}-${idx}`}>
+                  <span className={`scene-tag scene-${o.source}`}>{o.source === 'sound' ? 'Heard' : 'Seen'}</span>
+                  <span className="scene-kind">{o.kind}</span>
+                  {o.detail && <span className="scene-detail">{o.detail}</span>}
+                  <span className="scene-time mono">
+                    {new Date(o.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="card stress-card">
           <h2>Voice stress</h2>
           <LiveValue value={incident.voiceStressScore}>
@@ -186,6 +209,27 @@ export default function IncidentDetailPage() {
             <h2>Call recording</h2>
             <CallRecordingPlayer incidentId={incident.id} />
             <p className="sub">Full call audio (mic + AI voice), for evidence and verification. Playable anytime.</p>
+          </div>
+        )}
+
+        {incident.videoRecording && incident.videoRecording.length > 0 && (
+          <div className="card recording-card">
+            <h2>Call video</h2>
+            <ul className="drive-videos">
+              {incident.videoRecording.map((v) => (
+                <li key={v.camera}>
+                  <span className="drive-cam">{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>
+                  {v.status === 'uploaded' && v.driveUrl ? (
+                    <a className="btn btn-sm" href={v.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
+                  ) : v.status === 'recording' ? (
+                    <span className="sub">Uploading…</span>
+                  ) : (
+                    <span className="sub">Upload failed</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="sub">Saved to the team's Google Drive for later review.</p>
           </div>
         )}
 

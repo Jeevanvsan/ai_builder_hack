@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/disguise/PageHeader'
 import { db } from '../lib/firebase'
 import { zeroTraceExit } from '../lib/gemini/exit'
-import { startIncident, updateLiveFields, confirmAddress } from '../../../shared/incidents/client.ts'
+import { analyzePhoto } from '../lib/gemini/photoVision'
+import { startIncident, updateLiveFields, confirmAddress, reportSceneObservation } from '../../../shared/incidents/client.ts'
 import type { Severity } from '../../../shared/incidents/types.ts'
 
 // Each visible option is an ordinary "delivery instruction" — its real meaning only appears on long-press, so
@@ -61,6 +62,30 @@ export function SilentTapPage() {
   const [address, setAddress] = useState('')
   const [note, setNote] = useState('')
   const [ready, setReady] = useState(false)
+  const [photoState, setPhotoState] = useState<'idle' | 'analysing' | 'attached' | 'failed'>('idle')
+
+  // Attach a photo (Epic 6.1): Gemini reads it into structured signal and merges it into the incident. Styled as
+  // an ordinary "add a photo for the rider" affordance. The raw image isn't stored — only the AI's read of it.
+  const onPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    const id = incidentIdRef.current
+    if (!file || !id) return
+    setPhotoState('analysing')
+    try {
+      const analysis = await analyzePhoto(file)
+      await updateLiveFields(db, id, {
+        dangerIndicators: analysis.dangerIndicators,
+        urgency: analysis.urgency,
+        notes: `Photo: ${analysis.summary}`,
+      })
+      for (const obs of analysis.observations) {
+        await reportSceneObservation(db, id, { source: 'camera', kind: 'photo', detail: obs })
+      }
+      setPhotoState('attached')
+    } catch {
+      setPhotoState('failed')
+    }
+  }
 
   useEffect(() => {
     void startIncident(db, { channel: 'silent-tap' }).then(({ id }) => {
@@ -116,6 +141,17 @@ export function SilentTapPage() {
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Confirm your address"
         />
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">Add a photo</h2>
+        <p className="tap-hint">Optional — a picture to help the rider find you.</p>
+        <label className="tap-option" style={{ cursor: 'pointer' }}>
+          <span className="tap-option-label">
+            {photoState === 'analysing' ? 'Uploading photo…' : photoState === 'attached' ? 'Photo added ✓' : photoState === 'failed' ? 'Couldn’t add photo — tap to retry' : 'Choose a photo'}
+          </span>
+          <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={(e) => void onPhoto(e)} />
+        </label>
       </section>
 
       <section className="card">

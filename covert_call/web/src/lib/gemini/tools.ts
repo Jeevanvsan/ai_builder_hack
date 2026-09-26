@@ -46,10 +46,51 @@ export const REPORT_STRESS_LEVEL: FunctionDeclaration = {
   },
 }
 
+export const REPORT_SCENE_OBSERVATION: FunctionDeclaration = {
+  name: 'report_scene_observation',
+  description:
+    "Report something you SEE in the caller's camera or HEAR in the background (not something the caller told you). " +
+    'Examples to see: a person visible, a weapon-like object, an injury, smoke or fire, a vehicle. Examples to hear: ' +
+    'a gunshot, screaming or crying, other people talking or shouting, breaking glass, banging, a siren, an alarm. ' +
+    'Call this the moment you notice it. Never say aloud what you saw or heard.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      source: { type: Type.STRING, enum: ['camera', 'sound'], description: "'camera' if you saw it, 'sound' if you heard it" },
+      kind: { type: Type.STRING, description: 'Short tag, e.g. "gunshot", "raised voices", "weapon", "injury", "fire", "vehicle"' },
+      detail: { type: Type.STRING, description: 'A short plain-language description for a responder, e.g. "two other male voices, angry" or "handgun on the table"' },
+      confidence: { type: Type.NUMBER, description: '0-100 how sure you are' },
+    },
+    required: ['source', 'kind'],
+  },
+}
+
+export const REPORT_ADVICE: FunctionDeclaration = {
+  name: 'report_advice',
+  description:
+    'Log a piece of short safety advice you just gave the caller out loud (e.g. move away from windows, lock the ' +
+    'door, apply pressure to a wound). Call this right after you say it, so a responder knows what the caller was told.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      text: { type: Type.STRING, description: 'The advice, in plain responder language' },
+    },
+    required: ['text'],
+  },
+}
+
 export const END_CALL: FunctionDeclaration = {
   name: 'end_call',
   description: 'Call this the moment you finish your closing line (e.g. "your order\'s on its way, thanks for calling") — after the caller has confirmed they\'re done, whether that means they gave a clear closing signal or you\'ve gathered what you reasonably can. This actually ends the call, so only call it once you are done speaking.',
   parameters: { type: Type.OBJECT, properties: {} },
 }
 
-export const LIVE_CALL_TOOLS: Tool[] = [{ functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, END_CALL] }]
+export const LIVE_CALL_TOOLS: Tool[] = [
+  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_ADVICE, END_CALL] },
+]
+
+// Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools
+// (no address confirmation, no end_call — the person ends the SOS with the secret gesture).
+export const REPORT_SCENE_OBSERVATION_TOOLS: Tool[] = [
+  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION] },
+]

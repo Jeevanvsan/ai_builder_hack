@@ -1,7 +1,8 @@
 import { GoogleGenAI, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
-import { confirmAddress, recordVoiceStress, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { confirmAddress, recordAdvice, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
+import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
 import { startCallRecording, type CallRecorder } from './recorder.ts'
 import { LIVE_CALL_TOOLS } from './tools.ts'
@@ -33,6 +34,9 @@ export async function startLiveCall(
   db: Firestore,
   incidentId: string,
   callbacks: LiveCallCallbacks,
+  // The caller can pass a mic stream it already opened (Epic 9 opens the mic and the back camera together); when
+  // omitted, the mic is opened here as before. `videoStream` (Epic 10) turns on ~1 fps camera frames to Gemini.
+  opts: { micStream?: MediaStream; videoStream?: MediaStream } = {},
 ): Promise<LiveCallHandle> {
   const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
   if (!apiKey) throw new Error('Gemini Live is not configured')
@@ -54,6 +58,12 @@ export async function startLiveCall(
   let lastActivityAt = Date.now()
   let silentNudges = 0
   let finished = false
+  // Session resumption (Epic 10.1): a session with video attached hits a shorter cap, so we keep the latest
+  // resumption handle and transparently reopen the session if it drops mid-call. Only used when video is on.
+  const useVideo = Boolean(opts.videoStream)
+  let resumptionHandle: string | undefined
+  let reconnects = 0
+  const MAX_RECONNECTS = 3
 
   // Gemini can fire several tool calls back-to-back within the same turn (e.g. report_situation right after
   // report_stress_level) — writing to the same Firestore document concurrently from two overlapping
@@ -84,6 +94,25 @@ export async function startLiveCall(
       case 'report_stress_level': {
         const score = args.score
         if (typeof score === 'number') enqueueWrite(() => recordVoiceStress(db, incidentId, Math.max(0, Math.min(100, score))))
+        break
+      }
+      case 'report_scene_observation': {
+        const source = args.source
+        const kind = args.kind
+        if ((source === 'camera' || source === 'sound') && typeof kind === 'string') {
+          enqueueWrite(() =>
+            reportSceneObservation(db, incidentId, {
+              source,
+              kind,
+              detail: typeof args.detail === 'string' ? args.detail : undefined,
+              confidence: typeof args.confidence === 'number' ? args.confidence : undefined,
+            }),
+          )
+        }
+        break
+      }
+      case 'report_advice': {
+        if (typeof args.text === 'string' && args.text.trim()) enqueueWrite(() => recordAdvice(db, incidentId, args.text as string))
         break
       }
       case 'end_call': {
@@ -121,6 +150,10 @@ export async function startLiveCall(
     // interruption, explaining the earlier bug where the persona went silent partway through every real call.
     if (message.serverContent?.interrupted) player.clearQueue()
 
+    // Keep the newest resumption handle so we can reopen the session if it drops mid-call (video sessions are short).
+    const newHandle = message.sessionResumptionUpdate?.newHandle
+    if (newHandle) resumptionHandle = newHandle
+
     const calls = message.toolCall?.functionCalls
     if (calls?.length) {
       for (const call of calls) handleToolCall(call)
@@ -133,8 +166,8 @@ export async function startLiveCall(
   let session: Session
   callbacks.onStatusChange('connecting')
 
-  try {
-    session = await client.live.connect({
+  const openSession = (resume?: string) =>
+    client.live.connect({
       model: LIVE_MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
@@ -152,6 +185,10 @@ export async function startLiveCall(
         outputAudioTranscription: {},
         systemInstruction: PERSONA_SYSTEM_INSTRUCTION,
         tools: LIVE_CALL_TOOLS,
+        // Only for video calls (Epic 10): compression stretches the shorter audio+video session, and resumption
+        // lets us reopen it if it drops. Audio-only calls keep the exact proven config, so their behaviour is
+        // unchanged. `resume` carries the handle from a previous session when reconnecting.
+        ...(useVideo ? { contextWindowCompression: { slidingWindow: {} }, sessionResumption: resume ? { handle: resume } : {} } : {}),
       },
       callbacks: {
         // onopen can fire before `client.live.connect()`'s own promise resolves and assigns `session` below —
@@ -165,10 +202,23 @@ export async function startLiveCall(
         },
         onclose: (e) => {
           console.warn('[QuickBite call] Gemini Live closed:', e?.code, e?.reason)
-          callbacks.onStatusChange('ended')
+          // A video session that drops before the call is done and still has a resumption handle is reopened
+          // transparently, so the caller never sees the call end mid-conversation.
+          if (!finished && useVideo && resumptionHandle && reconnects < MAX_RECONNECTS) {
+            reconnects += 1
+            callbacks.onStatusChange('connecting')
+            void openSession(resumptionHandle)
+              .then((s) => { session = s })
+              .catch(() => callbacks.onStatusChange('ended'))
+            return
+          }
+          if (!finished) callbacks.onStatusChange('ended')
         },
       },
     })
+
+  try {
+    session = await openSession()
   } catch {
     callbacks.onStatusChange('failed')
     throw new Error("Couldn't connect the call")
@@ -180,10 +230,18 @@ export async function startLiveCall(
 
   const mic = await startMicCapture((base64Pcm) => {
     if (!muted) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
-  })
+  }, opts.micStream)
   micStop = mic.stop
 
   const recorder: CallRecorder | null = startCallRecording(mic.stream, player.recordingStream)
+
+  // Epic 10.1: stream ~1 fps camera frames to Gemini so it can see the scene, ask about it, and flag what it sees.
+  let frameSampler: FrameSampler | null = null
+  if (opts.videoStream) {
+    frameSampler = startFrameSampler(opts.videoStream, (base64Jpeg) => {
+      if (!finished) session.sendRealtimeInput({ video: { data: base64Jpeg, mimeType: 'image/jpeg' } })
+    })
+  }
 
   const silenceTimer = setInterval(() => {
     if (finished || muted) return
@@ -219,6 +277,7 @@ export async function startLiveCall(
     end: async () => {
       finished = true
       clearInterval(silenceTimer)
+      frameSampler?.stop()
       micStop?.()
       const recording = recorder ? await recorder.stop() : null
       player.stop()

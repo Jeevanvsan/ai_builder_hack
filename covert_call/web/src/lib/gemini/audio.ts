@@ -21,14 +21,26 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary)
 }
 
+// Phone browsers play Web Audio through the loudspeaker (a web page can't pick the earpiece), so echo
+// cancellation matters: without it Mia hears her own voice back through the mic. Shared so the caller can request
+// the mic and the back camera in one getUserMedia (Epic 9) with the identical audio constraints.
+export const MIC_CONSTRAINTS: MediaTrackConstraints = {
+  channelCount: 1,
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+}
+
 // Captures the mic, resamples to 16kHz mono PCM16, and calls `onChunk` with base64-encoded audio ready for
 // Session.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } }).
-export async function startMicCapture(onChunk: (base64Pcm: string) => void): Promise<{ stop: () => void; stream: MediaStream }> {
-  // Phone browsers play Web Audio through the loudspeaker (a web page can't pick the earpiece), so echo
-  // cancellation matters: without it Mia hears her own voice back through the mic.
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-  })
+// If `providedStream` is passed (e.g. the caller already opened the mic alongside the camera), its audio track is
+// reused and its tracks are left for the caller to stop; otherwise the mic is opened and owned here.
+export async function startMicCapture(
+  onChunk: (base64Pcm: string) => void,
+  providedStream?: MediaStream,
+): Promise<{ stop: () => void; stream: MediaStream }> {
+  const ownsStream = !providedStream
+  const stream = providedStream ?? (await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS }))
   const context = new AudioContext()
   const source = context.createMediaStreamSource(stream)
   // ScriptProcessorNode is deprecated but still the simplest cross-browser way to get raw PCM frames without
@@ -58,7 +70,9 @@ export async function startMicCapture(onChunk: (base64Pcm: string) => void): Pro
       stopped = true
       processor.disconnect()
       source.disconnect()
-      stream.getTracks().forEach((t) => t.stop())
+      // Only stop the mic if we opened it. A caller-provided stream (shared with the camera/recorder) is stopped
+      // by the caller once everything that uses it has finished.
+      if (ownsStream) stream.getTracks().forEach((t) => t.stop())
       void context.close()
     },
   }

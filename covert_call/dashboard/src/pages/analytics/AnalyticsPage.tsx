@@ -115,8 +115,8 @@ export default function AnalyticsPage() {
     animationDuration: 500,
   }
 
-  // A 2-way split is a composition question ("what share is each"), which a donut communicates more directly
-  // than a 2-bar comparison.
+  // Composition across all four reporting channels ("what share is each"), which a donut communicates directly.
+  // Empty channels are dropped so the legend stays clean when only some are in use.
   const channelOption: EChartsOption = {
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     legend: { bottom: 0, textStyle: { color: chartColors.muted(), fontSize: 12 } },
@@ -129,7 +129,9 @@ export default function AnalyticsPage() {
       data: [
         { name: 'Voice call', value: a.byChannel.liveCall, itemStyle: { color: chartColors.accent() } },
         { name: 'Silent tap', value: a.byChannel.silentTap, itemStyle: { color: chartColors.low() } },
-      ],
+        { name: 'Coded order', value: a.byChannel.clickOrder, itemStyle: { color: chartColors.medium() } },
+        { name: 'Silent SOS', value: a.byChannel.silentSos, itemStyle: { color: chartColors.high() } },
+      ].filter((d) => d.value > 0),
     }],
     animationDuration: 500,
   }

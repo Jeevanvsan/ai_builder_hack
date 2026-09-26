@@ -37,6 +37,9 @@ export interface MenuItem {
   rating?: number
   ratingCount?: string
   bestseller?: boolean
+  // Links this item to a coded meaning in lib/codes.ts (Epic 8, click & order). Ordinary customers never notice
+  // it; a person in danger long-presses to see what it reports and adds it like any normal item.
+  code?: string
 }
 
 export const MENU: MenuItem[] = [
@@ -85,6 +88,7 @@ export const MENU: MenuItem[] = [
     category: 'pizza',
     rating: 4.6,
     ratingCount: '740',
+    code: 'crime-witnessed',
   },
   {
     id: 'veg-burger',
@@ -142,6 +146,7 @@ export const MENU: MenuItem[] = [
     category: 'sides',
     rating: 4.3,
     ratingCount: '1.1k',
+    code: 'followed',
   },
   {
     id: 'fries',
@@ -165,6 +170,7 @@ export const MENU: MenuItem[] = [
     rating: 4.6,
     ratingCount: '2.8k',
     bestseller: true,
+    code: 'domestic',
   },
   {
     id: 'cold-coffee',
@@ -187,6 +193,7 @@ export const MENU: MenuItem[] = [
     category: 'drinks',
     rating: 4.1,
     ratingCount: '420',
+    code: 'hazard',
   },
   {
     id: 'hot-sauce',
@@ -205,6 +212,80 @@ export const MENU: MenuItem[] = [
     image: cheeseDip,
     veg: true,
     category: 'addons',
+  },
+  {
+    id: 'party-platter',
+    name: 'Party Platter',
+    description: 'Four large pizzas, garlic bread and dips. Built for a crowd or a big group.',
+    price: 899,
+    image: familyCombo,
+    veg: false,
+    category: 'pizza',
+    rating: 4.5,
+    ratingCount: '310',
+    code: 'group-fight',
+  },
+  {
+    id: 'kids-meal',
+    name: "Kids' Meal Box",
+    description: 'A mini burger, fries and a small treat. Just right for one child.',
+    price: 199,
+    image: vegBurger,
+    veg: true,
+    category: 'burgers',
+    rating: 4.2,
+    ratingCount: '520',
+    code: 'child-danger',
+  },
+  {
+    id: 'extra-pepperoni',
+    name: 'Extra Pepperoni',
+    description: 'Add extra pepperoni to any pizza.',
+    price: 49,
+    image: chickenTikkaPizza,
+    veg: false,
+    category: 'addons',
+    code: 'weapon',
+  },
+  {
+    id: 'extra-spicy',
+    name: 'Extra Spicy',
+    description: 'Make any order extra spicy.',
+    price: 0,
+    image: hotSauce,
+    veg: true,
+    category: 'addons',
+    code: 'harmed-now',
+  },
+  {
+    id: 'extra-cheese',
+    name: 'Extra Cheese',
+    description: 'An extra layer of melted cheese on any order.',
+    price: 49,
+    image: cheeseDip,
+    veg: true,
+    category: 'addons',
+    code: 'confined',
+  },
+  {
+    id: 'extra-napkins',
+    name: 'Extra Napkins',
+    description: 'A pack of extra napkins with your order.',
+    price: 0,
+    image: fries,
+    veg: true,
+    category: 'addons',
+    code: 'injured',
+  },
+  {
+    id: 'to-go-box',
+    name: 'Sealed To-Go Box',
+    description: 'Extra sealed packaging so your order travels well.',
+    price: 19,
+    image: fries,
+    veg: true,
+    category: 'addons',
+    code: 'taken',
   },
 ]
 
