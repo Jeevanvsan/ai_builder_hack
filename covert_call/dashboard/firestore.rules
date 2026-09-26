@@ -82,6 +82,7 @@ service cloud.firestore {
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
           'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
           'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
+          'correlatedIncidentIds',
           'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
         ])
@@ -110,6 +111,7 @@ service cloud.firestore {
         && (!('transcriptLines' in d) || (d.transcriptLines is list && d.transcriptLines.size() <= 3000))
         && (!('fieldHistory' in d) || (d.fieldHistory is list && d.fieldHistory.size() <= 500))
         && (!('bulletin' in d) || d.bulletin is map)
+        && (!('correlatedIncidentIds' in d) || (d.correlatedIncidentIds is list && d.correlatedIncidentIds.size() <= 20))
         && optionalString(d, 'recommendation', 200)
         && optionalString(d, 'groundedContext', 300)
         && optionalString(d, 'consolidatedSummary', 5000)

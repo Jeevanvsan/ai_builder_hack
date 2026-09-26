@@ -299,3 +299,8 @@ export function consolidateIncident(
 export function recordGroundedContext(db: Firestore, id: string, context: string): Promise<void> {
   return updateDoc(ref(db, id), { groundedContext: context })
 }
+
+// Epic 19.1: best-effort, separate from consolidateIncident() for the same reason as groundedContext above.
+export function recordCorrelatedIncidents(db: Firestore, id: string, matchIds: string[]): Promise<void> {
+  return updateDoc(ref(db, id), { correlatedIncidentIds: matchIds })
+}

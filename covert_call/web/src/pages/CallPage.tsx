@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { doc, getDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
 import { APP_NAME } from '../lib/brand'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
+import { findCorrelatedIncidents } from '../lib/gemini/correlate'
 import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
@@ -150,6 +151,12 @@ export function CallPage() {
         if (address) {
           void groundedLocationContext(address).then((context) => {
             if (context) void recordGroundedContext(db, id, context)
+          })
+        }
+
+        if (incident) {
+          void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
+            if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
           })
         }
       } catch {

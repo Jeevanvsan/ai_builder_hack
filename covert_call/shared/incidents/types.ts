@@ -66,6 +66,10 @@ export interface Incident {
   // conditions near the confirmed location. Best-effort context only; absent if grounding found nothing relevant
   // or isn't configured.
   groundedContext?: string | null
+  // Other incident IDs that appear to describe the same person/vehicle/location as this one (Epic 19.1), found
+  // by comparing our own recent reports — never an external identity lookup. Absent means no match was found or
+  // the check wasn't run.
+  correlatedIncidentIds?: string[]
   // Rigid dispatch-bulletin-style breakdown (Epic 16.4), written once at consolidation alongside the prose
   // `consolidatedSummary` — terse fragments formatted like a real dispatch broadcast, not sentences.
   bulletin?: {
