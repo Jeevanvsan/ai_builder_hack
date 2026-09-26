@@ -6,7 +6,13 @@ import { GoogleGenAI } from '@google/genai'
 // "search a named person" feature). This is a nice-to-have context line, not a core capability.
 const MODEL = 'gemini-3.5-flash-lite'
 
+// Off by default: every ended call already makes 1-2 requests to this same shared free-tier model quota
+// (consolidation, correlation) — this weather/road line is the least essential of the post-call passes, so it's
+// skipped unless explicitly turned on, rather than adding a 3rd request to every single call.
+const ENABLED = import.meta.env.VITE_ENABLE_GROUNDED_CONTEXT === 'true'
+
 export async function groundedLocationContext(address: string): Promise<string | null> {
+  if (!ENABLED) return null
   const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
   if (!apiKey) return null
 

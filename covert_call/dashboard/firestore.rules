@@ -84,7 +84,7 @@ service cloud.firestore {
           'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
           'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
-          'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
+          'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -106,6 +106,7 @@ service cloud.firestore {
         && (!('videoFront' in d) || (d.videoFront is map && d.videoFront.status in ['live', 'ended']))
         && (!('hasRecording' in d) || d.hasRecording is bool)
         && (!('videoRecording' in d) || (d.videoRecording is list && d.videoRecording.size() <= 4))
+        && (!('audioRecording' in d) || d.audioRecording is map)
         && (!('sceneObservations' in d) || (d.sceneObservations is list && d.sceneObservations.size() <= 2000))
         && (!('adviceGiven' in d) || (d.adviceGiven is list && d.adviceGiven.size() <= 500))
         && (!('fieldConfidenceLive' in d) || d.fieldConfidenceLive is map)

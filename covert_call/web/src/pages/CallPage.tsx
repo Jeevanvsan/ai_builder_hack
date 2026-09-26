@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
@@ -10,7 +10,6 @@ import { APP_NAME } from '../lib/brand'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { findCorrelatedIncidents } from '../lib/gemini/correlate'
-import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
 import { saveCallRecording } from '../lib/gemini/uploadRecording'
@@ -139,20 +138,21 @@ export function CallPage() {
         const stressTrend = incident?.voiceStressTrend ?? []
         const address = incident?.location.confirmed?.address ?? null
 
-        // Retry consolidation once on failure (a transient network blip or rate limit shouldn't permanently lose
-        // the case summary) before giving up and flagging it for the dashboard.
+        // Retry once on failure (a transient network blip or rate limit shouldn't permanently lose the case
+        // summary) before giving up and flagging it for the dashboard. One request now covers both the case
+        // summary/bulletin and the privacy (leakage) check — was two separate model calls on the same
+        // transcript, which needlessly doubled how often a single call could hit the shared free-tier rate limit.
         const withRetry = <T,>(fn: () => Promise<T>) => fn().catch(() => fn())
-        const [consolidation, redactions] = await Promise.allSettled([
-          withRetry(() => consolidateCall(transcript, fields, stressTrend, address)),
-          withRetry(() => runLeakageCheck(transcript)),
-        ])
-        if (consolidation.status === 'fulfilled') {
-          await consolidateIncident(db, id, consolidation.value)
-        } else {
-          console.error('[QuickBite call] consolidation failed after retry:', consolidation.reason)
+        try {
+          const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address))
+          await Promise.all([
+            consolidateIncident(db, id, consolidation),
+            recordLeakageCheck(db, id, consolidation.redactions),
+          ])
+        } catch (e) {
+          console.error('[QuickBite call] consolidation failed after retry:', e)
           await updateDoc(doc(db, INCIDENTS, id), { consolidationFailed: true }).catch(() => {})
         }
-        if (redactions.status === 'fulfilled') await recordLeakageCheck(db, id, redactions.value)
 
         if (address) {
           void groundedLocationContext(address).then((context) => {
@@ -171,15 +171,46 @@ export function CallPage() {
       }
 
       if (recording) {
-        try {
-          await saveCallRecording(id, recording)
-          await markHasRecording(db, id)
-        } catch (e) {
-          // Best-effort: losing the recording (e.g. a long call too big for one Firestore document) shouldn't
-          // block ending the call — every other piece of the incident (fields, summary, location) is still saved.
-          // But it's flagged (not silently dropped) so the dashboard can say why there's no player.
-          console.error('[QuickBite call] saving the recording failed:', e)
-          await updateDoc(doc(db, INCIDENTS, id), { recordingFailed: e instanceof Error ? e.message.slice(0, 200) : 'Unknown error' }).catch(() => {})
+        // Drive first (no size cap, unlike the Firestore fallback below) when configured — same uploader as the
+        // call video. Uploaded in the background so ending the call stays instant; falls back to the Firestore
+        // subcollection doc only if Drive isn't configured or its upload fails.
+        if (driveConfigured) {
+          void updateDoc(doc(db, INCIDENTS, id), {
+            audioRecording: { status: 'recording', startedAt: new Date().toISOString() },
+          }).catch(() => {})
+          void (async () => {
+            try {
+              const result = await uploadCallVideo(recording, { incidentId: id, camera: 'back', mimeType: recording.type || 'audio/webm' })
+              await setAudioRecording(db, id, {
+                status: 'uploaded',
+                driveFileId: result?.driveFileId ?? null,
+                driveUrl: result?.driveUrl ?? null,
+                startedAt: new Date().toISOString(),
+                endedAt: new Date().toISOString(),
+              })
+            } catch (e) {
+              console.error('[QuickBite call] Drive audio upload failed, falling back to Firestore:', e)
+              await setAudioRecording(db, id, { status: 'failed', startedAt: new Date().toISOString(), endedAt: new Date().toISOString() }).catch(() => {})
+              try {
+                await saveCallRecording(id, recording)
+                await markHasRecording(db, id)
+              } catch (e2) {
+                console.error('[QuickBite call] Firestore fallback also failed:', e2)
+                await updateDoc(doc(db, INCIDENTS, id), { recordingFailed: e2 instanceof Error ? e2.message.slice(0, 200) : 'Unknown error' }).catch(() => {})
+              }
+            }
+          })()
+        } else {
+          try {
+            await saveCallRecording(id, recording)
+            await markHasRecording(db, id)
+          } catch (e) {
+            // Best-effort: losing the recording (e.g. a long call too big for one Firestore document) shouldn't
+            // block ending the call — every other piece of the incident (fields, summary, location) is still saved.
+            // But it's flagged (not silently dropped) so the dashboard can say why there's no player.
+            console.error('[QuickBite call] saving the recording failed:', e)
+            await updateDoc(doc(db, INCIDENTS, id), { recordingFailed: e instanceof Error ? e.message.slice(0, 200) : 'Unknown error' }).catch(() => {})
+          }
         }
       }
 
