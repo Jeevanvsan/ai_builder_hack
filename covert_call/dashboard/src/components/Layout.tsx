@@ -3,6 +3,7 @@ import { useAuth } from '../lib/authContext'
 import { responderLabel } from '../lib/auth'
 import { useIncidentAlerts, type AlertPermission } from '../lib/useIncidentAlerts'
 import { useNextUrgentHotkey } from '../lib/useNextUrgentHotkey'
+import CriticalAlerts from './CriticalAlerts'
 import IncidentToasts from './IncidentToasts'
 import ResponderMenu from './ResponderMenu'
 
@@ -58,6 +59,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <IncidentToasts toasts={alerts.toasts} onDismiss={alerts.dismiss} />
+      <CriticalAlerts alerts={alerts.criticals} onDismiss={alerts.dismissCritical} />
     </div>
   )
 }

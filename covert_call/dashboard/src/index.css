@@ -1157,3 +1157,23 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 @media (prefers-reduced-motion: reduce) {
   .audio-bar { transition: none; }
 }
+
+/* Critical alert popup: breaks through do-not-disturb for gunfire / weapon / break-in / caller silent after danger. */
+.modal-actions { flex-wrap: wrap; }
+.critical-reason { margin: 0 0 1rem; padding: 0.65rem 0.8rem; border-radius: 8px; background: color-mix(in srgb, var(--high) 10%, #fff); border-left: 3px solid var(--high); color: var(--high); font-weight: 700; }
+
+/* Board tiles stay inside their slot: a long threat list scrolls instead of spilling over neighbouring tiles. */
+.board-grid > .evidence-tile { max-height: 100%; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Critical mode: an attack is under way on a live call. Red frame + banner; the tile grid shifts down so the
+   banner never covers the top row of tiles. */
+.case-board.is-critical { box-shadow: 0 0 0 3px var(--high), 0 0 28px color-mix(in srgb, var(--high) 35%, transparent); animation: critical-frame 1.6s ease-in-out infinite; }
+.case-board.is-critical .board-grid { padding-top: 4rem; }
+.critical-banner { position: absolute; top: 0.9rem; left: 1.25rem; right: 1.25rem; z-index: 5; display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.9rem; border-radius: 10px; background: var(--high); color: #fff; font-size: 0.92rem; box-shadow: 0 6px 18px color-mix(in srgb, var(--high) 40%, transparent); }
+.critical-banner strong { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem; }
+.critical-banner-text { font-weight: 700; }
+.critical-banner-action { margin-left: auto; font-weight: 600; opacity: 0.92; text-align: right; }
+.critical-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: ring 1.2s ease-out infinite; flex: none; }
+@keyframes critical-frame { 50% { box-shadow: 0 0 0 3px var(--high), 0 0 6px color-mix(in srgb, var(--high) 20%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .case-board.is-critical, .critical-dot { animation: none; } }
+@media (max-width: 1100px) { .critical-banner { position: static; margin: 0.75rem; flex-wrap: wrap; } .critical-banner-action { margin-left: 0; text-align: left; } .case-board.is-critical .board-grid { padding-top: 1.25rem; } }

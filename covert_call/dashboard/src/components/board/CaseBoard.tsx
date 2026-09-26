@@ -9,12 +9,14 @@ import IncidentMap from '../IncidentMap'
 import { useIncidents } from '../../lib/incidentsStore'
 import { nearbyIncidentIds, deriveEvidence, SLOT_OF, type Evidence, type EvidenceKind } from '../../lib/evidence'
 import { livePosition, routeProgress } from '../../lib/livePosition'
+import { affirmed } from '../../../../shared/incidents/severity.ts'
 import { nearbyServices, suggestedServiceKind, type NearbyService } from '../../../../shared/nav/nearbyServices.ts'
 import CaseHub from './CaseHub'
 import EvidenceTile from './EvidenceTile'
 import LightLinks from './LightLinks'
 import StressWave from './StressWave'
 
+const CRITICAL_NOW = /shoot|shot|gunfire|firing|break(ing)? (in|the|into)|broke|glass|window|opened the door|grabbed|dragged|abduct|kidnap|stab|silent after danger|direct (visual )?contact/i
 const ORDER: EvidenceKind[] = ['vehicle', 'location', 'subjects', 'threat', 'stress', 'seen', 'nearby', 'linked']
 const SERVICE_LABEL = { police: 'Police', fire: 'Fire', hospital: 'Hospital' } as const
 
@@ -123,8 +125,22 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
     return undefined
   }
 
+  // Critical mode: an attack is actively under way (not just "a weapon was mentioned"). The newest such report
+  // drives the banner, so it reads as what is happening right now.
+  const criticalNow = live
+    ? [...affirmed(incident.extractedFieldsLive.dangerIndicators)].reverse().find((d) => CRITICAL_NOW.test(d))
+    : undefined
+
   return (
-    <div className="case-board" ref={boardRef}>
+    <div className={`case-board${criticalNow ? ' is-critical' : ''}`} ref={boardRef}>
+      {criticalNow && (
+        <div className="critical-banner" role="alert">
+          <span className="critical-dot" />
+          <strong>Critical</strong>
+          <span className="critical-banner-text">{criticalNow.charAt(0).toUpperCase() + criticalNow.slice(1)}</span>
+          {incident.recommendation && <span className="critical-banner-action">{incident.recommendation}</span>}
+        </div>
+      )}
       <div className="board-map">
         <IncidentMap location={incident.location} backdrop route={incident.safeRoute} />
       </div>

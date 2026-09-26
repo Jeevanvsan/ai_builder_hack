@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { onSnapshot } from 'firebase/firestore'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Incident } from '../../../shared/incidents/types'
+import { affirmed } from '../../../shared/incidents/severity.ts'
 import type { IncidentToast } from '../components/IncidentToasts'
 import {
   audioUnlocked,
@@ -41,6 +42,22 @@ function materialChange(before: Incident, after: Incident): string | null {
   return null
 }
 
+// Life-threatening developments that must reach a responder even while they're busy on an incident page (the
+// normal "do not disturb" rule hid a gunfire report on the very case being watched). Negated tags ("No weapon")
+// never count.
+const CRITICAL = /gun|shot|shoot|firearm|knife|stab|weapon|blood|bleed|explosion|abduct|kidnap|breaking (in|the|into)|broke (in|the)|window|glass|opened the door|grabbed|dragged|silent after danger|unable to speak/i
+
+export type CriticalAlert = { incident: Incident; reason: string; at: number }
+
+function criticalChange(before: Incident, after: Incident): string | null {
+  const fresh = affirmed(after.extractedFieldsLive.dangerIndicators.filter((d) => !before.extractedFieldsLive.dangerIndicators.includes(d)))
+  const hit = fresh.find((d) => CRITICAL.test(d))
+  if (hit) return hit
+  const seenBefore = before.sceneObservations?.length ?? 0
+  const newObs = (after.sceneObservations ?? []).slice(seenBefore).find((o) => CRITICAL.test(`${o.kind} ${o.detail}`) || /scream/i.test(o.kind))
+  return newObs ? `${newObs.source === 'sound' ? 'Heard' : 'Seen'}: ${newObs.detail || newObs.kind}` : null
+}
+
 // Watches open incidents on every page: sound + toast + system notification for each new, unopened incident,
 // and again (Epic 16.9) when an already-viewed incident materially changes — a responder who looked away
 // shouldn't miss a weapon getting confirmed mid-call just because they already opened it once.
@@ -55,6 +72,7 @@ export function useIncidentAlerts() {
     busyRef.current = busy
   }, [busy])
   const [toasts, setToasts] = useState<IncidentToast[]>([])
+  const [criticals, setCriticals] = useState<CriticalAlert[]>([])
   const [permission, setPermission] = useState<AlertPermission>(currentPermission)
   const [unviewedCount, setUnviewedCount] = useState(0)
   const [soundUnlocked, setSoundUnlocked] = useState(audioUnlocked)
@@ -73,8 +91,12 @@ export function useIncidentAlerts() {
       // one (that's `fresh`'s job), so an incident is either a "new incident" toast or a "material change"
       // toast on any given snapshot, never both.
       const changed: IncidentToast[] = []
+      const critical: CriticalAlert[] = []
       if (known) {
         for (const incident of incidents) {
+          const prev = known.get(incident.id)
+          const why = prev ? criticalChange(prev, incident) : null
+          if (why) critical.push({ incident, reason: why, at: Date.now() })
           if (isUnviewed(incident)) continue
           const before = known.get(incident.id)
           if (!before) continue
@@ -95,6 +117,17 @@ export function useIncidentAlerts() {
         fresh.forEach((i) => showSystemNotification(i, () => navigate(`/incident/${i.id}`)))
         if (changed.length) playEscalationCue()
       }
+      // One alert per incident, updated in place with the latest development, so a burst of reports doesn't
+      // stack up a pile of popups. Shown regardless of do-not-disturb.
+      if (critical.length) {
+        playEscalationCue()
+        setCriticals((prev) => {
+          const next = new Map(prev.map((c) => [c.incident.id, c]))
+          for (const c of critical) next.set(c.incident.id, c)
+          return [...next.values()]
+        })
+      }
+      setCriticals((prev) => prev.map((c) => ({ ...c, incident: incidents.find((i) => i.id === c.incident.id) ?? c.incident })))
     })
   }, [navigate])
 
@@ -133,6 +166,7 @@ export function useIncidentAlerts() {
   }
 
   const dismiss = (id: string) => setToasts((prev) => prev.filter((t) => t.id !== id))
+  const dismissCritical = (id: string) => setCriticals((prev) => prev.filter((c) => c.incident.id !== id))
 
-  return { toasts: busy ? [] : toasts, dismiss, permission, enable, soundBlocked: shouldRing && !soundUnlocked }
+  return { toasts: busy ? [] : toasts, dismiss, criticals, dismissCritical, permission, enable, soundBlocked: shouldRing && !soundUnlocked }
 }
