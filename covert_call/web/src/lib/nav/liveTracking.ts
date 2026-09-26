@@ -20,6 +20,8 @@ const fmtM = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math
 
 // Keeps the caller's live GPS flowing to the incident while the call is open, and keeps a route to safety current
 // as they move: tracks progress, re-routes when they leave the route, and nudges Mia before each upcoming turn.
+const PRECISE_M = 100
+
 export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote: (note: string) => void): LiveTracker {
   let pos: LatLng | null = null
   let lastWrite: { at: number; p: LatLng } | null = null
@@ -52,6 +54,12 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   }
 
   const onFix = (p: GeolocationPosition) => {
+    // Laptop/Wi-Fi fixes can be kilometres off (one put an Alappuzha caller near Kothamangalam). Only a precise
+    // fix (phone GPS) drives routing; otherwise the caller's confirmed address does.
+    if (p.coords.accuracy > PRECISE_M) {
+      if (!gpsFix && !latestIncident?.location.confirmed) pos = null
+      return
+    }
     gpsFix = true
     pos = { lat: p.coords.latitude, lng: p.coords.longitude }
     const now = Date.now()
@@ -119,7 +127,8 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       // No GPS fix yet (desktop, denied, indoors): fall back to the incident's latest known location (IP or a
       // confirmed address) so guidance still works instead of looping on "ask for a landmark".
       if (!pos) pos = await knownLocation()
-      if (!pos) return `No location yet. ${landmark ? `The caller already said: "${landmark}" — do NOT ask for a landmark again; call confirm_address with it.` : 'Ask ONCE for a landmark or junction name.'} Meanwhile tell them to keep moving towards a busy, well-lit place (a shop, petrol pump, crowd).`
+      if (!gpsFix && !latestIncident?.location.confirmed) pos = null
+      if (!pos) return `No reliable location yet — you MUST ask the caller now where exactly they are (road/area AND town), read it back, and call confirm_address; then call get_route_guidance again. Do not give any directions until then. ${landmark ? `The caller already said: "${landmark}" — do NOT ask for a landmark again; call confirm_address with it.` : 'Ask ONCE for a landmark or junction name.'} Meanwhile tell them to keep moving towards a busy, well-lit place (a shop, petrol pump, crowd).`
       if (!route) await reroute(situation ?? 'caller needs to reach safety')
       if (!route) return 'Could not find a route right now — ask for the nearest landmark and keep them moving somewhere busy and lit.'
       const r: SafeRoute = route
@@ -131,7 +140,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
         `Destination: ${r.destination.name} (${r.destination.kind}), ${fmtM(prog.toDestinationM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min.`,
         prog.next ? `Next: ${prog.next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(prog.toNextM)}.` : '',
         after ? `Then: ${after.instruction}.` : '',
-        here ? `Near the caller now: ${here}.` : '',
+        here ? `Reference landmark near the caller's GPS position (the caller has NOT mentioned it — say "you should see ${here} nearby", never "that ${here}"): ${here}.` : '',
         landmark ? `Caller reports being at: ${landmark}.` : '',
         "Say it in the caller's language, with the landmark, the direction and the distance; if they ask what is there, describe the landmark and how far the destination is.",
       ].filter(Boolean).join(' ')

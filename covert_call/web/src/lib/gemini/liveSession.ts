@@ -241,7 +241,17 @@ export async function startLiveCall(
         // own speech-to-text for both directions, which is what actually fills message.serverContent's
         // transcription fields below. Without this the whole call transcript was silently empty every time,
         // even on calls where the audio itself worked fine, breaking consolidation/leakage-check downstream.
-        inputAudioTranscription: {},
+        // Hints for the caller-side speech-to-text: likely languages (short words were being detected as German or
+        // Spanish) and local place names / code words that were being misheard ("Vazhicherry" → "Veterinary").
+        inputAudioTranscription: {
+          languageCodes: ['en-IN', 'ml-IN', 'hi-IN', 'ta-IN'],
+          customVocabulary: [
+            'QuickBite', 'Mia', 'talk', 'order', 'garlic bread', 'pepperoni', 'extra spicy', 'kids meal', 'family combo',
+            'Alappuzha', 'Alleppey', 'Vazhicherry', 'Muhamma', 'Mullakkal', 'Kalavoor', 'Cherthala', 'Kochi', 'Ernakulam',
+            'Kottayam', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Bengaluru', 'HSR Layout', 'Koramangala',
+            'petrol pump', 'junction', 'police station',
+          ],
+        },
         outputAudioTranscription: {},
         // Scared callers pause mid-answer. Low end-sensitivity + a longer silence window stop Gemini from taking its
         // turn in those pauses; low start-sensitivity keeps Mia's own voice leaking from the speaker (noise

@@ -298,3 +298,8 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - `confirm_address` now rejects vague places ("petrol pump", "green sign post", "near the market"): the tool answer tells Mia to ask for area/road and town. Before, "petrol pump" was geocoded to a pump in Mattancherry, Kochi. A saved address now tells her to call `get_route_guidance` if the caller is followed or chased.
   - Persona: mandatory sequence — exact location (area/road + town), then confirm_address, then route to the police station. A petrol pump is never the destination.
   - Web app and dashboard redeployed.
+- 2026-09-26 (IST, ~23:20): **Notes for Ameen (web call + nav + persona, please review):**
+  - Routing uses GPS only when it's precise (accuracy ≤ 100 m, i.e. phone GPS). A laptop's Wi-Fi fix put an Alappuzha caller near Kothamangalam, so Mia routed 7.7 km without asking where they were. With no precise fix or confirmed address, `get_route_guidance` now tells Mia she MUST ask the exact location (road/area + town), read it back and confirm it before giving any directions.
+  - Caller transcription hints: `inputAudioTranscription.languageCodes` (en-IN, ml-IN, hi-IN, ta-IN) plus `customVocabulary` (local places, code words). Probed first: `gemini-3.8-live` accepts them.
+  - Persona "NEVER ASSUME — CHECK": ask walking or vehicle before "keep driving"; a tool's landmark is "you should see X nearby", not something the caller said; read back the street and get the town; one reply per turn.
+  - Web app redeployed.
