@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
 import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
@@ -139,14 +139,20 @@ export function CallPage() {
         const stressTrend = incident?.voiceStressTrend ?? []
         const address = incident?.location.confirmed?.address ?? null
 
-        const [consolidation, redactions] = await Promise.all([
-          consolidateCall(transcript, fields, stressTrend, address),
-          runLeakageCheck(transcript),
+        // Retry consolidation once on failure (a transient network blip or rate limit shouldn't permanently lose
+        // the case summary) before giving up and flagging it for the dashboard.
+        const withRetry = <T,>(fn: () => Promise<T>) => fn().catch(() => fn())
+        const [consolidation, redactions] = await Promise.allSettled([
+          withRetry(() => consolidateCall(transcript, fields, stressTrend, address)),
+          withRetry(() => runLeakageCheck(transcript)),
         ])
-        await Promise.all([
-          consolidateIncident(db, id, consolidation),
-          recordLeakageCheck(db, id, redactions),
-        ])
+        if (consolidation.status === 'fulfilled') {
+          await consolidateIncident(db, id, consolidation.value)
+        } else {
+          console.error('[QuickBite call] consolidation failed after retry:', consolidation.reason)
+          await updateDoc(doc(db, INCIDENTS, id), { consolidationFailed: true }).catch(() => {})
+        }
+        if (redactions.status === 'fulfilled') await recordLeakageCheck(db, id, redactions.value)
 
         if (address) {
           void groundedLocationContext(address).then((context) => {

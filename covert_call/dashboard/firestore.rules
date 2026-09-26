@@ -82,7 +82,7 @@ service cloud.firestore {
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
           'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
           'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
-          'correlatedIncidentIds', 'safeRoute', 'webIntel',
+          'correlatedIncidentIds', 'safeRoute', 'webIntel', 'consolidationFailed',
           'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
         ])
@@ -114,6 +114,7 @@ service cloud.firestore {
         && (!('fieldHistory' in d) || (d.fieldHistory is list && d.fieldHistory.size() <= 500))
         && (!('bulletin' in d) || d.bulletin is map)
         && (!('webIntel' in d) || d.webIntel is map)
+        && (!('consolidationFailed' in d) || d.consolidationFailed is bool)
         && (!('correlatedIncidentIds' in d) || (d.correlatedIncidentIds is list && d.correlatedIncidentIds.size() <= 20))
         && optionalString(d, 'recommendation', 200)
         && optionalString(d, 'groundedContext', 300)
