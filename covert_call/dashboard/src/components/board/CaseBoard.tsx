@@ -125,7 +125,7 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
           )}
           {web && (
             <div className="web-intel">
-              <div className="web-intel-head">On the web · Google Search</div>
+              <div className="web-intel-head">On the web · Google News</div>
               {web.findings.length ? (
                 <ul className="web-intel-list">{web.findings.map((f) => <li key={f}><DecodeText text={f} /></li>)}</ul>
               ) : (

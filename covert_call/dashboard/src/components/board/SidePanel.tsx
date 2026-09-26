@@ -73,7 +73,15 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                   )}
                 </>
               ) : live ? (
-                <p className="panel-empty">Gemini writes the case summary when the call ends.</p>
+                <>
+                  <p className="panel-empty">Gemini writes the case summary when the call ends.</p>
+                  <FactSheet incident={incident} />
+                </>
+              ) : incident.consolidationFailed ? (
+                <>
+                  <p className="panel-empty">The AI summary couldn't be generated for this call. Showing what was reported instead.</p>
+                  <FactSheet incident={incident} />
+                </>
               ) : summaryPending ? (
                 <div className="evidence-searching" role="status">
                   <span className="searching-bar" />

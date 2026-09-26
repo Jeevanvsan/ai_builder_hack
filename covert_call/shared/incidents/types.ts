@@ -56,6 +56,10 @@ export interface Incident {
   // call runs unusually long; absent means no history was recorded (older incidents, or a very short call).
   fieldHistory?: { fields: Incident['extractedFieldsLive']; at: string }[]
   consolidatedSummary: string | null
+  // Set only if the post-call consolidation pass (summary/bulletin) failed after retrying, so the dashboard can
+  // say why the summary is missing instead of showing an empty state forever (Epic 3.4 bug: it used to fail
+  // completely silently, with the incident stuck showing "Gemini writes the case summary..." forever).
+  consolidationFailed?: boolean
   fieldConfidence: Record<string, FieldConfidence>
   // Live confidence per field, updated as the call progresses (Epic 16.2) — distinct from `fieldConfidence`,
   // which is only written once at consolidation. Lets the dashboard show a field sharpening from "uncertain" to
