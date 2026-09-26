@@ -114,6 +114,10 @@ export interface Incident {
   // The front-camera live feed, only for a dual-camera SOS (Epic 11). Same shape as `video`; the dashboard shows a
   // Back/Front toggle when both are present.
   videoFront?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
+  // A one-way WebRTC feed of the caller's raw microphone audio (never the caller's device speaker output, and
+  // never anything sent back to them) — a responder can listen live via the dashboard's Listen button. Separate
+  // from the call's own recorded audio (hasRecording/audioRecording), which is only available after the call.
+  audioListen?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
   // One entry per camera whose footage is being saved to the team Google Drive (Epic 9.2; Epic 11 records two
   // cameras for the silent SOS). Absent means no Drive recording (e.g. no camera, or the Drive upload URL isn't
   // configured). driveUrl is filled once the upload finishes.

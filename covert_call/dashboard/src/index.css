@@ -1142,3 +1142,31 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .recording-row { display: flex; align-items: center; gap: 0.5rem; }
 .recording-row .recording-player { flex: 1; min-width: 0; }
 .recording-download { white-space: nowrap; font-size: 0.8rem; padding: 0.35rem 0.7rem; }
+
+/* Live audio listen-in: a small reactive waveform driven frame-by-frame from real analyser data (see
+   LiveAudioListen.tsx), not a canned loop — bars ease toward each new height so the motion reads as fluid rather
+   than stepped, per the corporate/dashboard motion personality used across this UI (snappy, minimal overshoot). */
+.audio-listen { display: grid; gap: 0.5rem; padding: 0.75rem; border-radius: 0.75rem; background: var(--panel-2, #f4f6f9); border: 1px solid var(--border, #e3e7ee); }
+.audio-listen-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.audio-listen-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+.audio-listen-label .live-dot { background: var(--live); }
+.audio-waveform {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 44px;
+  padding: 4px 0;
+}
+.audio-bar {
+  flex: 1;
+  min-width: 2px;
+  max-width: 5px;
+  border-radius: 999px;
+  background: var(--muted, #9aa3af);
+  transition: height 90ms cubic-bezier(0.2, 0, 0, 1), background-color 200ms ease-out;
+}
+.audio-waveform.is-speaking .audio-bar { background: var(--live); }
+@media (prefers-reduced-motion: reduce) {
+  .audio-bar { transition: none; }
+}

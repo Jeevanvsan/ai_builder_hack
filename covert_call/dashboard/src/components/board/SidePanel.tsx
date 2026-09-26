@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { Incident } from '../../../../shared/incidents/types'
 import BulletinCard from '../BulletinCard'
 import CallRecordingPlayer from '../CallRecordingPlayer'
+import LiveAudioListen from '../LiveAudioListen'
 import LiveVideo from '../LiveVideo'
 import NoteForm from '../NoteForm'
 import ReplayScrubber from '../ReplayScrubber'
@@ -34,6 +35,8 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
           <Link to={`/incident/${incident.id}/video`} className="btn btn-sm panel-video-full">Full screen</Link>
         </div>
       )}
+
+      {live && incident.audioListen?.status === 'live' && <LiveAudioListen incident={incident} />}
 
       <div className="panel-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'conversation'} className={tab === 'conversation' ? 'active' : ''} onClick={() => pick('conversation')}>
@@ -101,7 +104,11 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                   <div className="drive-row">
                     <span>Call audio</span>
                     {incident.audioRecording.status === 'uploaded' && incident.audioRecording.driveUrl ? (
-                      <a className="btn btn-sm" href={incident.audioRecording.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
+                      incident.audioRecording.driveFileId ? (
+                        <a className="btn btn-sm" href={`https://drive.google.com/uc?export=download&id=${incident.audioRecording.driveFileId}`}>Download</a>
+                      ) : (
+                        <a className="btn btn-sm" href={incident.audioRecording.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
+                      )
                     ) : (
                       <span className="sub">{incident.audioRecording.status === 'recording' ? 'Uploading…' : 'Upload failed — see below'}</span>
                     )}
@@ -117,7 +124,11 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                   <div key={v.camera} className="drive-row">
                     <span>{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>
                     {v.status === 'uploaded' && v.driveUrl ? (
-                      <a className="btn btn-sm" href={v.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
+                      v.driveFileId ? (
+                        <a className="btn btn-sm" href={`https://drive.google.com/uc?export=download&id=${v.driveFileId}`}>Download</a>
+                      ) : (
+                        <a className="btn btn-sm" href={v.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
+                      )
                     ) : (
                       <span className="sub">{v.status === 'recording' ? 'Uploading…' : 'Upload failed'}</span>
                     )}

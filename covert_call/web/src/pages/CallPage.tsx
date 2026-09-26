@@ -37,6 +37,7 @@ export function CallPage() {
   // recorder handle. All optional — the call runs audio-only if there's no camera.
   const mediaRef = useRef<MediaStream | null>(null)
   const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
+  const micPublisherStopRef = useRef<(() => Promise<void>) | null>(null)
   const videoRecRef = useRef<VideoRecorderHandle | null>(null)
   const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Cart state at the moment this page mounted — later cart changes (e.g. adding items in another tab) must not
@@ -79,6 +80,18 @@ export function CallPage() {
         callRef.current = handle
       } catch {
         setStatus('failed')
+      }
+
+      // Publish the caller's raw mic audio one-way, so a responder can listen live from the dashboard (separate
+      // from — and never sent back through — the caller's own call audio to Gemini). Best-effort: a blocked
+      // connection just means no listen-in, never blocks the call itself.
+      if (media?.stream) {
+        try {
+          const micOnly = new MediaStream(media.stream.getAudioTracks())
+          micPublisherStopRef.current = await startVideoPublisher(db, id, micOnly, { camera: 'mic' })
+        } catch {
+          // No listen-in feed; the call and recording continue.
+        }
       }
 
       // With a camera: stream it live to the dashboard, and (if Drive is configured) record video + audio for the
@@ -127,6 +140,7 @@ export function CallPage() {
     const recording = await call?.end()
     // Stop the live feed (also marks video ended on the incident) and release the camera + mic.
     await publisherStopRef.current?.()
+    await micPublisherStopRef.current?.()
     mediaRef.current?.getTracks().forEach((t) => t.stop())
     setStatus('ended')
 
