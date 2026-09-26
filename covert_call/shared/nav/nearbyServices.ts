@@ -161,3 +161,38 @@ export async function landmarkNear(p: { lat: number; lng: number }): Promise<str
   }
   return null
 }
+
+// Places a landmark the caller names ("St. George Auditorium", "Convent Square junction") on the map, searching
+// only near where they were last known (they can't have jumped across town). Used when there's no precise GPS,
+// so their position — and the route — follow what they report. Null if nothing matching is found nearby.
+export async function locateLandmark(text: string, near: { lat: number; lng: number }): Promise<{ lat: number; lng: number; name: string } | null> {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !/^(the|near|junction|board|road|saw|see|seeing|front|of|and|now|currently|showing|something|like|sign|signboard|im|am)$/.test(w))
+    .slice(0, 3)
+  if (!words.length) return null
+  const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\"]/g, '')).join('.*')
+  const q = `[out:json][timeout:10];nwr(around:3000,${near.lat},${near.lng})[name~"${pattern}",i];out center 10;`
+  for (const url of OVERPASS_URLS) {
+    const data = await queryOverpass(url, q)
+    if (!data) continue
+    const hits = data.elements
+      .map((e) => ({ name: e.tags?.name ?? '', lat: e.lat ?? (e as { center?: { lat: number } }).center?.lat, lng: e.lon ?? (e as { center?: { lon: number } }).center?.lon }))
+      .filter((h): h is { name: string; lat: number; lng: number } => h.lat != null && h.lng != null)
+      .sort((a, b) => haversineKm(near, a) - haversineKm(near, b))
+    if (hits[0]) return hits[0]
+    break
+  }
+  // Fallback: Nominatim search bounded to ~3 km around the last known position.
+  const d = 0.03
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&bounded=1&viewbox=${near.lng - d},${near.lat + d},${near.lng + d},${near.lat - d}&q=${encodeURIComponent(words.join(' '))}`
+  try {
+    const res = await fetch(url, typeof window === 'undefined' ? { headers: { 'User-Agent': 'QuickBite-hackathon-prototype' } } : {})
+    const [hit] = res.ok ? await res.json() : []
+    return hit ? { lat: Number(hit.lat), lng: Number(hit.lon), name: hit.display_name?.split(',')[0] ?? words.join(' ') } : null
+  } catch {
+    return null
+  }
+}
