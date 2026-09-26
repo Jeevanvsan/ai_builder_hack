@@ -174,9 +174,12 @@ export function CallPage() {
         try {
           await saveCallRecording(id, recording)
           await markHasRecording(db, id)
-        } catch {
+        } catch (e) {
           // Best-effort: losing the recording (e.g. a long call too big for one Firestore document) shouldn't
           // block ending the call — every other piece of the incident (fields, summary, location) is still saved.
+          // But it's flagged (not silently dropped) so the dashboard can say why there's no player.
+          console.error('[QuickBite call] saving the recording failed:', e)
+          await updateDoc(doc(db, INCIDENTS, id), { recordingFailed: e instanceof Error ? e.message.slice(0, 200) : 'Unknown error' }).catch(() => {})
         }
       }
 

@@ -60,6 +60,9 @@ export interface Incident {
   // say why the summary is missing instead of showing an empty state forever (Epic 3.4 bug: it used to fail
   // completely silently, with the incident stuck showing "Gemini writes the case summary..." forever).
   consolidationFailed?: boolean
+  // Set only if saving the call's audio recording failed (most likely: over Firestore's ~1MB document limit on
+  // a longer call — see uploadRecording.ts) — same "say why instead of just missing" fix as consolidationFailed.
+  recordingFailed?: string
   fieldConfidence: Record<string, FieldConfidence>
   // Live confidence per field, updated as the call progresses (Epic 16.2) — distinct from `fieldConfidence`,
   // which is only written once at consolidation. Lets the dashboard show a field sharpening from "uncertain" to
@@ -75,9 +78,6 @@ export interface Incident {
   // conditions near the confirmed location. Best-effort context only; absent if grounding found nothing relevant
   // or isn't configured.
   groundedContext?: string | null
-  // Recent PUBLIC reports found on the web near this place for this kind of incident (news, police notices),
-  // via Gemini + Google Search. Searched with the place and incident type only, never a person's name.
-  webIntel?: { query: string; findings: string[]; sources: { title: string; url: string }[]; searchedAt: string }
   // Other incident IDs that appear to describe the same person/vehicle/location as this one (Epic 19.1), found
   // by comparing our own recent reports — never an external identity lookup. Absent means no match was found or
   // the check wasn't run.
