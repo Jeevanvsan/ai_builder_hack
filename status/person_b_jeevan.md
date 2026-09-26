@@ -276,3 +276,9 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - `liveSession.ts` sets `realtimeInputConfig.automaticActivityDetection`: start and end sensitivity LOW, `silenceDurationMs` 1200, `prefixPaddingMs` 200. This gives callers time to pause without Mia jumping in, and stops her own voice from the speaker counting as a barge-in (she was restarting sentences).
   - Persona: the greeting now asks straight away "can you talk freely, or shall we keep it like a normal food order? say 'talk' or 'order'" (the old "quick order or menu" step is merged into it). New rules: speak slowly and calmly, never repeat a question just asked (only after a silence note), wait for fragments to finish, and act at once on plain words ("I'm being chased") even mid-order.
   - Web app redeployed.
+- 2026-09-26 (IST, ~21:30): **Notes for Ameen (Live model + persona + nav, please review):**
+  - Voice calls now use `gemini-3.8-live-extended-thinking` with `thinkingLevel: LOW`. `?model=live` in the URL falls back to `gemini-3.8-live`. Probed with our key: it connects and replies with audio. The silent observer is unchanged.
+  - Fixed the landmark loop: with no GPS fix, route guidance fell back to "ask for a landmark" every time. It now uses the incident's rough or confirmed location, and if even that is missing it tells Mia not to re-ask a landmark already given.
+  - Persona: tools are silent (never speak `<function_call>`/`end_call`); "ask once, remember forever"; never tell a chased caller to "stay where you are".
+  - An occasional male voice was reported; the voice is fixed to Kore in config, so the cause is unknown. Please listen for it.
+  - Web app redeployed.

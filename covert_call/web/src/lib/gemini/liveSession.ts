@@ -1,4 +1,4 @@
-import { EndSensitivity, GoogleGenAI, Modality, StartSensitivity, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { EndSensitivity, GoogleGenAI, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
 import { appendTranscriptLine, confirmAddress, recordAdvice, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
@@ -12,7 +12,10 @@ import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
 // "not found for API version v1beta" (error 1008) against a real key — gemini-3.8-live is the current default
 // Live API model for low-latency voice agents. Kept as a single constant, not hardcoded elsewhere, so it's easy
 // to swap again if the model catalog changes.
-const LIVE_MODEL = 'gemini-3.8-live'
+// Extended Thinking reasons in the background while it talks (better situation judgement, fewer repeats).
+// `?model=live` in the URL falls back to the plain Live model for side-by-side testing.
+const USE_PLAIN_LIVE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('model') === 'live'
+const LIVE_MODEL = USE_PLAIN_LIVE ? 'gemini-3.8-live' : 'gemini-3.8-live-extended-thinking'
 
 export type CallStatus = 'connecting' | 'live' | 'ended' | 'failed'
 
@@ -243,6 +246,8 @@ export async function startLiveCall(
             silenceDurationMs: 1200,
           },
         },
+        // Low keeps replies quick on a live call; the model still thinks in the background while speaking.
+        ...(USE_PLAIN_LIVE ? {} : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
         systemInstruction: PERSONA_SYSTEM_INSTRUCTION,
         tools: LIVE_CALL_TOOLS,
         // Only for video calls (Epic 10): compression stretches the shorter audio+video session, and resumption
