@@ -107,6 +107,9 @@ export async function startLiveCall(
   // Silence after that point is a reason to stay connected, not the ordinary "no answer, end the call" case —
   // see the silence timer below and persona.ts's SILENCE section.
   let dangerReported = false
+  // The model often never files the age/gender estimate on its own (the persona asks for it "once, early"), so a
+  // one-off reminder goes out once the caller has spoken for a while — see the estimate timer below.
+  let estimateReported = false
   let finished = false
   // Session resumption (Epic 10.1): a session with video attached hits a shorter cap, so we keep the latest
   // resumption handle and transparently reopen the session if it drops mid-call. Only used when video is on.
@@ -168,6 +171,7 @@ export async function startLiveCall(
         const AGE_GROUPS = ['child', 'teen', 'adult', 'elderly', 'unclear']
         const GENDERS = ['male', 'female', 'unclear']
         if (typeof ageGroup === 'string' && AGE_GROUPS.includes(ageGroup) && typeof gender === 'string' && GENDERS.includes(gender)) {
+          estimateReported = true
           enqueueWrite(() => recordCallerEstimate(db, incidentId, {
             ageGroup: ageGroup as 'child' | 'teen' | 'adult' | 'elderly' | 'unclear',
             gender: gender as 'male' | 'female' | 'unclear',
@@ -180,6 +184,7 @@ export async function startLiveCall(
         const source = args.source
         const kind = args.kind
         if ((source === 'camera' || source === 'sound') && typeof kind === 'string') {
+          if (/weapon|gun|shot|knife|stab|scream|blood|explosion|fight|attack/i.test(`${kind} ${args.detail ?? ''}`)) dangerReported = true
           enqueueWrite(() =>
             reportSceneObservation(db, incidentId, {
               source,
@@ -390,6 +395,17 @@ export async function startLiveCall(
     flushTranscript(true)
   }, 5_000)
 
+  // Sent only while Mia isn't talking, so it doesn't interrupt her; retried every 5s until it goes out once.
+  const estimateTimer = setInterval(() => {
+    if (finished || estimateReported) { clearInterval(estimateTimer); return }
+    const callerLines = transcriptLines.filter((l) => l.speaker === 'Caller').length
+    if (callerLines < 2 || player.isPlaying()) return
+    clearInterval(estimateTimer)
+    session.sendClientContent({
+      turns: '(System note, not the caller: you have heard the caller\'s voice. Call report_caller_estimate NOW with your best guess of their age group and gender — silently, do not say anything about it and do not change what you were doing. If you were mid-conversation, just continue exactly where you were.)',
+    })
+  }, 5_000)
+
   const silenceTimer = setInterval(() => {
     if (finished || muted) return
     if (player.isPlaying()) {
@@ -399,25 +415,25 @@ export async function startLiveCall(
     if (Date.now() - lastActivityAt < SILENCE_MS) return
     lastActivityAt = Date.now()
     silentNudges += 1
+    // After danger, silence usually means the caller is hiding or the attacker is right there. Nudging Mia to
+    // re-ask made her say "Still there? I'm still listening" out loud over and over during an armed attack,
+    // which can give the caller away. Instead: one instruction to go quiet, then no more nudges — she speaks only
+    // when the caller speaks, and the line stays open for the responder listening live.
+    if (dangerReported) {
+      if (silentNudges === 1) {
+        enqueueWrite(() => updateLiveFields(db, incidentId, {
+          dangerIndicators: ['caller silent after danger - line kept open'],
+          urgency: 'high',
+        }))
+        session.sendClientContent({
+          turns: '(System note, not the caller: the caller has gone silent after danger was reported — they may be hiding or the attacker may be right there. Say NOTHING now. Do not check in, do not ask "still there", do not repeat yourself. Stay completely silent and keep listening; only speak again when the caller speaks to you. Keep reporting sounds you hear with report_scene_observation. Never call end_call.)',
+        })
+      }
+      return
+    }
     if (silentNudges <= 3) {
       session.sendClientContent({
         turns: `(System note, not the caller: the caller has been silent. Silence attempt ${silentNudges} of 3 — follow your SILENCE rule and gently repeat your last question with its meaning. If the caller has just answered it, ignore this note and continue.)`,
-      })
-    } else if (dangerReported && silentNudges >= 4) {
-      // Danger was already reported this call (a weapon, a gunshot/scream heard, high urgency): going silent
-      // now likely means the caller can't safely speak, not that the call is over. Stay connected indefinitely
-      // — no end_call instruction, no failsafe hang-up — with a periodic check-in every ~20-30s (this timer
-      // ticks every 1s and only re-fires once SILENCE_MS/1000 ≈ 12 ticks have passed since the last activity,
-      // so successive silentNudges values naturally space out by SILENCE_MS, not every second).
-      if (silentNudges === 4) {
-        enqueueWrite(() => updateLiveFields(db, incidentId, {
-          dangerIndicators: ['went silent after danger reported - stay connected'],
-          urgency: 'high',
-          notes: 'Caller went silent after danger was reported; call kept open for the response team.',
-        }))
-      }
-      session.sendClientContent({
-        turns: '(System note, not the caller: still no response, but danger was already reported this call. Do NOT end the call. Stop repeating yourself — check in with one short line and otherwise stay silent and keep listening, per your SILENCE rule.)',
       })
     } else if (silentNudges === 4) {
       session.sendClientContent({
@@ -442,6 +458,7 @@ export async function startLiveCall(
       finished = true
       flushTranscript(true)
       clearInterval(silenceTimer)
+      clearInterval(estimateTimer)
       tracker?.stop()
       clearInterval(transcriptFlushTimer)
       frameSampler?.stop()

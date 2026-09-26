@@ -1,5 +1,6 @@
 import type { Incident } from '../../../shared/incidents/types'
 import { livePosition } from './livePosition'
+import { isNegatedIndicator } from '../../../shared/incidents/severity.ts'
 
 // Sorts what an incident already knows into the case board's evidence tiles. Pure: no new data, no fetching.
 // Each tile has a fixed slot around the hub, so tiles never jump around as facts arrive, and a tile only exists
@@ -88,12 +89,18 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
   }
 
   if (threat.length || f.urgency) {
-    const weaponFirst = [...threat].sort((a, b) => Number(WEAPON.test(b)) - Number(WEAPON.test(a)))
+    // Newest first, capped: a long call piled 15+ tags into this tile and it spilled over its neighbours. The
+    // first weapon mention is always kept on top even when it's older than the latest five.
+    const MAX = 5
+    const recent = threat.slice(-MAX).reverse()
+    const weapon = threat.find((d) => WEAPON.test(d) && !isNegatedIndicator(d))
+    const shown = weapon && !recent.includes(weapon) ? [weapon, ...recent.slice(0, MAX - 1)] : recent
+    const hidden = threat.length - shown.length
     out.threat = {
       kind: 'threat',
       label: 'Threat',
-      values: weaponFirst.map(cap),
-      sub: f.urgency ? `Urgency: ${f.urgency}` : undefined,
+      values: shown.map(cap),
+      sub: [f.urgency ? `Urgency: ${f.urgency}` : null, hidden > 0 ? `+${hidden} earlier in the case file` : null].filter(Boolean).join(' · ') || undefined,
       tone: threat.some((d) => WEAPON.test(d)) || f.urgency === 'high' ? 'high' : 'medium',
     }
   }

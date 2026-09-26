@@ -29,6 +29,13 @@ export function deriveRecommendation(fields: Incident['extractedFieldsLive'], se
   const danger = affirmed(fields.dangerIndicators)
   const weapon = danger.some((d) => /weapon|gun|firearm|knife/i.test(d))
   const fireOrInjury = danger.some((d) => /fire|smoke|blood|injur|stab|gunshot|explosion|blast/i.test(d))
+  // Most severe stage first, so the recommendation moves with the situation instead of stopping at the first
+  // weapon mention: shots fired > attacker has reached the caller > weapon seen.
+  const shotsFired = danger.some((d) => /shoot|shot at|shots|gunfire|gunshot|firing/i.test(d))
+  const reachedCaller = danger.some((d) => /break(ing)? (in|the|into)|broke|glass|window|opened the door|grabbed|dragged|abduct|kidnap|attacker(s)? (at|reached|with) (the )?caller|direct (visual )?contact/i.test(d))
+  if (shotsFired && reachedCaller) return 'Armed attack on the caller in progress — dispatch armed police and ambulance now'
+  if (shotsFired) return 'Shots fired at the caller — dispatch armed police and ambulance now'
+  if (reachedCaller) return 'Attacker has reached the caller — dispatch police immediately, caller may be taken'
   if (weapon) return 'Recommend immediate police dispatch — weapon reported'
   if (fireOrInjury) return 'Recommend immediate police + medical dispatch — injury or hazard reported'
   if (severity === 'high') return 'Recommend immediate dispatch'
