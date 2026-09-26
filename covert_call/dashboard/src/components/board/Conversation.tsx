@@ -61,9 +61,17 @@ export default function Conversation({ lines, emptyText }: { lines: Line[]; empt
   }, [lines.length])
 
   if (!lines.length) return <p className="panel-empty">{emptyText}</p>
+  // A growing line is written several times as it streams in ("That's g", then "That's good…"); show only the
+  // newest version of each.
+  const merged = lines.reduce<Line[]>((acc, l) => {
+    const prev = acc.at(-1)
+    if (prev && prev.speaker === l.speaker && l.text.startsWith(prev.text)) acc[acc.length - 1] = l
+    else if (!(prev && prev.speaker === l.speaker && prev.text.startsWith(l.text))) acc.push(l)
+    return acc
+  }, [])
   return (
     <ul className="bubbles" ref={listRef}>
-      {lines.map((line, i) => <Bubble key={`${line.at}-${i}`} line={line} isNew={line.at === newestAt} />)}
+      {merged.map((line, i) => <Bubble key={`${i}`} line={line} isNew={line.at === newestAt} />)}
     </ul>
   )
 }

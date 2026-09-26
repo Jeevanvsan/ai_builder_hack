@@ -57,38 +57,33 @@ export async function startLiveCall(
   // Fragments arrive word-sized from the transcription API; writing every fragment would be far too write-heavy,
   // so only completed lines are persisted, reusing the same write queue as every other live write.
   let lastFlushedIndex = -1
-  let lastFlushedLength = 0
   // includeLast: the periodic safety timer also flushes a still-growing last line (good enough for a live view,
   // re-appended as a fresh Firestore entry each time it grows) — a real speaker switch, by contrast, only ever
   // flushes completed lines, since the switch itself is the signal that the previous line is truly done.
+  // Each line remembers how much of it has been written. A finished line is written once in full; the still-open
+  // last line is re-written only when it has grown (the dashboard shows the newest version of a growing line).
+  // Previously a periodic flush marked the open line as done, so the rest of the caller's sentence (which
+  // arrives in fragments, often after Mia starts replying) was never written and lines appeared cut off.
+  const written: number[] = []
+  const writeLine = (i: number) => {
+    const line = transcriptLines[i]
+    const text = line.text.trim()
+    if (!text || (written[i] ?? 0) >= line.text.length) return
+    written[i] = line.text.length
+    const speaker = line.speaker === 'Mia' ? 'Mia' : 'Caller'
+    enqueueWrite(() => appendTranscriptLine(db, incidentId, speaker, text))
+  }
   const flushTranscript = (includeLast = false) => {
     const upTo = includeLast ? transcriptLines.length : transcriptLines.length - 1
-    for (let i = lastFlushedIndex + 1; i < upTo; i++) {
-      const line = transcriptLines[i]
-      const speaker = line.speaker === 'Mia' ? 'Mia' : 'Caller'
-      const text = line.text.trim()
-      if (text) enqueueWrite(() => appendTranscriptLine(db, incidentId, speaker, text))
-      lastFlushedIndex = i
-    }
-    // The still-open last line, if it grew since the last periodic flush, gets appended again (superseding the
-    // partial version already written) — acceptable duplication for a live view, trimmed at consolidation time.
-    if (includeLast && transcriptLines.length > 0) {
-      const last = transcriptLines[transcriptLines.length - 1]
-      if (last.text.length > lastFlushedLength) {
-        const speaker = last.speaker === 'Mia' ? 'Mia' : 'Caller'
-        const text = last.text.trim()
-        if (text) enqueueWrite(() => appendTranscriptLine(db, incidentId, speaker, text))
-        lastFlushedLength = last.text.length
-      }
-    }
+    for (let i = Math.max(0, lastFlushedIndex); i < upTo; i++) writeLine(i)
+    lastFlushedIndex = Math.max(lastFlushedIndex, transcriptLines.length - 2)
   }
   const appendTranscript = (speaker: string, text: string) => {
     const last = transcriptLines.at(-1)
     if (last?.speaker === speaker) last.text += text
     else {
-      flushTranscript()
-      lastFlushedLength = 0
       transcriptLines.push({ speaker, text })
+      flushTranscript() // writes the previous line in full now that it's finished
     }
   }
 
@@ -115,7 +110,16 @@ export async function startLiveCall(
     writeQueue = writeQueue.then(write, write)
   }
 
-  const handleToolCall = (call: FunctionCall) => {
+  // A bare landmark ("petrol pump", "bus stop") geocodes to a random place of that type — it once put an
+  // Alappuzha caller at a petrol pump in Kochi. Those are rejected so Mia asks for the area/road and town.
+  const GENERIC_PLACE = /\b(petrol|fuel|pump|shop|store|sign ?(board|post)|junction|bus ?stop|signal|market|temple|church|mosque|school|hospital|road|street|lane|building|bridge|beach|park|near|here)\b/i
+  const tooVague = (a: string) => {
+    const words = a.trim().split(/\s+/).filter(Boolean)
+    return words.length < 2 ? !/[A-Z]/.test(a) || GENERIC_PLACE.test(a) : !a.includes(',') && words.length <= 3 && GENERIC_PLACE.test(a)
+  }
+
+  // Returns the tool response text for calls whose answer matters to the model; undefined means plain "ok".
+  const handleToolCall = (call: FunctionCall): string | undefined => {
     const args = (call.args ?? {}) as Record<string, unknown>
     switch (call.name) {
       case 'report_situation': {
@@ -129,8 +133,12 @@ export async function startLiveCall(
       }
       case 'confirm_address': {
         const address = args.address
-        if (typeof address === 'string') enqueueWrite(() => confirmAddress(db, incidentId, address))
-        break
+        if (typeof address !== 'string') break
+        if (tooVague(address)) {
+          return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
+        }
+        enqueueWrite(() => confirmAddress(db, incidentId, address))
+        return 'Saved. If they are being chased, followed or need to move, call get_route_guidance now and guide them to the police station/hospital it gives.'
       }
       case 'report_stress_level': {
         const score = args.score
@@ -199,10 +207,10 @@ export async function startLiveCall(
     if (calls?.length) {
       const routeCalls = calls.filter((c) => c.name === 'get_route_guidance')
       const others = calls.filter((c) => c.name !== 'get_route_guidance')
-      for (const call of others) handleToolCall(call)
+      const outputs = others.map((call) => handleToolCall(call) ?? 'ok')
       if (others.length) {
         void session.sendToolResponse({
-          functionResponses: others.map((call) => ({ id: call.id, name: call.name, response: { output: 'ok' } })),
+          functionResponses: others.map((call, i) => ({ id: call.id, name: call.name, response: { output: outputs[i] } })),
         })
       }
       // Route guidance needs a real answer (live GPS + routing), so it's answered once the tracker resolves.
