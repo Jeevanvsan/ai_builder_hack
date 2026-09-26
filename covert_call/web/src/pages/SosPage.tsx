@@ -8,6 +8,7 @@ import {
   consolidateIncident,
   recordLeakageCheck,
   recordGroundedContext,
+  recordCorrelatedIncidents,
   INCIDENTS,
 } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
@@ -19,6 +20,7 @@ import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/vid
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
+import { findCorrelatedIncidents } from '../lib/gemini/correlate'
 import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 
@@ -146,6 +148,12 @@ export function SosPage() {
         if (address) {
           void groundedLocationContext(address).then((context) => {
             if (context) void recordGroundedContext(db, id, context)
+          })
+        }
+
+        if (incident) {
+          void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
+            if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
           })
         }
       } catch {

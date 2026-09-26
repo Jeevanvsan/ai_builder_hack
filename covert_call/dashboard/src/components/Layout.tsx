@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/authContext'
 import { responderLabel } from '../lib/auth'
 import { useIncidentAlerts, type AlertPermission } from '../lib/useIncidentAlerts'
+import { useNextUrgentHotkey } from '../lib/useNextUrgentHotkey'
 import IncidentToasts from './IncidentToasts'
 import ResponderMenu from './ResponderMenu'
 
@@ -15,6 +16,7 @@ const alertLabel: Record<AlertPermission, string> = {
 export default function Layout() {
   const { user, responder, isAdmin } = useAuth()
   const alerts = useIncidentAlerts()
+  useNextUrgentHotkey()
 
   return (
     <div className="shell">
@@ -33,6 +35,7 @@ export default function Layout() {
           >
             {alertLabel[alerts.permission]}
           </button>
+          <span className="hotkey-hint" title="Jumps to the most urgent open incident">Press <kbd>N</kbd> for next urgent</span>
           <ResponderMenu name={responderLabel(user, responder)} />
         </div>
       </header>

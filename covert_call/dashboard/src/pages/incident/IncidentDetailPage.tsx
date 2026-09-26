@@ -11,10 +11,12 @@ import NearbyServicesCard from '../../components/NearbyServicesCard'
 import NoteForm from '../../components/NoteForm'
 import ReplayScrubber from '../../components/ReplayScrubber'
 import ResponseActions from '../../components/ResponseActions'
+import SceneSketch from '../../components/SceneSketch'
 import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
 import { playEscalationCue } from '../../lib/alertOutputs'
 import BulletinCard from '../../components/BulletinCard'
+import CorrelatedIncidentsCard from '../../components/CorrelatedIncidentsCard'
 import { channelLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
 import { useAuth } from '../../lib/authContext'
@@ -213,6 +215,8 @@ export default function IncidentDetailPage() {
           <LiveTranscript lines={incident.transcriptLines} />
         )}
 
+        <SceneSketch incident={incident} />
+
         {incident.reasoningTrace && incident.reasoningTrace.length > 0 && (
           <div className="card reasoning-card">
             <h2>Why this severity</h2>
@@ -302,6 +306,8 @@ export default function IncidentDetailPage() {
         {!live && incident.consolidatedSummary && <ReplayScrubber incident={incident} />}
 
         {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} />}
+
+        {incident.correlatedIncidentIds && <CorrelatedIncidentsCard incidentIds={incident.correlatedIncidentIds} />}
 
         <div className="card summary-card">
           <h2>Consolidated summary</h2>
