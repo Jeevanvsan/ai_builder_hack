@@ -31,24 +31,50 @@ function extractPincodeAndCity(address: string): string | null {
   return cityMatch ? `${pinMatch[0]}, ${cityMatch[1].trim()}` : pinMatch[0]
 }
 
-async function viaNominatim(address: string, near: Coordinates | null): Promise<Coordinates | null> {
-  const direct = await nominatimSearch(address, near)
-  if (direct) return direct
+// Last resort when even the street/area name is too garbled to match anything: the town/city name alone (the
+// last comma-separated part, or the whole string if there are no commas) is short and common enough that a
+// mis-transcribed street ("Vaisheri" for "Vazhicherry") doesn't drag it down with it. Lands in the right town,
+// not the right street — still far better than the caller's device GPS, which can be tens of km off.
+function lastPlacePart(address: string): string | null {
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean)
+  const last = parts.at(-1)?.replace(/-?\s*\d{5,6}\s*$/, '').trim()
+  return last && last.length >= 3 ? last : null
+}
 
-  const fallbackQuery = extractPincodeAndCity(address)
-  if (!fallbackQuery) return null
-  return nominatimSearch(fallbackQuery, near)
+export type GeocodeHit = Coordinates & {
+  // 'exact': the full spoken address matched something. 'approximate': only a pincode or the town/city name
+  // matched — the street itself couldn't be found (likely mis-transcribed), so the pin is in the right area but
+  // not necessarily the right street. Consumers should mark an 'approximate' hit as uncertain, not confirmed.
+  precision: 'exact' | 'approximate'
+}
+
+async function viaNominatim(address: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+  const direct = await nominatimSearch(address, near)
+  if (direct) return { ...direct, precision: 'exact' }
+
+  const pincodeQuery = extractPincodeAndCity(address)
+  if (pincodeQuery) {
+    const hit = await nominatimSearch(pincodeQuery, near)
+    if (hit) return { ...hit, precision: 'approximate' }
+  }
+
+  const town = lastPlacePart(address)
+  if (town && town !== address) {
+    const hit = await nominatimSearch(town, near)
+    if (hit) return { ...hit, precision: 'approximate' }
+  }
+  return null
 }
 
 // Google Geocoding when a key with Geocoding access is supplied, otherwise (or on failure) free OpenStreetMap Nominatim.
 export async function geocodeAddress(
   address: string,
   opts: { near?: Coordinates | null; googleMapsKey?: string } = {},
-): Promise<Coordinates | null> {
+): Promise<GeocodeHit | null> {
   try {
     if (opts.googleMapsKey) {
       const hit = await viaGoogle(address, opts.googleMapsKey).catch(() => null)
-      if (hit) return hit
+      if (hit) return { ...hit, precision: 'exact' }
     }
     return await viaNominatim(address, opts.near ?? null)
   } catch {

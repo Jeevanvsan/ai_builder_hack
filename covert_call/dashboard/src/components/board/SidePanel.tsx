@@ -152,6 +152,11 @@ function FactSheet({ incident: i }: { incident: Incident }) {
   if (i.location.track?.length) rows.push(['Movement', `${i.location.track.length} live GPS points`])
   if (r) rows.push(['Heading to', `${r.destination.name} (${r.destination.kind}), ${(r.distanceM / 1000).toFixed(1)} km, step ${r.stepIndex + 1} of ${r.steps.length}`])
   if (i.voiceStressScore != null) rows.push(['Voice stress', String(i.voiceStressScore)])
+  if (i.callerEstimate) {
+    const c = i.callerEstimate
+    const parts = [c.ageGroup !== 'unclear' ? c.ageGroup : null, c.gender !== 'unclear' ? c.gender : null].filter(Boolean)
+    rows.push(['Caller (AI estimate)', parts.length ? `${parts.join(', ')} — unconfirmed, from voice` : 'unclear — unconfirmed'])
+  }
   return (
     <dl className="fact-sheet">
       {rows.map(([k, v]) => (<div key={k}><dt>{k}</dt><dd>{v}</dd></div>))}

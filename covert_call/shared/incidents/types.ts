@@ -103,6 +103,10 @@ export interface Incident {
   adviceGiven?: { text: string; at: string }[]
   voiceStressScore: number | null
   voiceStressTrend: { timestamp: string; score: number }[]
+  // The AI's rough, UNCONFIRMED guess of the caller's age group and gender from voice/camera (never something
+  // the caller stated) — shown to a responder clearly labelled as an estimate, mainly to flag a child or
+  // elderly caller. Absent until the model reports one; a call may not get one at all if it's short or unclear.
+  callerEstimate?: { ageGroup: 'child' | 'teen' | 'adult' | 'elderly' | 'unclear'; gender: 'male' | 'female' | 'unclear'; confidence?: number | null; at: string }
   leakageCheckStatus: { reviewed: boolean; redactions: string[] }
   severity: Severity
   // Present once the QuickBite app starts streaming the back camera (Epic 7.1). Absent means no video for this incident.

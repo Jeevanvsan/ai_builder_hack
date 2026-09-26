@@ -46,6 +46,24 @@ export const REPORT_STRESS_LEVEL: FunctionDeclaration = {
   },
 }
 
+export const REPORT_CALLER_ESTIMATE: FunctionDeclaration = {
+  name: 'report_caller_estimate',
+  description:
+    "Report your best rough guess of the caller's approximate age group and gender, from their voice (and camera " +
+    'image if visible) — NOT something the caller stated. This is only ever a rough estimate a responder should ' +
+    'treat as unconfirmed, useful mainly to flag a child or elderly caller (different urgency/handling). Call it ' +
+    'once, early in the call, as soon as you have a reasonable impression — do not ask the caller about it.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      ageGroup: { type: Type.STRING, enum: ['child', 'teen', 'adult', 'elderly', 'unclear'], description: 'Rough age bracket' },
+      gender: { type: Type.STRING, enum: ['male', 'female', 'unclear'], description: "Rough guess of the caller's gender, from voice/appearance" },
+      confidence: { type: Type.NUMBER, description: '0-100 how sure you are — usually low-to-moderate for this' },
+    },
+    required: ['ageGroup', 'gender'],
+  },
+}
+
 export const REPORT_SCENE_OBSERVATION: FunctionDeclaration = {
   name: 'report_scene_observation',
   description:
@@ -102,11 +120,11 @@ export const END_CALL: FunctionDeclaration = {
 }
 
 export const LIVE_CALL_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_ADVICE, GET_ROUTE_GUIDANCE, END_CALL] },
+  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_ADVICE, GET_ROUTE_GUIDANCE, END_CALL] },
 ]
 
 // Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools
 // (no address confirmation, no end_call — the person ends the SOS with the secret gesture).
 export const REPORT_SCENE_OBSERVATION_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION] },
+  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE] },
 ]
