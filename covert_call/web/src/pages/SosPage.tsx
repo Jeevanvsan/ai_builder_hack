@@ -7,6 +7,7 @@ import {
   upsertVideoRecording,
   consolidateIncident,
   recordLeakageCheck,
+  recordGroundedContext,
   INCIDENTS,
 } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
@@ -17,6 +18,7 @@ import { startSilentObserver, type SilentObserverHandle } from '../lib/gemini/si
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { consolidateCall } from '../lib/gemini/consolidate'
+import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 
@@ -134,11 +136,18 @@ export function SosPage() {
         const incident = snap.data() as Omit<Incident, 'id'> | undefined
         const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
         const stressTrend = incident?.voiceStressTrend ?? []
+        const address = incident?.location.confirmed?.address ?? null
         const [consolidation, redactions] = await Promise.all([
-          consolidateCall(transcript, fields, stressTrend),
+          consolidateCall(transcript, fields, stressTrend, address),
           runLeakageCheck(transcript),
         ])
         await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, redactions)])
+
+        if (address) {
+          void groundedLocationContext(address).then((context) => {
+            if (context) void recordGroundedContext(db, id, context)
+          })
+        }
       } catch {
         // Best-effort: the live-extracted fields are already saved.
       }

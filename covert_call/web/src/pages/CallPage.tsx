@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { doc, getDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
 import { APP_NAME } from '../lib/brand'
 import { consolidateCall } from '../lib/gemini/consolidate'
+import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
@@ -135,15 +136,22 @@ export function CallPage() {
         const incident = snap.data() as Omit<Incident, 'id'> | undefined
         const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
         const stressTrend = incident?.voiceStressTrend ?? []
+        const address = incident?.location.confirmed?.address ?? null
 
         const [consolidation, redactions] = await Promise.all([
-          consolidateCall(transcript, fields, stressTrend),
+          consolidateCall(transcript, fields, stressTrend, address),
           runLeakageCheck(transcript),
         ])
         await Promise.all([
           consolidateIncident(db, id, consolidation),
           recordLeakageCheck(db, id, redactions),
         ])
+
+        if (address) {
+          void groundedLocationContext(address).then((context) => {
+            if (context) void recordGroundedContext(db, id, context)
+          })
+        }
       } catch {
         // Best-effort: the incident's live-extracted fields are already saved even if consolidation/leakage
         // check fails here (e.g. no key configured) — a responder still sees everything gathered during the call.

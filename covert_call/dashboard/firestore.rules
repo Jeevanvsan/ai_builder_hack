@@ -81,7 +81,7 @@ service cloud.firestore {
         && d.keys().hasOnly([
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
           'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
-          'transcriptSummary', 'reasoningTrace', 'recommendation',
+          'transcriptSummary', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
           'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
         ])
@@ -107,7 +107,9 @@ service cloud.firestore {
         && (!('adviceGiven' in d) || (d.adviceGiven is list && d.adviceGiven.size() <= 500))
         && (!('fieldConfidenceLive' in d) || d.fieldConfidenceLive is map)
         && (!('reasoningTrace' in d) || (d.reasoningTrace is list && d.reasoningTrace.size() <= 500))
+        && (!('bulletin' in d) || d.bulletin is map)
         && optionalString(d, 'recommendation', 200)
+        && optionalString(d, 'groundedContext', 300)
         && optionalString(d, 'consolidatedSummary', 5000)
         && optionalString(d, 'transcriptSummary', 5000);
     }

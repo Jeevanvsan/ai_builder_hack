@@ -246,7 +246,19 @@ export function recordLeakageCheck(db: Firestore, id: string, redactions: string
 export function consolidateIncident(
   db: Firestore,
   id: string,
-  patch: { consolidatedSummary: string; fieldConfidence: Record<string, FieldConfidence> },
+  patch: {
+    consolidatedSummary: string
+    fieldConfidence: Record<string, FieldConfidence>
+    bulletin?: Incident['bulletin']
+  },
 ): Promise<void> {
-  return updateDoc(ref(db, id), { consolidatedSummary: patch.consolidatedSummary, fieldConfidence: patch.fieldConfidence })
+  const update: Record<string, unknown> = { consolidatedSummary: patch.consolidatedSummary, fieldConfidence: patch.fieldConfidence }
+  if (patch.bulletin) update.bulletin = patch.bulletin
+  return updateDoc(ref(db, id), update)
+}
+
+// Epic 16.10: best-effort, separate from consolidateIncident() since Search grounding can fail/be unconfigured
+// independently of the rest of consolidation succeeding.
+export function recordGroundedContext(db: Firestore, id: string, context: string): Promise<void> {
+  return updateDoc(ref(db, id), { groundedContext: context })
 }

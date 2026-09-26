@@ -12,12 +12,14 @@ import ResponseActions from '../../components/ResponseActions'
 import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
 import { playEscalationCue } from '../../lib/alertOutputs'
+import BulletinCard from '../../components/BulletinCard'
 import { channelLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
 import { useAuth } from '../../lib/authContext'
 import { responderLabel } from '../../lib/auth'
 import { markViewed } from '../../lib/responseActions'
 import { buildTimeline } from '../../lib/timeline'
+import { useChangesSinceLastView } from '../../lib/useChangesSinceLastView'
 import type { FieldConfidence } from '../../../../shared/incidents/types'
 import { useNow } from '../../lib/useNow'
 
@@ -39,6 +41,9 @@ export default function IncidentDetailPage() {
   useEffect(() => {
     if (incidentId && viewedAt === null) void markViewed(incidentId, name)
   }, [incidentId, viewedAt, name])
+
+  // Epic 16.8: what changed since this browser last opened this incident.
+  const changesSinceLastView = useChangesSinceLastView(incident)
 
   // Epic 16.7: a distinct cue the instant severity increases on the incident already open in front of this
   // responder — deliberately independent of Epic 4.6's "do not disturb while on an incident page" rule, since
@@ -133,6 +138,12 @@ export default function IncidentDetailPage() {
         </div>
       </div>
 
+      {changesSinceLastView && (
+        <div className="diff-banner">
+          Since you last checked: {changesSinceLastView.join(', ')}
+        </div>
+      )}
+
       <div className={incident.video || incident.videoFront ? 'detail-grid has-video' : 'detail-grid'}>
         {(incident.video || incident.videoFront) && (
           <div className="card video-card">
@@ -163,6 +174,11 @@ export default function IncidentDetailPage() {
                 ? `Approximate: ${rough.lat.toFixed(4)}, ${rough.lng.toFixed(4)} (${rough.source === 'gps' ? 'GPS' : 'IP fallback'})`
                 : 'Approximate location: capturing…'}
             </div>
+            {incident.groundedContext && (
+              <LiveValue value={incident.groundedContext}>
+                <div className="sub grounded-context">{incident.groundedContext}</div>
+              </LiveValue>
+            )}
           </div>
         </div>
 
@@ -276,6 +292,8 @@ export default function IncidentDetailPage() {
             <p className="sub">Saved to the team's Google Drive for later review.</p>
           </div>
         )}
+
+        {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} />}
 
         <div className="card summary-card">
           <h2>Consolidated summary</h2>
