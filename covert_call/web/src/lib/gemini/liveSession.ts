@@ -1,4 +1,4 @@
-import { EndSensitivity, GoogleGenAI, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { GoogleGenAI, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
 import { appendTranscriptLine, confirmAddress, recordAdvice, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
@@ -241,9 +241,10 @@ export async function startLiveCall(
         realtimeInputConfig: {
           automaticActivityDetection: {
             startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_LOW,
-            endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
             prefixPaddingMs: 200,
-            silenceDurationMs: 1200,
+            // ~0.7 s: long enough for a breath mid-answer, short enough that replies don't feel slow. (1.2 s with
+            // low end-sensitivity added over a second of dead air to every turn.)
+            silenceDurationMs: 700,
           },
         },
         // Low keeps replies quick on a live call; the model still thinks in the background while speaking.
