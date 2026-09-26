@@ -282,3 +282,4 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - Persona: tools are silent (never speak `<function_call>`/`end_call`); "ask once, remember forever"; never tell a chased caller to "stay where you are".
   - An occasional male voice was reported; the voice is fixed to Kore in config, so the cause is unknown. Please listen for it.
   - Web app redeployed.
+- 2026-09-26 (IST, ~21:45): Replies felt slow. Measured time to first audio: `gemini-3.8-live` 1.0–2.2 s; extended-thinking LOW 1.0–1.1 s with an occasional 3.8 s; MINIMAL isn't supported. Most of the delay came from voice detection, so I dropped the low end-sensitivity and cut `silenceDurationMs` from 1200 to 700; start sensitivity stays LOW. The extended-thinking model stays; `?model=live` is the fallback. Web app redeployed.
