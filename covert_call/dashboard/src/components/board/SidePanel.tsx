@@ -74,7 +74,7 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                 </>
               ) : live ? (
                 <>
-                  <p className="panel-empty">Gemini writes the case summary when the call ends.</p>
+                  <p className="panel-empty">AI writes the case summary when the call ends.</p>
                   <FactSheet incident={incident} />
                 </>
               ) : incident.consolidationFailed ? (
@@ -94,10 +94,13 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
 
             {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} />}
 
-            {(incident.hasRecording || (incident.videoRecording?.length ?? 0) > 0) && (
+            {(incident.hasRecording || (incident.videoRecording?.length ?? 0) > 0 || (incident.recordingFailed && !live)) && (
               <section className="case-section">
                 <h3>Evidence recordings</h3>
                 {incident.hasRecording && <CallRecordingPlayer incidentId={incident.id} />}
+                {!incident.hasRecording && incident.recordingFailed && !live && (
+                  <p className="panel-empty">No audio recording — saving it failed ({incident.recordingFailed}).</p>
+                )}
                 {incident.videoRecording?.map((v) => (
                   <div key={v.camera} className="drive-row">
                     <span>{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>

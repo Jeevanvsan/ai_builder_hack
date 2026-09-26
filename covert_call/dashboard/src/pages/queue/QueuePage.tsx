@@ -94,7 +94,7 @@ export default function QueuePage() {
                   </div>
                   <div className="row-cell row-time">
                     <span className="mono">{formatElapsed(i.sessionStartedAt, now)}</span>
-                    <span className="sub" title={formatTime(i.sessionStartedAt)}>{timeAgo(i.sessionStartedAt, now)}</span>
+                    <span className="sub">{timeAgo(i.sessionStartedAt, now)} · {formatTime(i.sessionStartedAt)}</span>
                   </div>
                 </motion.div>
               )
