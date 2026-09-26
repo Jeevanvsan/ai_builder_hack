@@ -288,3 +288,8 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - Dashboard map zooms out to fit a route that isn't fully in view (once per route).
   - Default model reverted to `gemini-3.8-live`: with extended thinking, the caller's transcript was missing and English was misheard. `?model=extended` opts in.
   - Web app and dashboard redeployed.
+- 2026-09-26 (IST, ~22:30):
+  - Dashboard: new web check. `dashboard/src/lib/webIntel.ts` uses `gemini-3.5-flash` + Google Search to look up recent public reports of similar incidents near the confirmed place, using only the place and incident type (never names). Results and source links go in the Linked cases card, stored in `incident.webIntel` (type and rules updated, rules deployed). **Blocked by quota:** both our keys return 429 for Google Search grounding, while plain generate works. The card shows "no recent reports" until quota is available.
+  - Dashboard: the replay now shows after every ended call (it used to need the AI summary, which also fails on quota). The call recording has a Download button.
+  - **Notes for Ameen (persona):** new "LOCATION FIRST, THEN THE RIGHT DESTINATION" section. Mia gets the real location before any route; a place the caller mentions (petrol pump) is where they are, not the destination, so she still guides to the police station/hospital. She may suggest a manned petrol pump only as a temporary safe spot if the station is over ~2 km away and danger is immediate.
+  - Web app and dashboard redeployed.
