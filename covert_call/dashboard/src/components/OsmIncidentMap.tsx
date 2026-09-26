@@ -49,7 +49,11 @@ export default function OsmIncidentMap({ rough, confirmed, target, backdrop, tra
           </CircleMarker>
         </>
       )}
-      {moving && <Polyline positions={track!.map((p) => [p.lat, p.lng] as [number, number])} pathOptions={{ color: '#2b6cb0', weight: 4, opacity: 0.6 }} interactive={false} />}
+      {moving && <Polyline positions={track!.map((p) => [p.lat, p.lng] as [number, number])} pathOptions={{ color: '#0b57d0', weight: 5, opacity: 0.9, dashArray: '1 9', lineCap: 'round' }} interactive={false} />}
+      {moving && track!.slice(-12, -1).map((p, k, arr) => (
+        <CircleMarker key={`${p.lat},${p.lng},${k}`} center={[p.lat, p.lng]} radius={3 + (k / arr.length) * 3} interactive={false} pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#0b57d0', fillOpacity: 0.35 + (k / arr.length) * 0.6 }} />
+      ))}
+      {current && <CircleMarker center={[current.lat, current.lng]} radius={24} interactive={false} className="live-pulse" pathOptions={{ stroke: false, fillColor: '#0b57d0', fillOpacity: 0.2 }} />}
       {!moving && rough && (
         <CircleMarker center={[rough.lat, rough.lng]} radius={9} pathOptions={{ color: '#5f6673', fillColor: '#8a919c', fillOpacity: 0.9, weight: 2 }}>
           <Tooltip>Approximate location</Tooltip>

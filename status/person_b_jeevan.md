@@ -254,3 +254,9 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - **Please put the web app code in `covert_call/web/`** and add `"web"` to `workspaces` in `covert_call/package.json`; run `npm install` from `covert_call/`.
 - Data model changes go through `covert_call/shared/incidents/types.ts` — tell Jeevan before changing it (the dashboard reads every field).
 - Billing on `quickbite-5cde0` unblocks 3.4 (summary), Google Maps, and closed-tab notifications — worth deciding together with the project owner.
+
+## 2026-09-26 (IST, evening) — route/map polish, fact sheet, case linking
+- Dashboard: linked cases now include rule-based matches (within 300 m, last 7 days) alongside the AI matches.
+- Map: only the base tiles are greyed out now. The route, the moving track (dots, newest in bold), a pulsing live position and the markers show at full colour.
+- Case file: when there's no AI summary, it shows a fact sheet (urgency, people, danger, location, movement, route).
+- **Notes for Ameen (please review, web/persona):** `web/src/lib/gemini/persona.ts` GETTING TO SAFETY now makes Mia ask the caller to confirm they've reached safety before she ends the call, and keep guiding if they don't confirm. Web app redeployed.

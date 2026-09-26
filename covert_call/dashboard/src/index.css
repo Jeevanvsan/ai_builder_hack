@@ -765,14 +765,20 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   box-shadow: 0 1px 2px rgba(20, 30, 50, 0.05), 0 18px 40px -24px rgba(20, 30, 50, 0.3);
 }
 .board-map { position: absolute; inset: 0; }
-.board-map .map { height: 100%; min-height: 0; border: 0; border-radius: 0; filter: grayscale(0.85) contrast(0.85) brightness(1.1) opacity(0.75); }
+.board-map .map { height: 100%; min-height: 0; border: 0; border-radius: 0; }
+/* Only the base tiles are muted; the route, track and markers stay at full colour above the veil. */
+.board-map .leaflet-tile-pane { filter: grayscale(0.85) contrast(0.85) brightness(1.1) opacity(0.6); }
+.board-map .leaflet-overlay-pane { z-index: 450; filter: drop-shadow(0 0 6px rgba(11, 87, 208, 0.45)); }
+.live-pulse { animation: live-pulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes live-pulse { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .live-pulse { animation: none; } }
 .board-map .leaflet-control-attribution { font-size: 10px; background: rgba(255, 255, 255, 0.7); }
 /* Softens the map towards the edges so tiles read clearly, while the area around the hub stays sharp. */
 .board-veil {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, rgba(244, 247, 251, 0) 0%, rgba(244, 247, 251, 0.15) 20%, rgba(244, 247, 251, 0.6) 50%, rgba(244, 247, 251, 0.85) 100%);
+  background: radial-gradient(ellipse at center, rgba(244, 247, 251, 0) 0%, rgba(244, 247, 251, 0.15) 20%, rgba(244, 247, 251, 0.35) 55%, rgba(244, 247, 251, 0.6) 100%);
 }
 .light-links { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: visible; }
 .board-grid {
@@ -1124,3 +1130,7 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 }
 
 .video-cam-toggle .btn.active { background: #fff; color: #111418; }
+.fact-sheet { display: grid; gap: 0.5rem; margin: 0; }
+.fact-sheet > div { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.5rem; font-size: 0.9rem; }
+.fact-sheet dt { color: var(--muted, #6b7280); font-weight: 600; }
+.fact-sheet dd { margin: 0; }
