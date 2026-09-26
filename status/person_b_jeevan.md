@@ -156,6 +156,15 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-26 ~21:30 IST: live-call testing fixes, all deployed (web + dashboard + Firestore rules), branch `phase-3-epic-16-decision-support`, not pushed yet.** Web/persona changes need your review:
+  - **Persona (`persona.ts`):** call `confirm_address` the moment the caller mentions any place, and again for every new landmark; call `get_route_guidance` with each reported landmark; answer the question the caller actually asked (e.g. "any shop nearby?") instead of repeating the standing instruction; say a warm goodbye before `end_call`.
+  - **`liveSession.ts`:** `end_call` now waits for the goodbye audio to finish playing (it used to cut off after a fixed 4 s); `<no speech>` / `{pause}` transcription tokens are stripped out of the transcript.
+  - **`liveTracking.ts` / `nearbyServices.ts`:** landmarks are searched even when the phone has GPS (the landmark overrides GPS if they're more than 800 m apart); an uncertain match tells Mia to confirm it with the caller.
+  - **Geocoding (`geocode.ts`):** district-level hits are rejected (bare "Alappuzha" landed tens of km away); if one part of an address is misheard, the other parts are retried without it ("St. George Auditorium, Vaisheri, Alappuzha" → found).
+  - **Severity (`severity.ts`):** tags like "No weapon involved" / "No injury" no longer count as a weapon or injury (this used to trigger "weapon reported").
+  - **Firestore rules:** added the missing `audioViewers` match, which had broken live audio listen-in entirely.
+  - **Dashboard:** the map, Route tile and Location tile now follow the caller live (distance counts down, next turn advances); caller age/gender shows on the dispatch bulletin; the Scene tab was removed.
+  - Still open: the responder "take over the call" 2-way voice feature is not built; Drive upload failures still need the Apps Script execution log to diagnose.
 - **2026-09-25 21:11 IST: Phase 2 DEPLOYED to Firebase (from the `phase-2` branch, before merge).**
   - Firestore rules deployed (compiled clean), dashboard + web app both rebuilt and deployed; both return 200.
   - Live: web https://quickbite-5cde0.web.app · dashboard https://quickbite-5cde0-dashboard.web.app.
