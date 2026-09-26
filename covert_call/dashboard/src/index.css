@@ -1134,3 +1134,11 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .fact-sheet > div { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.5rem; font-size: 0.9rem; }
 .fact-sheet dt { color: var(--muted, #6b7280); font-weight: 600; }
 .fact-sheet dd { margin: 0; }
+.web-intel { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed rgba(0, 0, 0, 0.12); }
+.web-intel-head { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #1a73e8; margin-bottom: 0.3rem; }
+.web-intel-list { margin: 0; padding-left: 1rem; font-size: 0.82rem; display: grid; gap: 0.25rem; }
+.web-intel-sources { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+.web-intel-sources a { font-size: 0.72rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: #eef4ff; color: #1a56c4; text-decoration: none; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recording-row { display: flex; align-items: center; gap: 0.5rem; }
+.recording-row .recording-player { flex: 1; min-width: 0; }
+.recording-download { white-space: nowrap; font-size: 0.8rem; padding: 0.35rem 0.7rem; }

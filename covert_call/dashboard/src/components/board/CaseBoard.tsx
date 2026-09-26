@@ -13,6 +13,7 @@ import CaseHub from './CaseHub'
 import EvidenceTile from './EvidenceTile'
 import LightLinks from './LightLinks'
 import StressWave from './StressWave'
+import { ensureWebIntel, incidentTypeOf, placeOf } from '../../lib/webIntel'
 
 const ORDER: EvidenceKind[] = ['vehicle', 'location', 'subjects', 'threat', 'stress', 'seen', 'nearby', 'linked']
 const SERVICE_LABEL = { police: 'Police', fire: 'Fire', hospital: 'Hospital' } as const
@@ -50,6 +51,15 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
     evidence.nearby = { kind: 'nearby', label: 'Nearby help', values: [], tone: 'neutral', pending: 'Finding nearby police, fire and hospital…' }
   } else if (Array.isArray(nearby)) {
     evidence.nearby = { kind: 'nearby', label: 'Nearby help', values: [], tone: 'live', sub: nearby.length ? undefined : 'No stations within 5 km' }
+  }
+
+  // Web check: recent public reports of similar incidents near the confirmed place (once per incident).
+  const canSearchWeb = Boolean(placeOf(incident) && incidentTypeOf(incident))
+  useEffect(() => { if (canSearchWeb) void ensureWebIntel(incident) }, [canSearchWeb, incident])
+  const web = incident.webIntel
+  if (canSearchWeb || web) {
+    const base = evidence.linked ?? { kind: 'linked' as const, label: 'Linked cases', values: [], tone: 'neutral' as const }
+    evidence.linked = { ...base, tone: base.values.length || web?.findings.length ? 'live' : base.tone, pending: !web ? 'Searching the web for similar reports nearby…' : base.pending }
   }
 
   const route = incident.safeRoute
@@ -103,13 +113,32 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
         </ul>
       )
     }
-    if (e.kind === 'linked' && e.values.length) {
+    if (e.kind === 'linked' && (e.values.length || web)) {
       return (
-        <ul className="tile-list">
-          {e.values.map((id) => (
-            <li key={id}><Link to={`/incident/${id}`} className="mono">{id}</Link><span className="sub">{incident.correlatedIncidentIds?.includes(id) ? 'AI: same person or vehicle' : 'same place, last 7 days'}</span></li>
-          ))}
-        </ul>
+        <>
+          {e.values.length > 0 && (
+            <ul className="tile-list">
+              {e.values.map((id) => (
+                <li key={id}><Link to={`/incident/${id}`} className="mono">{id}</Link><span className="sub">{incident.correlatedIncidentIds?.includes(id) ? 'AI: same person or vehicle' : 'same place, last 7 days'}</span></li>
+              ))}
+            </ul>
+          )}
+          {web && (
+            <div className="web-intel">
+              <div className="web-intel-head">On the web · Google Search</div>
+              {web.findings.length ? (
+                <ul className="web-intel-list">{web.findings.map((f) => <li key={f}><DecodeText text={f} /></li>)}</ul>
+              ) : (
+                <p className="sub">No recent public reports of similar incidents nearby.</p>
+              )}
+              {web.sources.length > 0 && (
+                <div className="web-intel-sources">
+                  {web.sources.map((s) => <a key={s.url} href={s.url} target="_blank" rel="noreferrer">{s.title || new URL(s.url).hostname}</a>)}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )
     }
     return undefined

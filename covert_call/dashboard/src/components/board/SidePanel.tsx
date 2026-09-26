@@ -103,7 +103,7 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
               </section>
             )}
 
-            {!live && incident.consolidatedSummary && <ReplayScrubber incident={incident} />}
+            {!live && <ReplayScrubber incident={incident} />}
 
             <section className="case-section">
               <h3>Team notes</h3>
