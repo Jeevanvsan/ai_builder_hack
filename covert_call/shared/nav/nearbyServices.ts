@@ -17,7 +17,9 @@ export type NearbyService = {
 // rather than leaving the card permanently stuck on "couldn't load" for what's often a transient issue.
 const OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
 const RADIUS_M = 5_000
-const REQUEST_TIMEOUT_MS = 10_000
+// Short: this is one of two-plus mirrors tried in a race (see nearbyServices()) — a slow/dead mirror should give
+// up quickly so a working one isn't waited behind, not sit for the full 10s that made routing feel slow overall.
+const REQUEST_TIMEOUT_MS = 4_000
 
 const QUERY_TAGS: Record<ServiceKind, string> = {
   police: 'amenity=police',
@@ -83,19 +85,51 @@ async function viaNominatim(near: { lat: number; lng: number }): Promise<{ eleme
   return elements.length ? { elements } : null
 }
 
+// Cached by rounded position (~100m grid cell) for a short while: a call routes/re-routes several times as the
+// caller moves and the same nearby stations are correct each time, but this was being re-fetched from Overpass
+// on every single call (bestSafeRoute calls this internally, on top of the dashboard's own direct call for the
+// "Nearby help" tile) — each one paying the full slow-Overpass-mirror cost again for the same answer. This was
+// the single largest cause of routing feeling slow; caching it removes almost all of that repeated cost.
+const CACHE_MS = 5 * 60_000
+const cache = new Map<string, { at: number; promise: Promise<NearbyService[]> }>()
+const cacheKey = (near: { lat: number; lng: number }) => `${near.lat.toFixed(3)},${near.lng.toFixed(3)}`
+
+export function nearbyServices(near: { lat: number; lng: number }): Promise<NearbyService[]> {
+  const key = cacheKey(near)
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.promise
+  const promise = fetchNearbyServices(near)
+  cache.set(key, { at: Date.now(), promise })
+  // A failed lookup shouldn't be cached as if it succeeded — the next call gets a fresh attempt.
+  promise.catch(() => cache.delete(key))
+  return promise
+}
+
 // One Overpass query covering all three service kinds at once, to stay within the free public instance's rate
-// limits rather than firing three separate requests per incident view. Tries each mirror in turn.
-export async function nearbyServices(near: { lat: number; lng: number }): Promise<NearbyService[]> {
+// limits rather than firing three separate requests per incident view. Races each mirror (see below).
+async function fetchNearbyServices(near: { lat: number; lng: number }): Promise<NearbyService[]> {
   const filters = Object.values(QUERY_TAGS)
     .map((tag) => `node[${tag}](around:${RADIUS_M},${near.lat},${near.lng});`)
     .join('')
   const query = `[out:json][timeout:15];(${filters});out body;`
 
-  let data: { elements: OverpassElement[] } | null = null
-  for (const url of OVERPASS_URLS) {
-    data = await queryOverpass(url, query)
-    if (data) break
-  }
+  // Mirrors are independent alternatives, not an ordered fallback chain — start all of them at once and use
+  // whichever gives a real (non-null) answer FIRST, rather than trying one at a time (which used to wait out one
+  // dead mirror's full timeout before even starting the next — sequential trying, not any single slow request,
+  // was the main cause of routing feeling slow). A plain Promise.race would resolve on the first mirror to
+  // settle even if it fails, so this races each mirror's promise chained with "if null, wait forever" — the
+  // overall race then only resolves early on an actual hit, and still finishes (with null) once every mirror has
+  // failed, via the plain Promise.all fallback below.
+  const firstHit = new Promise<{ elements: OverpassElement[] } | null>((resolve) => {
+    let remaining = OVERPASS_URLS.length
+    for (const url of OVERPASS_URLS) {
+      void queryOverpass(url, query).then((d) => {
+        if (d) resolve(d)
+        else if (--remaining === 0) resolve(null)
+      })
+    }
+  })
+  let data = await firstHit
   // The free Overpass instances time out (504) under load — fall back to Nominatim's amenity search, which is
   // separate infrastructure and far more reliable, rather than reporting "no stations" that do exist.
   if (!data) data = await viaNominatim(near)
