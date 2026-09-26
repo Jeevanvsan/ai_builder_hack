@@ -66,62 +66,35 @@ export default function QueuePage() {
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && navigate(`/incident/${i.id}`)}
                 >
-                  <div className="incident-card-head">
+                  <div className="row-cell row-rank">
                     <span className="incident-card-rank">#{pager.offset + index + 1}</span>
                     <Chip tone={i.severity} filled>{i.severity}</Chip>
-                    {unviewed && <Chip tone="new" filled>New</Chip>}
-                    {i.callState === 'active' ? (
-                      <span className="live"><span className="live-dot" />Live</span>
-                    ) : (
-                      <span className="muted-inline">Ended</span>
-                    )}
                   </div>
-
-                  <Link to={`/incident/${i.id}`} className="incident-card-id mono" onClick={(e) => e.stopPropagation()}>
-                    {i.id}
-                  </Link>
-                  <div className="sub">
-                    {channelLabel(i.channel)}
-                    {i.incidentType === 'sos' && (
-                      <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>
-                    )}
+                  <div className="row-cell row-id">
+                    <Link to={`/incident/${i.id}`} className="incident-card-id mono" onClick={(e) => e.stopPropagation()}>{i.id}</Link>
+                    <span className="sub">
+                      {channelLabel(i.channel)}
+                      {i.incidentType === 'sos' && <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>}
+                    </span>
                   </div>
-
-                  <div className="incident-card-body">
-                    <div className="incident-card-field">
-                      <span className="incident-card-label">People</span>
-                      <span>{f.peopleCount ?? '—'}</span>
-                    </div>
-                    <div className="incident-card-field">
-                      <span className="incident-card-label">Status</span>
-                      <Chip tone={i.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(i.response.status)}</Chip>
-                    </div>
-                    <div className="incident-card-field">
-                      <span className="incident-card-label">Voice stress</span>
-                      <StressMeter score={i.voiceStressScore} />
-                    </div>
+                  <div className="row-cell row-state">
+                    {i.callState === 'active' ? <span className="live"><span className="live-dot" />Live</span> : <span className="muted-inline">Ended</span>}
+                    <span>{unviewed ? <Chip tone="new" filled>New</Chip> : <Chip tone={i.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(i.response.status)}</Chip>}</span>
                   </div>
-
-                  {f.dangerIndicators.length > 0 && (
-                    <div className="incident-card-indicators">
-                      {f.dangerIndicators.slice(0, 3).map((d) => <Chip key={d} tone="danger">{d}</Chip>)}
-                      {f.dangerIndicators.length > 3 && <span className="sub">+{f.dangerIndicators.length - 3} more</span>}
-                    </div>
-                  )}
-
-                  <div className="incident-card-location sub">
-                    {i.location.confirmed ? (
-                      i.location.confirmed.address
-                    ) : i.location.rough ? (
-                      `≈ ${i.location.rough.lat.toFixed(3)}, ${i.location.rough.lng.toFixed(3)} (${i.location.rough.source === 'gps' ? 'GPS' : 'IP'})`
-                    ) : (
-                      'Locating…'
-                    )}
+                  <div className="row-cell row-indicators">
+                    {f.dangerIndicators.length > 0
+                      ? <>{f.dangerIndicators.slice(0, 2).map((d) => <Chip key={d} tone="danger">{d}</Chip>)}{f.dangerIndicators.length > 2 && <span className="sub">+{f.dangerIndicators.length - 2}</span>}</>
+                      : <span className="muted-inline">None reported</span>}
                   </div>
-
-                  <div className="incident-card-foot sub">
-                    <span className="mono">{formatElapsed(i.sessionStartedAt, now)} elapsed</span>
-                    <span title={formatTime(i.sessionStartedAt)}>{timeAgo(i.sessionStartedAt, now)}</span>
+                  <div className="row-cell row-people"><span className="incident-card-label">People</span>{f.peopleCount ?? '—'}</div>
+                  <div className="row-cell row-stress"><StressMeter score={i.voiceStressScore} /></div>
+                  <div className="row-cell row-location sub">
+                    {i.location.confirmed ? i.location.confirmed.address
+                      : i.location.rough ? `≈ ${i.location.rough.lat.toFixed(3)}, ${i.location.rough.lng.toFixed(3)}` : 'Locating…'}
+                  </div>
+                  <div className="row-cell row-time">
+                    <span className="mono">{formatElapsed(i.sessionStartedAt, now)}</span>
+                    <span className="sub" title={formatTime(i.sessionStartedAt)}>{timeAgo(i.sessionStartedAt, now)}</span>
                   </div>
                 </motion.div>
               )

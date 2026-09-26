@@ -12,9 +12,12 @@ function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
 }
 
 // Free fallback (no key, no billing) used when no Google Maps key is configured.
-export default function OsmIncidentMap({ rough, confirmed, target }: MapProps) {
+export default function OsmIncidentMap({ rough, confirmed, target, backdrop }: MapProps) {
+  const locked = backdrop
+    ? { dragging: false, zoomControl: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false }
+    : {}
   return (
-    <MapContainer className="map" center={[target.lat, target.lng]} zoom={15} scrollWheelZoom={false}>
+    <MapContainer className="map" center={[target.lat, target.lng]} zoom={backdrop ? 16 : 15} scrollWheelZoom={false} {...locked}>
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -29,7 +32,7 @@ export default function OsmIncidentMap({ rough, confirmed, target }: MapProps) {
           {/* Halo + white ring keep the incident pin distinct from the red hospital icons on OSM tiles. */}
           <CircleMarker center={[confirmed.lat, confirmed.lng]} radius={26} interactive={false} pathOptions={{ stroke: false, fillColor: '#c92a2a', fillOpacity: 0.18 }} />
           <CircleMarker center={[confirmed.lat, confirmed.lng]} radius={12} pathOptions={{ color: '#ffffff', fillColor: '#c92a2a', fillOpacity: 1, weight: 4 }}>
-            <Tooltip permanent direction="top" offset={[0, -12]}>Incident</Tooltip>
+            {!backdrop && <Tooltip permanent direction="top" offset={[0, -12]}>Incident</Tooltip>}
           </CircleMarker>
         </>
       )}
