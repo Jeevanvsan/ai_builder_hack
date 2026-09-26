@@ -147,6 +147,16 @@ export function updateLiveFields(db: Firestore, id: string, patch: Partial<LiveF
   })
 }
 
+// A one-off, best-effort AI estimate (not from anything the caller said) — plain overwrite, no severity coupling
+// (age/gender should never itself change urgency scoring).
+export function recordCallerEstimate(
+  db: Firestore,
+  id: string,
+  estimate: { ageGroup: 'child' | 'teen' | 'adult' | 'elderly' | 'unclear'; gender: 'male' | 'female' | 'unclear'; confidence?: number },
+): Promise<void> {
+  return updateDoc(ref(db, id), { callerEstimate: { ...estimate, confidence: estimate.confidence ?? null, at: now() } })
+}
+
 export function recordVoiceStress(db: Firestore, id: string, score: number): Promise<void> {
   return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
@@ -209,7 +219,15 @@ export async function confirmAddress(
     await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
     return confirmed
   }
-  const confirmed = { address: spokenAddress, lat: hit.lat, lng: hit.lng, confidence: 'confirmed' as const, confirmedAt: now() }
+  // 'approximate' means only the pincode or town/city matched, not the street itself (likely mis-transcribed,
+  // e.g. "Vaisheri" heard for "Vazhicherry") — the pin is in the right area, not necessarily the right street.
+  const confirmed = {
+    address: spokenAddress,
+    lat: hit.lat,
+    lng: hit.lng,
+    confidence: hit.precision === 'exact' ? ('confirmed' as const) : ('uncertain' as const),
+    confirmedAt: now(),
+  }
   await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
   return confirmed
 }

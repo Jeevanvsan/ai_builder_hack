@@ -67,7 +67,9 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
       kind: 'location',
       label: 'Location',
       values: [i.location.confirmed ? i.location.confirmed.address : loc ? `≈ ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}` : 'Unknown'],
-      sub: i.groundedContext ?? (pinned ? undefined : i.location.confirmed ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
+      sub: i.groundedContext ?? (pinned
+        ? (c?.confidence === 'uncertain' ? 'Approximate — the exact street could not be matched, area only' : undefined)
+        : i.location.confirmed ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
       tone: pinned ? 'live' : 'neutral',
       pending: !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,
     }

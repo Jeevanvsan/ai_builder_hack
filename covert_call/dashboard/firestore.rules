@@ -83,7 +83,7 @@ service cloud.firestore {
           'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
           'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
-          'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
+          'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven'
         ])
         && d.sessionStartedAt is string
@@ -102,6 +102,7 @@ service cloud.firestore {
         && d.response.notes is list && d.response.notes.size() <= 200
         && (!('voiceStressTrend' in d) || (d.voiceStressTrend is list && d.voiceStressTrend.size() <= 2000))
         && (!('voiceStressScore' in d) || d.voiceStressScore == null || (d.voiceStressScore is number && d.voiceStressScore >= 0 && d.voiceStressScore <= 100))
+        && (!('callerEstimate' in d) || d.callerEstimate is map)
         && (!('video' in d) || (d.video is map && d.video.status in ['live', 'ended']))
         && (!('videoFront' in d) || (d.videoFront is map && d.videoFront.status in ['live', 'ended']))
         && (!('hasRecording' in d) || d.hasRecording is bool)

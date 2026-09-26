@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
-import { appendTranscriptLine, confirmAddress, recordAdvice, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { appendTranscriptLine, confirmAddress, recordAdvice, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
@@ -93,6 +93,10 @@ export async function startLiveCall(
   const SPEAKING_LEVEL = 0.02
   let lastActivityAt = Date.now()
   let silentNudges = 0
+  // True once anything dangerous has been reported this call (a weapon, a gunshot/scream heard, high urgency).
+  // Silence after that point is a reason to stay connected, not the ordinary "no answer, end the call" case —
+  // see the silence timer below and persona.ts's SILENCE section.
+  let dangerReported = false
   let finished = false
   // Session resumption (Epic 10.1): a session with video attached hits a shorter cap, so we keep the latest
   // resumption handle and transparently reopen the session if it drops mid-call. Only used when video is on.
@@ -128,6 +132,9 @@ export async function startLiveCall(
         if (Array.isArray(args.dangerIndicators)) patch.dangerIndicators = args.dangerIndicators
         if (typeof args.urgency === 'string') patch.urgency = args.urgency
         if (typeof args.notes === 'string') patch.notes = args.notes
+        // Once real danger has been reported, going silent is a reason to STAY on the line, not hang up — see
+        // the silence-timer guard below. Never reset back to false: danger doesn't un-happen mid-call.
+        if (args.urgency === 'high' || (Array.isArray(args.dangerIndicators) && args.dangerIndicators.length)) dangerReported = true
         enqueueWrite(() => updateLiveFields(db, incidentId, patch))
         break
       }
@@ -143,6 +150,20 @@ export async function startLiveCall(
       case 'report_stress_level': {
         const score = args.score
         if (typeof score === 'number') enqueueWrite(() => recordVoiceStress(db, incidentId, Math.max(0, Math.min(100, score))))
+        break
+      }
+      case 'report_caller_estimate': {
+        const ageGroup = args.ageGroup
+        const gender = args.gender
+        const AGE_GROUPS = ['child', 'teen', 'adult', 'elderly', 'unclear']
+        const GENDERS = ['male', 'female', 'unclear']
+        if (typeof ageGroup === 'string' && AGE_GROUPS.includes(ageGroup) && typeof gender === 'string' && GENDERS.includes(gender)) {
+          enqueueWrite(() => recordCallerEstimate(db, incidentId, {
+            ageGroup: ageGroup as 'child' | 'teen' | 'adult' | 'elderly' | 'unclear',
+            gender: gender as 'male' | 'female' | 'unclear',
+            confidence: typeof args.confidence === 'number' ? args.confidence : undefined,
+          }))
+        }
         break
       }
       case 'report_scene_observation': {
@@ -356,13 +377,30 @@ export async function startLiveCall(
       session.sendClientContent({
         turns: `(System note, not the caller: the caller has been silent. Silence attempt ${silentNudges} of 3 — follow your SILENCE rule and gently repeat your last question with its meaning. If the caller has just answered it, ignore this note and continue.)`,
       })
+    } else if (dangerReported && silentNudges >= 4) {
+      // Danger was already reported this call (a weapon, a gunshot/scream heard, high urgency): going silent
+      // now likely means the caller can't safely speak, not that the call is over. Stay connected indefinitely
+      // — no end_call instruction, no failsafe hang-up — with a periodic check-in every ~20-30s (this timer
+      // ticks every 1s and only re-fires once SILENCE_MS/1000 ≈ 12 ticks have passed since the last activity,
+      // so successive silentNudges values naturally space out by SILENCE_MS, not every second).
+      if (silentNudges === 4) {
+        enqueueWrite(() => updateLiveFields(db, incidentId, {
+          dangerIndicators: ['went silent after danger reported - stay connected'],
+          urgency: 'high',
+          notes: 'Caller went silent after danger was reported; call kept open for the response team.',
+        }))
+      }
+      session.sendClientContent({
+        turns: '(System note, not the caller: still no response, but danger was already reported this call. Do NOT end the call. Stop repeating yourself — check in with one short line and otherwise stay silent and keep listening, per your SILENCE rule.)',
+      })
     } else if (silentNudges === 4) {
       session.sendClientContent({
-        turns: '(System note, not the caller: still no response after 3 attempts. Follow your SILENCE rule now — report it, say goodbye, and call end_call.)',
+        turns: '(System note, not the caller: still no response after 3 attempts, and nothing dangerous has been reported this call. Follow your SILENCE rule now — report it, say goodbye, and call end_call.)',
       })
-      // Failsafe in case the model doesn't hang up on its own.
+      // Failsafe in case the model doesn't hang up on its own. Re-checks dangerReported at fire time too, in
+      // case danger gets reported in the 20s between this nudge and the failsafe running.
       setTimeout(() => {
-        if (finished) return
+        if (finished || dangerReported) return
         enqueueWrite(() => updateLiveFields(db, incidentId, {
           dangerIndicators: ['no response - possibly unable to speak'],
           urgency: 'high',
