@@ -39,7 +39,7 @@ const PENDING_WINDOW_MS = 60_000
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-export function deriveEvidence(i: Incident, now: number): Partial<Record<EvidenceKind, Evidence>> {
+export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = []): Partial<Record<EvidenceKind, Evidence>> {
   const out: Partial<Record<EvidenceKind, Evidence>> = {}
   const f = i.extractedFieldsLive
 
@@ -102,11 +102,41 @@ export function deriveEvidence(i: Incident, now: number): Partial<Record<Evidenc
   }
 
   const endedRecently = i.sessionEndedAt ? now - Date.parse(i.sessionEndedAt) < PENDING_WINDOW_MS : false
-  if (i.correlatedIncidentIds?.length) {
-    out.linked = { kind: 'linked', label: 'Linked cases', values: i.correlatedIncidentIds, tone: 'live' }
-  } else if (endedRecently && !i.correlatedIncidentIds) {
-    out.linked = { kind: 'linked', label: 'Linked cases', values: [], tone: 'neutral', pending: 'Cross-checking recent cases…' }
+  // Linked cases = AI matches (same person/vehicle, written by the QuickBite app's correlation pass after a live call)
+  // plus rule-based matches computed here: any other incident within 300 m in the last 7 days. The rule part needs
+  // no AI and works for every channel, so a repeat location is never missed. The shimmer only shows while the AI
+  // pass can genuinely still be running (a live call that just ended).
+  const ids = [...new Set([...(i.correlatedIncidentIds ?? []), ...nearbyIds])]
+  const aiPending = i.channel === 'live-call' && endedRecently && !i.correlatedIncidentIds
+  if (ids.length) {
+    out.linked = { kind: 'linked', label: 'Linked cases', values: ids, tone: 'live', pending: aiPending ? 'AI cross-checking person & vehicle…' : undefined }
+  } else if (aiPending) {
+    out.linked = { kind: 'linked', label: 'Linked cases', values: [], tone: 'neutral', pending: 'AI cross-checking person & vehicle…' }
   }
 
   return out
+}
+
+const NEAR_M = 300
+const WINDOW_MS = 7 * 24 * 3600_000
+
+function metres(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return 12742000 * Math.asin(Math.sqrt(h))
+}
+
+// Other incidents reported at (almost) the same place recently — closest and newest first, capped at 5.
+export function nearbyIncidentIds(i: Incident, all: Incident[]): string[] {
+  const here = i.location.confirmed ?? i.location.rough
+  if (!here) return []
+  const t = Date.parse(i.sessionStartedAt)
+  return all
+    .filter((o) => o.id !== i.id && Math.abs(Date.parse(o.sessionStartedAt) - t) < WINDOW_MS)
+    .map((o) => ({ o, loc: o.location.confirmed ?? o.location.rough }))
+    .filter((x): x is { o: Incident; loc: NonNullable<typeof x.loc> } => Boolean(x.loc) && metres(here, x.loc!) < NEAR_M)
+    .sort((a, b) => Date.parse(b.o.sessionStartedAt) - Date.parse(a.o.sessionStartedAt))
+    .slice(0, 5)
+    .map((x) => x.o.id)
 }
