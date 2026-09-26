@@ -31,9 +31,21 @@ body {
   margin: 0;
   background:
     var(--bg-grid) 0 0 / 28px 28px,
-    linear-gradient(180deg, #f8fafd, var(--bg) 40%);
+    linear-gradient(180deg, #f8fafd, var(--bg) 40%),
+    radial-gradient(1200px 700px at 15% -10%, rgba(255, 122, 61, 0.08), transparent 60%),
+    radial-gradient(1000px 700px at 110% 10%, rgba(43, 108, 176, 0.07), transparent 60%);
+  background-attachment: fixed;
   min-height: 100vh;
+  animation: bg-drift 22s ease-in-out infinite alternate;
 }
+/* Ambient/deep-background layer (skill: "Gradient Shift" — 8-20s cycle, imperceptible at a glance). Combined
+   with the two floating card-glow layers below and the per-card border-spin, this is the three-layer ambient
+   system: deep background (this), midground (floating glows), foreground (card sheens/pulses). */
+@keyframes bg-drift {
+  from { background-position: 0 0, 0 0, 0% -10%, 100% 10%; }
+  to { background-position: 0 0, 0 0, 10% 5%, 90% -5%; }
+}
+@media (prefers-reduced-motion: reduce) { body { animation: none; } }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 h1, h2 { margin: 0; }
@@ -46,18 +58,19 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 
 .shell { min-height: 100vh; display: flex; flex-direction: column; }
 
+.header-group { position: sticky; top: 0; z-index: 20; }
+
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   padding: 0.9rem 2rem;
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(14px) saturate(1.3);
   -webkit-backdrop-filter: blur(14px) saturate(1.3);
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 20;
 }
 .brand { display: flex; align-items: center; gap: 0.6rem; }
 .brand-mark {
@@ -96,9 +109,6 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
-  position: sticky;
-  top: 3.6rem;
-  z-index: 19;
 }
 .subnav a { padding: 0.7rem 0.9rem; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s ease, border-color 0.15s ease; }
 .subnav a:hover { color: var(--text); text-decoration: none; }
@@ -169,7 +179,17 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   padding: 1rem 1.25rem;
   box-shadow: 0 1px 2px rgba(20, 30, 50, 0.04), 0 8px 20px -12px rgba(20, 30, 50, 0.12);
   transition: transform 0.22s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.22s cubic-bezier(0.2, 0, 0, 1);
+  /* Dashboard Load recipe: stat tiles are the hero row — they enter first and boldest (250ms vs. a plain
+     card's 400ms is intentionally quicker/snappier, matching "hero metric" weight), staggered 50ms apart. */
+  animation: stat-in 0.28s cubic-bezier(0.05, 0.7, 0.1, 1) backwards;
 }
+.stats > *:nth-child(1) { animation-delay: 0ms; }
+.stats > *:nth-child(2) { animation-delay: 50ms; }
+.stats > *:nth-child(3) { animation-delay: 100ms; }
+.stats > *:nth-child(4) { animation-delay: 150ms; }
+.stats > *:nth-child(n+5) { animation-delay: 180ms; }
+@keyframes stat-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .stat { animation: none; } }
 .stat:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(20, 30, 50, 0.05), 0 14px 28px -14px rgba(20, 30, 50, 0.2); }
 .stat-high { --tone: var(--high); }
 .stat-medium { --tone: var(--medium); }
@@ -177,6 +197,11 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .stat-value { font-size: 2.2rem; font-weight: 700; line-height: 1.1; color: var(--tone); font-variant-numeric: tabular-nums; }
 .stat-label { color: var(--muted); font-size: 0.9rem; }
 .stat-high .stat-value, .stat-live .stat-value { text-shadow: 0 0 24px color-mix(in srgb, var(--tone) 45%, transparent); }
+/* Ambient breathing on the hero metric only (skill: "Active indicator" preset — 0.95-1.05 scale, 2000ms) — a
+   live/urgent stat tile is the one thing on the queue that should feel like it's quietly demanding attention. */
+.stat-high, .stat-live { animation: stat-in 0.28s cubic-bezier(0.05, 0.7, 0.1, 1) backwards, stat-breathe 2.4s ease-in-out infinite 0.3s; }
+@keyframes stat-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.015); } }
+@media (prefers-reduced-motion: reduce) { .stat-high, .stat-live { animation: none; } }
 
 .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1rem; }
 .chart-card h2 { margin: 0 0 0.5rem; font-size: 1rem; }
@@ -335,13 +360,14 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .legend-item { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); text-transform: capitalize; }
 .legend-swatch { width: 0.65rem; height: 0.65rem; border-radius: 2px; }
 
-.queue tbody tr { cursor: pointer; }
+.queue tbody tr { cursor: pointer; transition: background 0.15s cubic-bezier(0.2, 0, 0, 1); }
 .queue tbody tr:hover td { background: #f3f5f8; }
-.queue td { vertical-align: top; }
+.queue td { vertical-align: top; transition: border-color 0.2s ease; }
 .queue td:first-child { border-left: 4px solid transparent; }
-.queue .row-high td:first-child { border-left-color: var(--high); }
+.queue .row-high td:first-child { border-left-color: var(--high); box-shadow: 2px 0 10px -3px var(--high-glow); animation: hologlow 2.4s ease-in-out infinite; }
 .queue .row-medium td:first-child { border-left-color: var(--medium); }
 .queue .row-low td:first-child { border-left-color: var(--low); }
+@media (prefers-reduced-motion: reduce) { .queue .row-high td:first-child { animation: none; } }
 .rank { font-weight: 700; color: var(--muted); }
 .mono { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .steps-list { padding-left: 1.2rem; margin: 0.5rem 0; }
@@ -423,7 +449,35 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   padding: 1.25rem;
   box-shadow: 0 1px 2px rgba(20, 30, 50, 0.04), 0 8px 24px -12px rgba(20, 30, 50, 0.12);
   transition: box-shadow 0.25s cubic-bezier(0.2, 0, 0, 1), transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+  animation: card-in 0.4s cubic-bezier(0.05, 0.7, 0.1, 1) backwards;
 }
+/* Every card in a grid enters staggered by its position, not all at once — a light choreography cascade
+   (20-40ms per item, capped so a long list doesn't take forever to finish appearing). */
+.grid > *:nth-child(1), .detail-grid > *:nth-child(1) { animation-delay: 0ms; }
+.grid > *:nth-child(2), .detail-grid > *:nth-child(2) { animation-delay: 40ms; }
+.grid > *:nth-child(3), .detail-grid > *:nth-child(3) { animation-delay: 80ms; }
+.grid > *:nth-child(4), .detail-grid > *:nth-child(4) { animation-delay: 120ms; }
+.grid > *:nth-child(5), .detail-grid > *:nth-child(5) { animation-delay: 160ms; }
+.grid > *:nth-child(n+6), .detail-grid > *:nth-child(n+6) { animation-delay: 200ms; }
+@keyframes card-in { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .card { animation: none; } }
+
+/* Always-on holographic edge — a slow, faint traveling highlight along the border, visible regardless of
+   call/severity state (the stronger `.card-live-edge` below is reserved for something actually live/active). */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(from var(--angle), transparent 0%, rgba(217, 122, 61, 0.35) 8%, transparent 20%, transparent 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: border-spin 7s linear infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) { .card::before { animation: none; opacity: 0; } }
 .card:hover { box-shadow: 0 1px 2px rgba(20, 30, 50, 0.05), 0 12px 32px -12px rgba(20, 30, 50, 0.18); }
 .card p { margin: 0 0 0.25rem; }
 .card.wide { grid-column: 1 / -1; }
@@ -438,6 +492,32 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   animation: border-spin 4s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { .card-live-edge { animation: none; } }
+
+/* Midground ambient layer (skill: "Floating / Hovering" + "Depth Through Speed"): a soft blurred glow drifting
+   slowly behind every card, offset per nth-child so instances never sync — this is the layer that was missing
+   before (only foreground per-element pulses existed). Purely decorative, sits behind the card's own content. */
+.card::after {
+  content: '';
+  position: absolute;
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 122, 61, 0.10), transparent 70%);
+  top: -20%;
+  right: -15%;
+  z-index: -1;
+  filter: blur(6px);
+  animation: card-float 7s ease-in-out infinite;
+  pointer-events: none;
+}
+.grid > *:nth-child(3n+1)::after, .detail-grid > *:nth-child(3n+1)::after { animation-duration: 7s; }
+.grid > *:nth-child(3n+2)::after, .detail-grid > *:nth-child(3n+2)::after { animation-duration: 9.5s; animation-delay: -2s; background: radial-gradient(circle, rgba(43, 108, 176, 0.09), transparent 70%); }
+.grid > *:nth-child(3n)::after, .detail-grid > *:nth-child(3n)::after { animation-duration: 6s; animation-delay: -4s; background: radial-gradient(circle, rgba(11, 158, 87, 0.08), transparent 70%); }
+@keyframes card-float {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-6%, 8%); }
+}
+@media (prefers-reduced-motion: reduce) { .card::after { animation: none; } }
 .fields { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0; }
 .fields dt { color: var(--muted); }
 .fields dd { margin: 0; }
