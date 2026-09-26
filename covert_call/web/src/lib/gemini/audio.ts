@@ -38,7 +38,7 @@ export const MIC_CONSTRAINTS: MediaTrackConstraints = {
 // If `providedStream` is passed (e.g. the caller already opened the mic alongside the camera), its audio track is
 // reused and its tracks are left for the caller to stop; otherwise the mic is opened and owned here.
 export async function startMicCapture(
-  onChunk: (base64Pcm: string) => void,
+  onChunk: (base64Pcm: string, level: number) => void,
   providedStream?: MediaStream,
 ): Promise<{ stop: () => void; stream: MediaStream }> {
   const ownsStream = !providedStream
@@ -56,8 +56,11 @@ export async function startMicCapture(
 
   processor.onaudioprocess = (e) => {
     const input = e.inputBuffer.getChannelData(0)
+    // RMS level of this frame, so the call can tell the caller is talking before any transcript arrives.
+    let sum = 0
+    for (let i = 0; i < input.length; i++) sum += input[i] * input[i]
     const resampled = resampleTo16k(input, context.sampleRate)
-    onChunk(arrayBufferToBase64(floatTo16BitPCM(resampled)))
+    onChunk(arrayBufferToBase64(floatTo16BitPCM(resampled)), Math.sqrt(sum / input.length))
   }
 
   source.connect(processor)
