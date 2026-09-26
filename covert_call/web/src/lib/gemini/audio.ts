@@ -27,7 +27,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export const MIC_CONSTRAINTS: MediaTrackConstraints = {
   channelCount: 1,
   echoCancellation: true,
-  noiseSuppression: true,
+  // Off on purpose: background sounds (voices, bangs, sirens) are evidence Gemini should hear. Echo cancellation
+  // stays on so Mia does not hear herself.
+  noiseSuppression: false,
   autoGainControl: true,
 }
 
