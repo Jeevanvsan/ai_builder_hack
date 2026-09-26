@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import CallRecordingPlayer from '../../components/CallRecordingPlayer'
 import Chip from '../../components/Chip'
@@ -6,10 +6,12 @@ import DataState from '../../components/DataState'
 import IncidentMap from '../../components/IncidentMap'
 import LiveValue from '../../components/LiveValue'
 import LiveVideo from '../../components/LiveVideo'
+import NearbyServicesCard from '../../components/NearbyServicesCard'
 import NoteForm from '../../components/NoteForm'
 import ResponseActions from '../../components/ResponseActions'
 import StressMeter from '../../components/StressMeter'
 import StressSparkline from '../../components/StressSparkline'
+import { playEscalationCue } from '../../lib/alertOutputs'
 import { channelLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
 import { useAuth } from '../../lib/authContext'
@@ -38,6 +40,20 @@ export default function IncidentDetailPage() {
     if (incidentId && viewedAt === null) void markViewed(incidentId, name)
   }, [incidentId, viewedAt, name])
 
+  // Epic 16.7: a distinct cue the instant severity increases on the incident already open in front of this
+  // responder — deliberately independent of Epic 4.6's "do not disturb while on an incident page" rule, since
+  // that rule protects a responder working a *different* incident, not this exact one escalating right now.
+  const severity = incident?.severity
+  const lastSeenSeverity = useRef<typeof severity>(undefined)
+  useEffect(() => {
+    if (severity === undefined) return
+    if (lastSeenSeverity.current !== undefined && severity !== lastSeenSeverity.current) {
+      const rank = { low: 0, medium: 1, high: 2 } as const
+      if (rank[severity] > rank[lastSeenSeverity.current]) playEscalationCue()
+    }
+    lastSeenSeverity.current = severity
+  }, [severity])
+
   if (loading || error) {
     return (
       <section>
@@ -62,7 +78,9 @@ export default function IncidentDetailPage() {
   const f = incident.extractedFieldsLive
   // A resolved case is never shown as a live call, even if the caller's session never reported ending.
   const live = incident.callState === 'active' && incident.response.status !== 'resolved'
-  const conf = incident.fieldConfidence
+  // Epic 16.2: while live, show confidence as it sharpens during the call; once consolidated, the permanent
+  // post-call `fieldConfidence` takes over (it may re-grade something the live pass only guessed at).
+  const conf = live ? (incident.fieldConfidenceLive ?? {}) : incident.fieldConfidence
   const back = incident.response.status === 'resolved'
     ? { to: '/history', label: 'Back to case history' }
     : { to: '/', label: 'Back to live queue' }
@@ -91,6 +109,11 @@ export default function IncidentDetailPage() {
             {incident.cameraMode && ` · cameras: ${incident.cameraMode}`}
             {incident.response.acknowledgedBy && ` · handled by ${incident.response.acknowledgedBy}`}
           </p>
+          {incident.recommendation && (
+            <LiveValue value={incident.recommendation}>
+              <p className={`recommendation recommendation-${incident.severity}`}>{incident.recommendation}</p>
+            </LiveValue>
+          )}
         </div>
         <div className="head-side">
           <ResponseActions incident={incident} />
@@ -163,6 +186,27 @@ export default function IncidentDetailPage() {
             <dd><LiveValue value={f.notes}>{f.notes ?? <span className="pending">—</span>}</LiveValue></dd>
           </dl>
         </div>
+
+        {confirmed && (
+          <NearbyServicesCard location={{ lat: confirmed.lat, lng: confirmed.lng }} dangerIndicators={f.dangerIndicators} />
+        )}
+
+        {incident.reasoningTrace && incident.reasoningTrace.length > 0 && (
+          <div className="card reasoning-card">
+            <h2>Why this severity</h2>
+            <p className="sub">What triggered each change, as it happened — not just the resulting chip.</p>
+            <ol className="reasoning-trace">
+              {incident.reasoningTrace.map((r, idx) => (
+                <li key={`${r.at}-${idx}`}>
+                  <span className="tl-time mono">
+                    {new Date(r.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                  <span>{r.text}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
 
         {incident.sceneObservations && incident.sceneObservations.length > 0 && (
           <div className="card scene-card">

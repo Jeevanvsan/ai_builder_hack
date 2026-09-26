@@ -14,3 +14,32 @@ export function deriveSeverity(fields: Incident['extractedFieldsLive'], voiceStr
 }
 
 export const maxSeverity = (a: Severity, b: Severity): Severity => (rank[a] >= rank[b] ? a : b)
+
+// One derived, human-readable recommended action (Epic 16.3) — deterministic and explainable from the same
+// inputs deriveSeverity() uses, so a responder gets a clear next step instead of having to interpret a chip.
+export function deriveRecommendation(fields: Incident['extractedFieldsLive'], severity: Severity): string {
+  const weapon = fields.dangerIndicators.some((d) => /weapon|gun|firearm|knife/i.test(d))
+  const fireOrInjury = fields.dangerIndicators.some((d) => /fire|smoke|blood|injur|stab|gunshot|explosion|blast/i.test(d))
+  if (weapon) return 'Recommend immediate police dispatch — weapon reported'
+  if (fireOrInjury) return 'Recommend immediate police + medical dispatch — injury or hazard reported'
+  if (severity === 'high') return 'Recommend immediate dispatch'
+  if (severity === 'medium') return 'Recommend monitoring closely — dispatch if the situation escalates'
+  return 'Recommend monitoring, no immediate dispatch needed'
+}
+
+// Builds one short reasoning-trace line for a severity/urgency change (Epic 16.1) — called only when the value
+// actually changed, not on every field write, so the trace stays a meaningful log of escalation, not noise.
+export function describeSeverityChange(
+  from: Severity,
+  to: Severity,
+  fields: Incident['extractedFieldsLive'],
+  voiceStress: number | null,
+): string {
+  const reasons: string[] = []
+  if (fields.urgency === 'high' || fields.urgency === 'medium') reasons.push(`urgency reported ${fields.urgency}`)
+  const lastIndicator = fields.dangerIndicators.at(-1)
+  if (lastIndicator) reasons.push(`"${lastIndicator}" reported`)
+  if (voiceStress !== null && voiceStress >= 55) reasons.push(`voice stress at ${voiceStress}`)
+  const why = reasons.length ? reasons.join(', ') : 'new information reported'
+  return `Severity raised ${from.toUpperCase()} → ${to.toUpperCase()} — ${why}`
+}
