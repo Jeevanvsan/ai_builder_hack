@@ -12,6 +12,9 @@ export function livePosition(loc: Incident['location']): LivePosition | null {
   const pinned = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng, at: c.confirmedAt } : null
   if (last && (!pinned || Date.parse(last.at) >= Date.parse(pinned.at))) return { lat: last.lat, lng: last.lng, at: last.at, source: 'track' }
   if (pinned) return { ...pinned, source: 'address' }
+  // Once the caller has told us where they are, the IP-based rough fix (often tens of km off — it put an
+  // Alappuzha caller in Kochi) is worse than no pin: the map would confidently show the wrong town.
+  if (c) return null
   return loc.rough ? { lat: loc.rough.lat, lng: loc.rough.lng, at: null, source: 'rough' } : null
 }
 

@@ -21,7 +21,7 @@ export default function IncidentMap({
   // so it's skipped here in favour of the rough fix rather than plotting the map at `null, null`.
   const pinned = confirmed && confirmed.lat != null && confirmed.lng != null ? { lat: confirmed.lat, lng: confirmed.lng, address: confirmed.address } : null
   const target = livePosition(location)
-  if (!target) return <div className="map map-loading">Locating caller…</div>
+  if (!target) return <div className="map map-loading">{confirmed ? 'Placing the address the caller gave…' : 'Locating caller…'}</div>
   // The turn marker follows the caller's live progress, not the step stored when the route was computed.
   const liveRoute = route ? { ...route, stepIndex: routeProgress(route, target).stepIndex } : route
 
