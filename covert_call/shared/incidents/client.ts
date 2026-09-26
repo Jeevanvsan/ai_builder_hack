@@ -1,4 +1,4 @@
-import { arrayUnion, doc, getDoc, runTransaction, setDoc, updateDoc, type Firestore } from 'firebase/firestore'
+import { arrayUnion, doc, getDoc, runTransaction, setDoc, updateDoc, type Firestore, type Transaction } from 'firebase/firestore'
 import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
 import { deriveSeverity, deriveRecommendation, describeSeverityChange, maxSeverity } from './severity.ts'
@@ -12,6 +12,28 @@ const GPS_WAIT_MS = 5_000
 const now = () => new Date().toISOString()
 const sleep = (ms: number) => new Promise<null>((r) => setTimeout(() => r(null), ms))
 const ref = (db: Firestore, id: string) => doc(db, INCIDENTS, id)
+
+// A live call's own writes (updateLiveFields, recordVoiceStress) read-modify-write the same incident document a
+// responder may be actively viewing — a dashboard action like markViewed() or acknowledge() bumps the document's
+// version and invalidates any transaction reading it at that exact moment. Firestore's SDK already retries a
+// failed transaction automatically, but only up to its own small internal budget; under a live call firing
+// several of these in quick succession while a responder is also interacting with the same incident, that budget
+// can be exhausted and the write silently dropped (the promise rejects, and enqueueWrite in liveSession.ts
+// swallows it). This wrapper adds an outer retry with backoff specifically for that contention case, so a
+// responder opening the incident mid-call never costs the call a voice-stress sample or a field update.
+const TRANSACTION_RETRIES = 5
+async function runTransactionWithRetry<T>(db: Firestore, updateFn: (tx: Transaction) => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < TRANSACTION_RETRIES; attempt++) {
+    try {
+      return await runTransaction(db, updateFn)
+    } catch (err) {
+      lastError = err
+      if (attempt < TRANSACTION_RETRIES - 1) await sleep(150 * 2 ** attempt)
+    }
+  }
+  throw lastError
+}
 
 export const newIncidentId = () => `INC-${Date.now().toString(36).toUpperCase()}`
 
@@ -77,7 +99,7 @@ async function attachRoughLocation(db: Firestore, id: string): Promise<RoughLoca
 // "aggressor present" later needs both remembered, not just the last one. dangerIndicators is deduped and
 // appended; notes (a single string, not an array, per the incident schema) has new distinct text appended.
 export function updateLiveFields(db: Firestore, id: string, patch: Partial<LiveFields>): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const existing = current.extractedFieldsLive
@@ -121,7 +143,7 @@ export function updateLiveFields(db: Firestore, id: string, patch: Partial<LiveF
 }
 
 export function recordVoiceStress(db: Firestore, id: string, score: number): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const newSeverity = maxSeverity(current.severity, deriveSeverity(current.extractedFieldsLive, score))
@@ -189,7 +211,7 @@ export function reportSceneObservation(
   id: string,
   obs: { source: 'camera' | 'sound'; kind: string; detail?: string; confidence?: number },
 ): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const detail = obs.detail?.trim() ?? ''
@@ -224,7 +246,7 @@ export function upsertVideoRecording(
   id: string,
   entry: { camera: 'back' | 'front' } & Partial<Omit<VideoRecording, 'camera'>>,
 ): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const list = [...(current.videoRecording ?? [])]
