@@ -2,7 +2,9 @@ import type { Incident } from '../../../shared/incidents/types'
 
 export type MapProps = {
   rough: Incident['location']['rough']
-  confirmed: Incident['location']['confirmed']
+  // Callers only ever pass a genuinely-pinned confirmed location here (lat/lng both non-null); an address that
+  // failed to geocode is filtered out upstream (IncidentMap.tsx) rather than plotted at `null, null`.
+  confirmed: { lat: number; lng: number; address: string } | null
   target: { lat: number; lng: number }
   // Non-interactive board backdrop: no drag/zoom/controls, so the incident pin stays centred under the case hub.
   backdrop?: boolean

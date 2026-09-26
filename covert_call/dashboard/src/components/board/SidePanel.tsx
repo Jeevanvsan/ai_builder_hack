@@ -94,13 +94,25 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
 
             {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} />}
 
-            {(incident.hasRecording || (incident.videoRecording?.length ?? 0) > 0 || (incident.recordingFailed && !live)) && (
+            {(incident.hasRecording || incident.audioRecording || (incident.videoRecording?.length ?? 0) > 0 || (incident.recordingFailed && !live)) && (
               <section className="case-section">
                 <h3>Evidence recordings</h3>
-                {incident.hasRecording && <CallRecordingPlayer incidentId={incident.id} />}
-                {!incident.hasRecording && incident.recordingFailed && !live && (
+                {incident.audioRecording ? (
+                  <div className="drive-row">
+                    <span>Call audio</span>
+                    {incident.audioRecording.status === 'uploaded' && incident.audioRecording.driveUrl ? (
+                      <a className="btn btn-sm" href={incident.audioRecording.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
+                    ) : (
+                      <span className="sub">{incident.audioRecording.status === 'recording' ? 'Uploading…' : 'Upload failed — see below'}</span>
+                    )}
+                  </div>
+                ) : (
+                  incident.hasRecording && <CallRecordingPlayer incidentId={incident.id} />
+                )}
+                {!incident.hasRecording && !incident.audioRecording && incident.recordingFailed && !live && (
                   <p className="panel-empty">No audio recording — saving it failed ({incident.recordingFailed}).</p>
                 )}
+                {incident.audioRecording?.status === 'failed' && incident.hasRecording && <CallRecordingPlayer incidentId={incident.id} />}
                 {incident.videoRecording?.map((v) => (
                   <div key={v.camera} className="drive-row">
                     <span>{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>

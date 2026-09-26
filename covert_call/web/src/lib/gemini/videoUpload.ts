@@ -36,7 +36,8 @@ export async function uploadCallVideo(
 ): Promise<DriveUploadResult | null> {
   if (!UPLOAD_URL) return null
   const base64 = await blobToBase64(blob)
-  const ext = meta.mimeType.includes('mp4') ? 'mp4' : 'webm'
+  // Reused for the call's audio recording too (mimeType then reads audio/webm or audio/ogg, never mp4/webm video).
+  const ext = meta.mimeType.includes('mp4') ? 'mp4' : meta.mimeType.includes('ogg') ? 'ogg' : 'webm'
   const res = await fetch(UPLOAD_URL, {
     method: 'POST',
     // text/plain avoids a CORS preflight, which Apps Script web apps don't handle.

@@ -30,8 +30,10 @@ export interface Incident {
     rough: RoughLocation | null
     confirmed: {
       address: string
-      lat: number
-      lng: number
+      // Null when the spoken address couldn't be geocoded at all — the text is still worth showing a responder,
+      // but there is no reliable pin to route to or move the caller's map position from (see confirmAddress()).
+      lat: number | null
+      lng: number | null
       confidence: FieldConfidence
       confirmedAt: string
     } | null
@@ -60,8 +62,8 @@ export interface Incident {
   // say why the summary is missing instead of showing an empty state forever (Epic 3.4 bug: it used to fail
   // completely silently, with the incident stuck showing "Gemini writes the case summary..." forever).
   consolidationFailed?: boolean
-  // Set only if saving the call's audio recording failed (most likely: over Firestore's ~1MB document limit on
-  // a longer call — see uploadRecording.ts) — same "say why instead of just missing" fix as consolidationFailed.
+  // Set only if saving the call's audio recording failed everywhere (Drive not configured/failed AND it was too
+  // big for the Firestore fallback below) — same "say why instead of just missing" fix as consolidationFailed.
   recordingFailed?: string
   fieldConfidence: Record<string, FieldConfidence>
   // Live confidence per field, updated as the call progresses (Epic 16.2) — distinct from `fieldConfidence`,
@@ -121,8 +123,18 @@ export interface Incident {
   }[]
   // True once the full call recording (mic + AI voice) has been saved to the incidents/{id}/recording/audio
   // subcollection doc — kept off the main document since Firestore caps a document at 1MiB. Absent/false if
-  // recording wasn't supported in the caller's browser, or the call was too long to fit in one document.
+  // recording wasn't supported in the caller's browser, the call was too long to fit in one document, and Drive
+  // upload (below) isn't configured or also failed.
   hasRecording?: boolean
+  // The call's own audio saved to the team Google Drive (Epic 9.2's uploader, reused) — the preferred path when
+  // configured, since it has no ~1MB size cap unlike the Firestore fallback above. Same shape as videoRecording.
+  audioRecording?: {
+    status: 'recording' | 'uploaded' | 'failed'
+    driveFileId?: string | null
+    driveUrl?: string | null
+    startedAt: string
+    endedAt?: string | null
+  }
   response: {
     status: ResponseStatus
     acknowledgedBy: string | null

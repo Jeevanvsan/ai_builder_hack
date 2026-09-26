@@ -200,15 +200,16 @@ export async function confirmAddress(
   const current = (await getDoc(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
   const rough = current?.location.rough ?? null
   const hit = await geocodeAddress(spokenAddress, { near: rough, googleMapsKey: opts.googleMapsKey })
-  const coords = hit ?? rough
-  if (!coords) return null
-  const confirmed = {
-    address: spokenAddress,
-    lat: coords.lat,
-    lng: coords.lng,
-    confidence: hit ? ('confirmed' as const) : ('uncertain' as const),
-    confirmedAt: now(),
+  // If geocoding genuinely fails, the caller's IP-based rough location can be many km off (it has put callers in
+  // the wrong town entirely) — using it as "confirmed" coordinates silently produced a wrong pin and a wrong
+  // route with no sign anything was off. Better to save the spoken address as text with NO pin than a wrong one
+  // that looks identical to a real fix; the dashboard shows it as unlocated instead of confidently wrong.
+  if (!hit) {
+    const confirmed = { address: spokenAddress, lat: null, lng: null, confidence: 'uncertain' as const, confirmedAt: now() }
+    await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
+    return confirmed
   }
+  const confirmed = { address: spokenAddress, lat: hit.lat, lng: hit.lng, confidence: 'confirmed' as const, confirmedAt: now() }
   await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
   return confirmed
 }
@@ -283,6 +284,12 @@ export function upsertVideoRecording(
     else list.push({ status: 'recording', startedAt: now(), ...entry })
     tx.update(ref(db, id), { videoRecording: list })
   })
+}
+
+// Sets the call's audio-to-Drive entry (Epic 9.2's uploader, reused for audio) — a plain overwrite, unlike
+// upsertVideoRecording's per-camera merge, since a call has at most one audio recording.
+export function setAudioRecording(db: Firestore, id: string, entry: NonNullable<Incident['audioRecording']>): Promise<void> {
+  return updateDoc(ref(db, id), { audioRecording: entry })
 }
 
 // A second Gemini pass reviews the call for uninvolved third parties mentioned without consent (a bystander, a

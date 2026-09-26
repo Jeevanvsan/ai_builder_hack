@@ -56,16 +56,20 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
 
   if (vehicle.length) out.vehicle = { kind: 'vehicle', label: 'Vehicle', values: vehicle.map(cap), tone: 'medium' }
 
-  const loc = i.location.confirmed ?? i.location.rough
-  if (loc) {
+  // A "confirmed" address with no lat/lng means geocoding failed outright (see confirmAddress()) — the text is
+  // still shown, but it's not treated as a located pin (no coordinates to fall back to for the ≈lat,lng display).
+  const c = i.location.confirmed
+  const pinned = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null
+  const loc = pinned ?? i.location.rough
+  if (loc || i.location.confirmed) {
     const endedRecently = i.sessionEndedAt ? now - Date.parse(i.sessionEndedAt) < PENDING_WINDOW_MS : false
     out.location = {
       kind: 'location',
       label: 'Location',
-      values: [i.location.confirmed ? i.location.confirmed.address : `≈ ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`],
-      sub: i.groundedContext ?? (i.location.confirmed ? undefined : 'Approximate — waiting for the caller'),
-      tone: i.location.confirmed ? 'live' : 'neutral',
-      pending: !i.groundedContext && i.location.confirmed && endedRecently ? 'Checking local conditions…' : undefined,
+      values: [i.location.confirmed ? i.location.confirmed.address : loc ? `≈ ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}` : 'Unknown'],
+      sub: i.groundedContext ?? (pinned ? undefined : i.location.confirmed ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
+      tone: pinned ? 'live' : 'neutral',
+      pending: !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,
     }
   }
 
@@ -128,13 +132,18 @@ function metres(a: { lat: number; lng: number }, b: { lat: number; lng: number }
 }
 
 // Other incidents reported at (almost) the same place recently — closest and newest first, capped at 5.
+const asPin = (l: Incident['location']): { lat: number; lng: number } | null => {
+  const c = l.confirmed
+  return c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : l.rough
+}
+
 export function nearbyIncidentIds(i: Incident, all: Incident[]): string[] {
-  const here = i.location.confirmed ?? i.location.rough
+  const here = asPin(i.location)
   if (!here) return []
   const t = Date.parse(i.sessionStartedAt)
   return all
     .filter((o) => o.id !== i.id && Math.abs(Date.parse(o.sessionStartedAt) - t) < WINDOW_MS)
-    .map((o) => ({ o, loc: o.location.confirmed ?? o.location.rough }))
+    .map((o) => ({ o, loc: asPin(o.location) }))
     .filter((x): x is { o: Incident; loc: NonNullable<typeof x.loc> } => Boolean(x.loc) && metres(here, x.loc!) < NEAR_M)
     .sort((a, b) => Date.parse(b.o.sessionStartedAt) - Date.parse(a.o.sessionStartedAt))
     .slice(0, 5)

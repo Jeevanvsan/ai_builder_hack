@@ -56,8 +56,12 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
   if (route) evidence.nearby = { kind: 'nearby', label: 'Route to safety', values: [], tone: 'live' }
 
   // Responder picks a station: route from the caller's latest position; the caller's app follows it live.
+  // A "confirmed" address that failed to geocode has no lat/lng (see confirmAddress()) — skip it as a position
+  // source rather than route from `null, null`.
+  const c = incident.location.confirmed
+  const confirmedPin = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null
   const routeTo = async (s: NearbyService) => {
-    const t = incident.location.track?.at(-1) ?? incident.location.confirmed ?? incident.location.rough
+    const t = incident.location.track?.at(-1) ?? confirmedPin ?? incident.location.rough
     if (!t) return
     const r = await bestSafeRoute({ lat: t.lat, lng: t.lng }, s.kind, 'Responder chose this station', 'responder', s)
     if (r) await setSafeRoute(db, incident.id, r)

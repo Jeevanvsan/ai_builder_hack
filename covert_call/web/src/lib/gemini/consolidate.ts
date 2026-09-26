@@ -19,6 +19,9 @@ export type ConsolidationResult = {
     status: string
     recommendedAction: string
   }
+  // Story 2.2's privacy check, folded into this same request (was a separate model call — merged so a call
+  // needs one round-trip to the shared-quota text model, not two, for two structured reads of the one transcript).
+  redactions: string[]
 }
 
 const RESPONSE_SCHEMA = {
@@ -46,8 +49,9 @@ const RESPONSE_SCHEMA = {
       },
       required: ['location', 'subjects', 'weapons', 'vehicle', 'status', 'recommendedAction'],
     },
+    redactions: { type: 'array', items: { type: 'string' } },
   },
-  required: ['consolidatedSummary', 'fieldConfidence', 'bulletin'],
+  required: ['consolidatedSummary', 'fieldConfidence', 'bulletin', 'redactions'],
 }
 
 // Turns a call transcript + what was extracted live into a permanent, dispatcher-style case record (Story 3.4),
@@ -80,7 +84,13 @@ Write bulletin: a terse, real dispatch-broadcast style breakdown, each field a s
 using "-" if genuinely unknown — location (the confirmed address, or "unconfirmed"), subjects (headcount +
 description if known), weapons ("none reported" if none), vehicle ("none reported" if none), status (one short
 phrase: ongoing / resolved / caller safe / unknown), recommendedAction (one short imperative dispatch instruction,
-e.g. "Dispatch police units, weapon reported" — consistent with the danger indicators and urgency above).`
+e.g. "Dispatch police units, weapon reported" — consistent with the danger indicators and urgency above).
+
+Also act as a privacy reviewer: check whether the caller mentioned any uninvolved third party who did not
+consent to being named or described — for example a bystander or a child referred to by name or identifying
+detail, where naming them isn't necessary to the report itself. Write redactions: a short list of exactly what
+should be redacted (e.g. "child's name: Priya"), or an empty list if nothing needs redacting. Don't flag the
+caller themselves or clearly necessary details (like "my neighbor" without a name, or a stated address).`
 
   const response = await client.models.generateContent({
     model: MODEL,

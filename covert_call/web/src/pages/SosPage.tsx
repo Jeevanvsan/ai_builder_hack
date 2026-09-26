@@ -21,7 +21,6 @@ import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { findCorrelatedIncidents } from '../lib/gemini/correlate'
-import { runLeakageCheck } from '../lib/gemini/leakageCheck'
 import { zeroTraceExit } from '../lib/gemini/exit'
 
 // The silent SOS screen (Epic 11). Reached ONLY by double-tapping the heart on the home screen. It shows a
@@ -132,18 +131,15 @@ export function SosPage() {
     await wakeLockRef.current?.release().catch(() => {})
 
     if (id) {
-      // Consolidate + leakage-check, same as a call end (best-effort).
+      // Consolidate (case summary/bulletin + the leakage/privacy check, one request), same as a call end (best-effort).
       try {
         const snap = await getDoc(doc(db, INCIDENTS, id))
         const incident = snap.data() as Omit<Incident, 'id'> | undefined
         const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
         const stressTrend = incident?.voiceStressTrend ?? []
         const address = incident?.location.confirmed?.address ?? null
-        const [consolidation, redactions] = await Promise.all([
-          consolidateCall(transcript, fields, stressTrend, address),
-          runLeakageCheck(transcript),
-        ])
-        await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, redactions)])
+        const consolidation = await consolidateCall(transcript, fields, stressTrend, address)
+        await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, consolidation.redactions)])
 
         if (address) {
           void groundedLocationContext(address).then((context) => {
