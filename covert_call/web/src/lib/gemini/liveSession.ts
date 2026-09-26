@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
-import { confirmAddress, recordAdvice, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { appendTranscriptLine, confirmAddress, recordAdvice, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
@@ -46,10 +46,44 @@ export async function startLiveCall(
   let muted = false
   let micStop: (() => void) | null = null
   const transcriptLines: { speaker: string; text: string }[] = []
+  // Epic 17.1: flush a completed line to Firestore on a speaker switch (the previous speaker's line is now
+  // "done"), plus a periodic safety flush so a long stretch from one speaker doesn't wait forever to appear live.
+  // Fragments arrive word-sized from the transcription API; writing every fragment would be far too write-heavy,
+  // so only completed lines are persisted, reusing the same write queue as every other live write.
+  let lastFlushedIndex = -1
+  let lastFlushedLength = 0
+  // includeLast: the periodic safety timer also flushes a still-growing last line (good enough for a live view,
+  // re-appended as a fresh Firestore entry each time it grows) — a real speaker switch, by contrast, only ever
+  // flushes completed lines, since the switch itself is the signal that the previous line is truly done.
+  const flushTranscript = (includeLast = false) => {
+    const upTo = includeLast ? transcriptLines.length : transcriptLines.length - 1
+    for (let i = lastFlushedIndex + 1; i < upTo; i++) {
+      const line = transcriptLines[i]
+      const speaker = line.speaker === 'Mia' ? 'Mia' : 'Caller'
+      const text = line.text.trim()
+      if (text) enqueueWrite(() => appendTranscriptLine(db, incidentId, speaker, text))
+      lastFlushedIndex = i
+    }
+    // The still-open last line, if it grew since the last periodic flush, gets appended again (superseding the
+    // partial version already written) — acceptable duplication for a live view, trimmed at consolidation time.
+    if (includeLast && transcriptLines.length > 0) {
+      const last = transcriptLines[transcriptLines.length - 1]
+      if (last.text.length > lastFlushedLength) {
+        const speaker = last.speaker === 'Mia' ? 'Mia' : 'Caller'
+        const text = last.text.trim()
+        if (text) enqueueWrite(() => appendTranscriptLine(db, incidentId, speaker, text))
+        lastFlushedLength = last.text.length
+      }
+    }
+  }
   const appendTranscript = (speaker: string, text: string) => {
     const last = transcriptLines.at(-1)
     if (last?.speaker === speaker) last.text += text
-    else transcriptLines.push({ speaker, text })
+    else {
+      flushTranscript()
+      lastFlushedLength = 0
+      transcriptLines.push({ speaker, text })
+    }
   }
 
   // Gemini Live only takes a turn after it hears the caller, so silence never makes it speak on its own.
@@ -243,6 +277,13 @@ export async function startLiveCall(
     })
   }
 
+  // Epic 17.1 safety flush: a speaker switch already flushes the previous line, but one speaker talking for a
+  // long stretch (e.g. Mia's Round 1 menu options) would otherwise wait indefinitely to appear in the live feed.
+  const transcriptFlushTimer = setInterval(() => {
+    if (finished) return
+    flushTranscript(true)
+  }, 5_000)
+
   const silenceTimer = setInterval(() => {
     if (finished || muted) return
     if (player.isPlaying()) {
@@ -276,7 +317,9 @@ export async function startLiveCall(
   return {
     end: async () => {
       finished = true
+      flushTranscript(true)
       clearInterval(silenceTimer)
+      clearInterval(transcriptFlushTimer)
       frameSampler?.stop()
       micStop?.()
       const recording = recorder ? await recorder.stop() : null

@@ -42,6 +42,14 @@ export interface Incident {
     urgency: Severity | null
     notes: string | null
   }
+  // Timestamped transcript lines written live during the call (Epic 17.1) — completed lines only (flushed on a
+  // speaker switch or a periodic safety timer), not every raw speech-to-text fragment. Shared by the annotated
+  // live transcript (17.2) and the post-call replay scrubber (17.3).
+  transcriptLines?: { speaker: 'Caller' | 'Mia'; text: string; at: string }[]
+  // A snapshot of extractedFieldsLive taken each time it changes (Epic 17.3) — lets the replay scrubber show only
+  // the fields known as of a given point in the call, not the final picture. Capped/pruned by the writer if a
+  // call runs unusually long; absent means no history was recorded (older incidents, or a very short call).
+  fieldHistory?: { fields: Incident['extractedFieldsLive']; at: string }[]
   consolidatedSummary: string | null
   fieldConfidence: Record<string, FieldConfidence>
   // Live confidence per field, updated as the call progresses (Epic 16.2) — distinct from `fieldConfidence`,
