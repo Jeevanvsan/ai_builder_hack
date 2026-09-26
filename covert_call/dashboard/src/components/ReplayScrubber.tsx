@@ -3,8 +3,8 @@ import type { Incident } from '../../../shared/incidents/types'
 
 // Epic 17.3: drag to any point in the call and see the transcript, extracted fields, and voice stress as they
 // stood at that instant — reconstructs the call without cross-referencing the transcript, fields and stress
-// trend separately by eye. Only shown once a case is consolidated (a live call already has all this data visible
-// directly via LiveTranscript / the live fields card / the stress sparkline).
+// trend separately by eye. Only shown once a case is consolidated (a live call already shows all of this on the
+// case board and in the conversation panel).
 const EMPTY_TRANSCRIPT: NonNullable<Incident['transcriptLines']> = []
 const EMPTY_HISTORY: NonNullable<Incident['fieldHistory']> = []
 
