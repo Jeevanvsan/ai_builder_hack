@@ -196,10 +196,16 @@ export async function landmarkNear(p: { lat: number; lng: number }): Promise<str
   return null
 }
 
+export type LandmarkHit = { lat: number; lng: number; name: string; confidence: 'high' | 'low' }
+
 // Places a landmark the caller names ("St. George Auditorium", "Convent Square junction") on the map, searching
 // only near where they were last known (they can't have jumped across town). Used when there's no precise GPS,
 // so their position — and the route — follow what they report. Null if nothing matching is found nearby.
-export async function locateLandmark(text: string, near: { lat: number; lng: number }): Promise<{ lat: number; lng: number; name: string } | null> {
+// `confidence` is 'low' when the match is weak enough that Mia should read it back and confirm rather than treat
+// it as settled: a single generic keyword left after filtering, a hit near the edge of the 3 km search radius (it
+// could just as easily be a same-named place further out that got missed), or the weaker Nominatim fallback path
+// rather than an exact OSM name match.
+export async function locateLandmark(text: string, near: { lat: number; lng: number }): Promise<LandmarkHit | null> {
   const words = text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -207,6 +213,7 @@ export async function locateLandmark(text: string, near: { lat: number; lng: num
     .filter((w) => w.length > 2 && !/^(the|near|junction|board|road|saw|see|seeing|front|of|and|now|currently|showing|something|like|sign|signboard|im|am)$/.test(w))
     .slice(0, 3)
   if (!words.length) return null
+  const weakMatch = words.length < 2
   const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\"]/g, '')).join('.*')
   const q = `[out:json][timeout:10];nwr(around:3000,${near.lat},${near.lng})[name~"${pattern}",i];out center 10;`
   for (const url of OVERPASS_URLS) {
@@ -216,16 +223,20 @@ export async function locateLandmark(text: string, near: { lat: number; lng: num
       .map((e) => ({ name: e.tags?.name ?? '', lat: e.lat ?? (e as { center?: { lat: number } }).center?.lat, lng: e.lon ?? (e as { center?: { lon: number } }).center?.lon }))
       .filter((h): h is { name: string; lat: number; lng: number } => h.lat != null && h.lng != null)
       .sort((a, b) => haversineKm(near, a) - haversineKm(near, b))
-    if (hits[0]) return hits[0]
+    if (hits[0]) {
+      const farFromAnchor = haversineKm(near, hits[0]) > 1.5
+      return { ...hits[0], confidence: weakMatch || farFromAnchor ? 'low' : 'high' }
+    }
     break
   }
-  // Fallback: Nominatim search bounded to ~3 km around the last known position.
+  // Fallback: Nominatim search bounded to ~3 km around the last known position. Always 'low' confidence — this
+  // path only runs when the more specific Overpass name match found nothing, so it's a looser free-text guess.
   const d = 0.03
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&bounded=1&viewbox=${near.lng - d},${near.lat + d},${near.lng + d},${near.lat - d}&q=${encodeURIComponent(words.join(' '))}`
   try {
     const res = await fetch(url, typeof window === 'undefined' ? { headers: { 'User-Agent': 'QuickBite-hackathon-prototype' } } : {})
     const [hit] = res.ok ? await res.json() : []
-    return hit ? { lat: Number(hit.lat), lng: Number(hit.lon), name: hit.display_name?.split(',')[0] ?? words.join(' ') } : null
+    return hit ? { lat: Number(hit.lat), lng: Number(hit.lon), name: hit.display_name?.split(',')[0] ?? words.join(' '), confidence: 'low' } : null
   } catch {
     return null
   }
