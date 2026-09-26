@@ -342,11 +342,11 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "map fields stress" "map nearby nearby" "map reasoning reasoning" "map timeline timeline" "recording recording recording" "summary summary summary";
+  grid-template-areas: "map fields stress" "map nearby nearby" "map reasoning reasoning" "map timeline timeline" "recording recording recording" "bulletin bulletin bulletin" "summary summary summary";
   gap: 1rem;
 }
 /* With a camera feed: medium video box in the right column; Full screen opens the large view. */
-.detail-grid.has-video { grid-template-areas: "map fields video" "map stress video" "nearby nearby nearby" "reasoning reasoning reasoning" "timeline timeline timeline" "recording recording recording" "summary summary summary"; }
+.detail-grid.has-video { grid-template-areas: "map fields video" "map stress video" "nearby nearby nearby" "reasoning reasoning reasoning" "timeline timeline timeline" "recording recording recording" "bulletin bulletin bulletin" "summary summary summary"; }
 .map-card { grid-area: map; display: flex; flex-direction: column; }
 .fields-card { grid-area: fields; }
 .stress-card { grid-area: stress; }
@@ -354,6 +354,7 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .reasoning-card { grid-area: reasoning; }
 .timeline-card { grid-area: timeline; }
 .recording-card { grid-area: recording; }
+.bulletin-card { grid-area: bulletin; }
 .summary-card { grid-area: summary; }
 .video-card { grid-area: video; display: flex; flex-direction: column; }
 .detail-live .summary-card { border-style: dashed; }
@@ -392,9 +393,23 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .summary { font-size: 1.05rem; line-height: 1.6; margin: 0 0 0.5rem; }
 
 @media (max-width: 1100px) {
-  .detail-grid { grid-template-columns: 1fr; grid-template-areas: "map" "fields" "stress" "nearby" "reasoning" "timeline" "summary"; }
-  .detail-grid.has-video { grid-template-areas: "video" "map" "fields" "stress" "nearby" "reasoning" "timeline" "summary"; }
+  .detail-grid { grid-template-columns: 1fr; grid-template-areas: "map" "fields" "stress" "nearby" "reasoning" "timeline" "bulletin" "summary"; }
+  .detail-grid.has-video { grid-template-areas: "video" "map" "fields" "stress" "nearby" "reasoning" "timeline" "bulletin" "summary"; }
 }
+
+.grounded-context { font-style: italic; margin-top: 0.2rem; }
+
+/* Epic 16.8: what changed since last view */
+.diff-banner { margin: 0 0 1rem; padding: 0.6rem 1rem; border-radius: 6px; background: #eef4ff; border: 1px solid #c7d9f7; color: #2c4a9e; font-weight: 600; font-size: 0.9rem; }
+
+/* Epic 16.4/16.5: dispatch bulletin */
+.bulletin-card { background: #14181f; color: #d8e4f0; border-color: #14181f; }
+.bulletin-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.bulletin-head h2 { color: #d8e4f0; }
+.bulletin-fields { margin: 0.75rem 0 0; display: grid; gap: 0.4rem; }
+.bulletin-row { display: grid; grid-template-columns: 7rem 1fr; gap: 0.75rem; }
+.bulletin-row dt { color: #7d93ac; font-weight: 700; }
+.bulletin-row dd { margin: 0; }
 
 /* Epic 16.6: nearby services */
 .nearby-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
@@ -520,6 +535,9 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color
 .toast .live-dot { background: var(--accent); flex: none; }
 .toast-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .toast-close { font: inherit; font-size: 1.3rem; line-height: 1; border: none; background: none; color: var(--muted); cursor: pointer; padding: 0 0.25rem; }
+/* Epic 16.9: a re-alert on an already-viewed incident reads distinctly from a brand-new one. */
+.toast-change { border-left-color: var(--medium); }
+.toast-change .live-dot { background: var(--medium); }
 @keyframes toast-in { from { transform: translateY(-8px); opacity: 0; } }
 .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.85rem; text-decoration: none; display: inline-block; }
 .btn-sm.btn-primary:hover { text-decoration: none; }

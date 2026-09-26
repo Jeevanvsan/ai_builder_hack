@@ -54,6 +54,20 @@ export interface Incident {
   // One derived, human-readable recommended action (Epic 16.3), computed alongside severity from the same
   // inputs — deterministic and explainable, not a separate Gemini call.
   recommendation?: string | null
+  // One short, non-personal factual line (Epic 16.10) sourced via Gemini Search grounding — e.g. weather/road
+  // conditions near the confirmed location. Best-effort context only; absent if grounding found nothing relevant
+  // or isn't configured.
+  groundedContext?: string | null
+  // Rigid dispatch-bulletin-style breakdown (Epic 16.4), written once at consolidation alongside the prose
+  // `consolidatedSummary` — terse fragments formatted like a real dispatch broadcast, not sentences.
+  bulletin?: {
+    location: string
+    subjects: string
+    weapons: string
+    vehicle: string
+    status: string
+    recommendedAction: string
+  }
   // What the AI saw on the camera or heard in the background during the call (Epic 10) — kept separate from what
   // the caller actually said. `source` is 'camera' (a video frame) or 'sound' (a background noise like a gunshot
   // or other voices). Absent until the first observation.
