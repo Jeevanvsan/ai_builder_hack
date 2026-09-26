@@ -2,6 +2,7 @@ import { doc, onSnapshot, type Firestore } from 'firebase/firestore'
 import { appendTrackPoint, INCIDENTS, setSafeRoute } from '../../../../shared/incidents/client.ts'
 import type { Incident } from '../../../../shared/incidents/types.ts'
 import { bestSafeRoute, distanceM, kindForSituation, progressOnRoute, type LatLng, type SafeRoute } from '../../../../shared/nav/route.ts'
+import { landmarkNear } from '../../../../shared/nav/nearbyServices.ts'
 
 const WRITE_EVERY_MS = 10_000
 const WRITE_EVERY_M = 30
@@ -71,7 +72,8 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     }
     if (prog.next && prog.toNextM < TURN_NOTICE_M && notedStep !== prog.stepIndex) {
       notedStep = prog.stepIndex
-      onTurnNote(`Next: ${prog.next.instruction} in about ${fmtM(prog.toNextM)}. ${fmtM(prog.toDestinationM)} to ${route.destination.name}.`)
+      const r0 = route, next = prog.next, toNext = prog.toNextM, toDest = prog.toDestinationM
+      void landmarkAt(next).then((lm) => onTurnNote(`Next: ${next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(toNext)}. ${fmtM(toDest)} to ${r0.destination.name}. Relay it in the caller's language, with the landmark if there is one, then one calming line.`))
     }
   }
 
@@ -86,6 +88,15 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     }
   })
 
+  // Landmark lookups are cached per turn point so repeated guidance calls don't re-query.
+  const lmCache = new Map<string, Promise<string | null>>()
+  function landmarkAt(step: { lat: number; lng: number } | null | undefined) {
+    if (!step) return Promise.resolve(null)
+    const k = `${step.lat},${step.lng}`
+    if (!lmCache.has(k)) lmCache.set(k, landmarkNear(step).catch(() => null))
+    return lmCache.get(k)!
+  }
+
   return {
     guidance: async (situation, landmark) => {
       if (!pos) return 'No GPS fix from the caller yet — ask for a nearby landmark or junction name instead.'
@@ -94,11 +105,15 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       const r: SafeRoute = route
       const prog = progressOnRoute(pos, r)
       const after = r.steps[prog.stepIndex + 1]
+      const lm = await landmarkAt(prog.next)
+      const here = await landmarkNear(pos)
       return [
         `Destination: ${r.destination.name} (${r.destination.kind}), ${fmtM(prog.toDestinationM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min.`,
-        prog.next ? `Next: ${prog.next.instruction} in about ${fmtM(prog.toNextM)}.` : '',
+        prog.next ? `Next: ${prog.next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(prog.toNextM)}.` : '',
         after ? `Then: ${after.instruction}.` : '',
+        here ? `Near the caller now: ${here}.` : '',
         landmark ? `Caller reports being at: ${landmark}.` : '',
+        "Say it in the caller's language, with the landmark, the direction and the distance; if they ask what is there, describe the landmark and how far the destination is.",
       ].filter(Boolean).join(' ')
     },
     stop: () => {
