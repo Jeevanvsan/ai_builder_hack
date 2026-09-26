@@ -12,9 +12,9 @@ import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
 // "not found for API version v1beta" (error 1008) against a real key — gemini-3.8-live is the current default
 // Live API model for low-latency voice agents. Kept as a single constant, not hardcoded elsewhere, so it's easy
 // to swap again if the model catalog changes.
-// Extended Thinking reasons in the background while it talks (better situation judgement, fewer repeats).
-// `?model=live` in the URL falls back to the plain Live model for side-by-side testing.
-const USE_PLAIN_LIVE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('model') === 'live'
+// Plain Live is the default: in testing, Extended Thinking dropped the caller's transcript and misheard English,
+// with no real latency gain. `?model=extended` opts into Extended Thinking for side-by-side testing.
+const USE_PLAIN_LIVE = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('model') === 'extended')
 const LIVE_MODEL = USE_PLAIN_LIVE ? 'gemini-3.8-live' : 'gemini-3.8-live-extended-thinking'
 
 export type CallStatus = 'connecting' | 'live' | 'ended' | 'failed'

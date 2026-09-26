@@ -52,6 +52,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   }
 
   const onFix = (p: GeolocationPosition) => {
+    gpsFix = true
     pos = { lat: p.coords.latitude, lng: p.coords.longitude }
     const now = Date.now()
     if (!lastWrite || now - lastWrite.at > WRITE_EVERY_MS || distanceM(lastWrite.p, pos) > WRITE_EVERY_M) {
@@ -82,6 +83,12 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   // A responder can pick a different station on the dashboard; follow it.
   const unsub = onSnapshot(doc(db, INCIDENTS, incidentId), (snap) => {
     latestIncident = snap.data() as Incident | undefined
+    // No GPS: when the caller's address gets confirmed (or corrected), route from there instead.
+    const c = latestIncident?.location.confirmed
+    if (!gpsFix && c && (!pos || distanceM(pos, c) > 150)) {
+      pos = { lat: c.lat, lng: c.lng }
+      if (route) void reroute(route.reason).then((r) => r && onTurnNote(`Route updated from the confirmed address: ${fmtM(r.distanceM)} to ${r.destination.name}. Next: ${r.steps[0]?.instruction ?? 'continue'}.`))
+    }
     const r = latestIncident?.safeRoute
     if (r && r.requestedBy === 'responder' && r.updatedAt !== route?.updatedAt && r.destination.name !== route?.destination.name) {
       adopt(r)
@@ -90,10 +97,12 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   })
 
   let latestIncident: Incident | undefined
+  let gpsFix = false
+  // Without GPS, only a CONFIRMED address is trusted for routing. The rough location is IP-based and can be tens
+  // of km off (it put a Muhamma caller in Kochi), which routed them to the wrong city's police station.
   async function knownLocation(): Promise<LatLng | null> {
-    const l = latestIncident?.location
-    const p = l?.confirmed ?? l?.rough
-    return p ? { lat: p.lat, lng: p.lng } : null
+    const c = latestIncident?.location.confirmed
+    return c ? { lat: c.lat, lng: c.lng } : null
   }
 
   // Landmark lookups are cached per turn point so repeated guidance calls don't re-query.

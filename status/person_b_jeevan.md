@@ -283,3 +283,8 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - An occasional male voice was reported; the voice is fixed to Kore in config, so the cause is unknown. Please listen for it.
   - Web app redeployed.
 - 2026-09-26 (IST, ~21:45): Replies felt slow. Measured time to first audio: `gemini-3.8-live` 1.0–2.2 s; extended-thinking LOW 1.0–1.1 s with an occasional 3.8 s; MINIMAL isn't supported. Most of the delay came from voice detection, so I dropped the low end-sensitivity and cut `silenceDurationMs` from 1200 to 700; start sensitivity stays LOW. The extended-thinking model stays; `?model=live` is the fallback. Web app redeployed.
+- 2026-09-26 (IST, ~22:00): **Notes for Ameen (Live model + nav, please review):**
+  - Wrong-city route: with no GPS, guidance fell back to the IP-based rough location. That put a Muhamma caller in Kochi and routed them to Palluruthy police station, 30 km away, off the map. Routing without GPS now uses only a confirmed address and re-routes when the address is confirmed or corrected.
+  - Dashboard map zooms out to fit a route that isn't fully in view (once per route).
+  - Default model reverted to `gemini-3.8-live`: with extended thinking, the caller's transcript was missing and English was misheard. `?model=extended` opts in.
+  - Web app and dashboard redeployed.

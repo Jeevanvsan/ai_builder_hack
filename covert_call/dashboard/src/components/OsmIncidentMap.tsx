@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
 import type { MapProps } from './mapTypes'
 
 function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
@@ -14,6 +15,20 @@ function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
     ro.observe(map.getContainer())
     return () => ro.disconnect()
   }, [map])
+  return null
+}
+
+// Zooms out just enough to show the whole route (plus the caller) when it doesn't fit the current view, once per
+// new route — so a route is never silently off-screen.
+function FitRoute({ route, target }: { route: NonNullable<MapProps['route']>; target: { lat: number; lng: number } }) {
+  const map = useMap()
+  const key = `${route.destination.name}|${route.updatedAt}`
+  useEffect(() => {
+    const pts = [...route.geometry.map((p) => [p.lat, p.lng] as [number, number]), [target.lat, target.lng] as [number, number]]
+    const bounds = L.latLngBounds(pts)
+    if (!map.getBounds().contains(bounds)) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, key])
   return null
 }
 
@@ -74,6 +89,7 @@ export default function OsmIncidentMap({ rough, confirmed, target, backdrop, tra
         </CircleMarker>
       )}
       <FollowTarget lat={target.lat} lng={target.lng} />
+      {route && <FitRoute route={route} target={current ?? target} />}
     </MapContainer>
   )
 }
