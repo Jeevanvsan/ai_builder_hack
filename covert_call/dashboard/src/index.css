@@ -905,19 +905,6 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .route-next { display: flex; align-items: baseline; gap: 0.45rem; padding: 0.4rem 0.55rem; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, #fff); font-weight: 700; font-size: 0.86rem; }
 .route-next-label { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 .map-dest-label { font-weight: 700; }
-/* Situation diagram (side panel "Scene" tab) */
-.scene-diagram { display: flex; flex-direction: column; gap: 0.75rem; }
-.scene-svg2 { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
-.sd-label { font: 700 10px 'Segoe UI', system-ui, sans-serif; text-anchor: middle; letter-spacing: 0.06em; text-transform: uppercase; }
-.sd-danger { fill: #d92a3f; }
-.sd-caller { fill: #2b6cb0; }
-.sd-route { fill: #1a73e8; }
-.sd-note { font: 600 9px 'Segoe UI', system-ui, sans-serif; text-anchor: middle; fill: #5b6472; }
-.sd-danger-note { fill: #d92a3f; }
-.sd-callouts li.sd-route-li::before { background: #1a73e8; }
-.sd-callouts { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
-.sd-callouts li { position: relative; padding: 0.4rem 0.6rem 0.4rem 1.4rem; border-radius: 8px; background: #fff; border: 1px solid var(--border); font-size: 0.84rem; font-weight: 600; }
-.sd-callouts li::before { content: ''; position: absolute; left: 0.6rem; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--high); }
 .scene-svg { width: 100%; height: 160px; margin-top: 0.5rem; }
 .scene-svg line, .scene-svg circle, .scene-svg rect, .scene-svg polygon { stroke: var(--text); fill: none; stroke-width: 2; }
 .scene-svg circle { fill: var(--surface-solid); }

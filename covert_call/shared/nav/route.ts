@@ -1,4 +1,5 @@
 import { nearbyServices, type NearbyService, type ServiceKind } from './nearbyServices.ts'
+import { affirmed } from '../incidents/severity.ts'
 
 // Driving routes via the free public OSRM server (no key, fair-use demo service — fine for a prototype).
 const OSRM = 'https://router.project-osrm.org/route/v1/driving'
@@ -62,7 +63,7 @@ export async function drivingRoute(from: LatLng, to: LatLng) {
 }
 
 export function kindForSituation(indicators: string[]): ServiceKind {
-  const t = indicators.join(' ').toLowerCase()
+  const t = affirmed(indicators).join(' ').toLowerCase()
   if (/fire|smoke|gas|explosion/.test(t)) return 'fire'
   if (/injur|blood|bleed|hurt|medical/.test(t)) return 'hospital'
   return 'police'

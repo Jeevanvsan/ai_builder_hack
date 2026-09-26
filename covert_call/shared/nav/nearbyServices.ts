@@ -1,6 +1,7 @@
 // Epic 16.6: once an incident's location is confirmed, look up nearby police, fire and hospital services so a
 // responder doesn't have to search for who to actually dispatch. Free OpenStreetMap Overpass API — no billing,
 // consistent with the project's existing free-tier-first pattern (Nominatim geocoding, free map tiles).
+import { affirmed } from '../incidents/severity.ts'
 
 export type ServiceKind = 'police' | 'fire' | 'hospital'
 
@@ -171,7 +172,7 @@ async function fetchNearbyServices(near: { lat: number; lng: number }): Promise<
 // Epic 16.6: which service type to lead with, based on what's already known about the incident — a highlight/
 // ordering hint, not a hard rule.
 export function suggestedServiceKind(dangerIndicators: string[]): ServiceKind {
-  const text = dangerIndicators.join(' ').toLowerCase()
+  const text = affirmed(dangerIndicators).join(' ').toLowerCase()
   if (/fire|smoke|gas|explosion|blast/.test(text)) return 'fire'
   if (/injur|blood|stab|gunshot|hurt|bleeding/.test(text)) return 'hospital'
   return 'police'
