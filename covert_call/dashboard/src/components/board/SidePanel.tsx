@@ -80,7 +80,7 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                   <span className="searching-label">Writing the case summary…</span>
                 </div>
               ) : (
-                <p className="panel-empty">No summary available for this incident.</p>
+                <FactSheet incident={incident} />
               )}
             </section>
 
@@ -113,5 +113,25 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
         )}
       </div>
     </aside>
+  )
+}
+
+// Shown when no AI summary exists (e.g. a simulated or channel-only case): the reported facts, stated plainly.
+function FactSheet({ incident: i }: { incident: Incident }) {
+  const f = i.extractedFieldsLive
+  const r = i.safeRoute
+  const rows: [string, string][] = [
+    ['Urgency', f.urgency ?? 'not stated'],
+    ['People', f.peopleCount != null ? String(f.peopleCount) : 'not stated'],
+    ['Danger', f.dangerIndicators.length ? f.dangerIndicators.join('; ') : 'none reported'],
+    ['Location', i.location.confirmed?.address ?? (i.location.rough ? `approx. ${i.location.rough.lat.toFixed(4)}, ${i.location.rough.lng.toFixed(4)}` : 'unknown')],
+  ]
+  if (i.location.track?.length) rows.push(['Movement', `${i.location.track.length} live GPS points`])
+  if (r) rows.push(['Heading to', `${r.destination.name} (${r.destination.kind}), ${(r.distanceM / 1000).toFixed(1)} km, step ${r.stepIndex + 1} of ${r.steps.length}`])
+  if (i.voiceStressScore != null) rows.push(['Voice stress', String(i.voiceStressScore)])
+  return (
+    <dl className="fact-sheet">
+      {rows.map(([k, v]) => (<div key={k}><dt>{k}</dt><dd>{v}</dd></div>))}
+    </dl>
   )
 }
