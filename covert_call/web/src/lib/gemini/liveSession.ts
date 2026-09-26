@@ -186,11 +186,27 @@ export async function startLiveCall(
         break
       }
       case 'end_call': {
-        // The tool call can arrive before its own closing-line audio has finished playing (or, if the model is
-        // over-eager, before the greeting itself has played on a very short first turn) — a grace period lets
-        // whatever's already queued in the player finish instead of cutting the caller off mid-sentence.
+        // The tool call can arrive before its own closing-line audio has finished playing (or even before
+        // playback has started at all, e.g. still buffering) — a fixed timeout was a guess that cut a longer
+        // goodbye off mid-sentence. Poll the player's actual queue instead: wait for it to start (in case the
+        // audio hasn't begun yet) then for it to finish, with a hard cap so a stuck flag can never hang the call.
         finished = true
-        setTimeout(() => callbacks.onCallEnd(), 4000)
+        const HARD_CAP_MS = 12_000
+        const POLL_MS = 150
+        const startedAt = Date.now()
+        const waitForPlaybackToFinish = () => {
+          const elapsed = Date.now() - startedAt
+          if (player.isPlaying()) {
+            if (elapsed < HARD_CAP_MS) setTimeout(waitForPlaybackToFinish, POLL_MS)
+            else callbacks.onCallEnd()
+            return
+          }
+          // Not playing yet — could be "already finished" or "hasn't started". Give it a short window to start
+          // before concluding there's nothing left to wait for.
+          if (elapsed < 800) { setTimeout(waitForPlaybackToFinish, POLL_MS); return }
+          callbacks.onCallEnd()
+        }
+        setTimeout(waitForPlaybackToFinish, POLL_MS)
         break
       }
     }

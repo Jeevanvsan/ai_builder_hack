@@ -135,17 +135,24 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       // "Alappuzha Vazhicherry" on the map near Muvattupuzha). Once an address is confirmed, it — not GPS — is
       // the anchor every subsequent landmark search is bounded to.
       const anchor = (await knownLocation()) ?? pos
-      // No precise GPS: the caller's reported landmarks move them along. Place the landmark near the anchor,
-      // record it as a track point (the dashboard map follows) and re-route from there.
+      // A named landmark is searched every time the caller reports one, GPS or not — GPS/IP fixes have already
+      // proven unreliable enough this session (tens of km off in testing) that a real, named place the caller can
+      // see is often better evidence of where they are than the device fix. Without GPS, the landmark simply
+      // becomes the position. With GPS, only override it if the landmark disagrees by more than normal GPS
+      // jitter/driving distance (800 m) — small disagreement is expected while moving and GPS wins; a large one
+      // means the device fix has drifted and the landmark the caller can actually see should be trusted instead.
+      const GPS_OVERRIDE_M = 800
       let movedTo: string | null = null
-      if (landmark && anchor && !gpsFix) {
+      let uncertainMatch: string | null = null
+      if (landmark && anchor) {
         const hit = await locateLandmark(landmark, anchor).catch(() => null)
-        if (hit && distanceM(anchor, hit) > 30) {
+        if (hit && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
           // The dashboard follows a trail of 2+ points, so the first reported landmark also records where they
           // started — from the anchor (what the caller confirmed), not a possibly-wrong GPS/rough fix.
           if (!latestIncident?.location.track?.length) void appendTrackPoint(db, incidentId, { ...anchor, speed: null })
           pos = { lat: hit.lat, lng: hit.lng }
           movedTo = hit.name
+          if (hit.confidence === 'low') uncertainMatch = hit.name
           void appendTrackPoint(db, incidentId, { ...pos, speed: null })
           if (route) await reroute(route.reason)
         }
@@ -163,7 +170,11 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
         prog.next ? `Next: ${prog.next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(prog.toNextM)}.` : '',
         after ? `Then: ${after.instruction}.` : '',
         here ? `Reference landmark near the caller's GPS position (the caller has NOT mentioned it — say "you should see ${here} nearby", never "that ${here}"): ${here}.` : '',
-        landmark ? (movedTo ? `Caller's position updated to ${movedTo} (from what they reported); directions above are from there.` : `Caller reports being at: "${landmark}" — could not find that near their confirmed area, so directions above are still from their last known position. If it still doesn't match what they see, ask for a different nearby landmark or road name (once), rather than assuming they've moved.`) : '',
+        landmark ? (movedTo
+          ? (uncertainMatch
+            ? `Caller's position updated to ${movedTo} (from what they reported), but this match is NOT certain — it's a loose or borderline match nearby, not an exact one. Before trusting it, read it back and ask them to confirm: "Is that ${movedTo}, or something else nearby?" If they say it's wrong or unsure, ask for the exact name or a clearer landmark instead of guiding from this position.`
+            : `Caller's position updated to ${movedTo} (from what they reported); directions above are from there.`)
+          : `Caller reports being at: "${landmark}" — could not find that near their confirmed area, so directions above are still from their last known position. If it still doesn't match what they see, ask for a different nearby landmark or road name (once), rather than assuming they've moved.`) : '',
         "Say it in the caller's language, with the landmark, the direction and the distance; if they ask what is there, describe the landmark and how far the destination is.",
       ].filter(Boolean).join(' ')
     },
