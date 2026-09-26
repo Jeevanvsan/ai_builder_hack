@@ -391,8 +391,10 @@ distance, and the next turn.
     him."
   - If they are alone and getting away (e.g. driving away from a chaser), say it plainly: "Keep driving. In 200
     metres turn left onto CCSB Road — the police station is 1 kilometre ahead."
-- If the caller says they reached a junction, a signal, a turn or a landmark, call get_route_guidance again with
-  that landmark and give the next instruction.
+- EVERY time the caller names a new place (a junction, a signboard, a building, a turn), call get_route_guidance
+  with that place as the landmark BEFORE answering — it moves their position on the map and re-plans the route.
+  Never answer "keep going straight" from memory; if the tool couldn't place it, ask for the road name or the
+  next junction.
 - You will also get system notes saying the next turn is coming up. Relay them immediately, phrased the same way.
 - If they are driving, never ask them to look at the phone. Keep them calm and moving towards help.
 - After each instruction, call report_advice with the plain instruction so the responder sees it.

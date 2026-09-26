@@ -2,7 +2,7 @@ import { doc, onSnapshot, type Firestore } from 'firebase/firestore'
 import { appendTrackPoint, INCIDENTS, setSafeRoute } from '../../../../shared/incidents/client.ts'
 import type { Incident } from '../../../../shared/incidents/types.ts'
 import { bestSafeRoute, distanceM, kindForSituation, progressOnRoute, type LatLng, type SafeRoute } from '../../../../shared/nav/route.ts'
-import { landmarkNear } from '../../../../shared/nav/nearbyServices.ts'
+import { landmarkNear, locateLandmark } from '../../../../shared/nav/nearbyServices.ts'
 
 const WRITE_EVERY_MS = 10_000
 const WRITE_EVERY_M = 30
@@ -128,6 +128,20 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       // confirmed address) so guidance still works instead of looping on "ask for a landmark".
       if (!pos) pos = await knownLocation()
       if (!gpsFix && !latestIncident?.location.confirmed) pos = null
+      // No precise GPS: the caller's reported landmarks move them along. Place the landmark near their last known
+      // position, record it as a track point (the dashboard map follows) and re-route from there.
+      let movedTo: string | null = null
+      if (landmark && pos && !gpsFix) {
+        const hit = await locateLandmark(landmark, pos).catch(() => null)
+        if (hit && distanceM(pos, hit) > 30) {
+          // The dashboard follows a trail of 2+ points, so the first reported landmark also records where they started.
+          if (!latestIncident?.location.track?.length) void appendTrackPoint(db, incidentId, { ...pos, speed: null })
+          pos = { lat: hit.lat, lng: hit.lng }
+          movedTo = hit.name
+          void appendTrackPoint(db, incidentId, { ...pos, speed: null })
+          if (route) await reroute(route.reason)
+        }
+      }
       if (!pos) return `No reliable location yet — you MUST ask the caller now where exactly they are (road/area AND town), read it back, and call confirm_address; then call get_route_guidance again. Do not give any directions until then. ${landmark ? `The caller already said: "${landmark}" — do NOT ask for a landmark again; call confirm_address with it.` : 'Ask ONCE for a landmark or junction name.'} Meanwhile tell them to keep moving towards a busy, well-lit place (a shop, petrol pump, crowd).`
       if (!route) await reroute(situation ?? 'caller needs to reach safety')
       if (!route) return 'Could not find a route right now — ask for the nearest landmark and keep them moving somewhere busy and lit.'
@@ -141,7 +155,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
         prog.next ? `Next: ${prog.next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(prog.toNextM)}.` : '',
         after ? `Then: ${after.instruction}.` : '',
         here ? `Reference landmark near the caller's GPS position (the caller has NOT mentioned it — say "you should see ${here} nearby", never "that ${here}"): ${here}.` : '',
-        landmark ? `Caller reports being at: ${landmark}.` : '',
+        landmark ? (movedTo ? `Caller's position updated to ${movedTo} (from what they reported); directions above are from there.` : `Caller reports being at: ${landmark} (could not place it on the map; directions are from their last known position — say so if unsure).`) : '',
         "Say it in the caller's language, with the landmark, the direction and the distance; if they ask what is there, describe the landmark and how far the destination is.",
       ].filter(Boolean).join(' ')
     },
