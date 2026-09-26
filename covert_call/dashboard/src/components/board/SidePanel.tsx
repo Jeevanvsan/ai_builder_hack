@@ -95,7 +95,7 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
               )}
             </section>
 
-            {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} />}
+            {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} callerEstimate={incident.callerEstimate} />}
 
             {(incident.hasRecording || incident.audioRecording || (incident.videoRecording?.length ?? 0) > 0 || (incident.recordingFailed && !live)) && (
               <section className="case-section">
