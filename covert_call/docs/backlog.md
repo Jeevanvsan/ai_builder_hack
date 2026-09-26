@@ -6,7 +6,9 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 
 **Status (2026-09-25):** Epic 4 done and live at https://quickbite-5cde0-dashboard.web.app. Epics 1, 2 and 3 are now built end-to-end on branch `epic-1-2-3-gemini-live` (picked up by Jeevan while Ameen was busy — not yet merged, pending Ameen's review): the disguised Gemini Live call flow, silent-tap mode, structured extraction, voice stress, leakage check, and post-call consolidation (built client-side, not blocked on backend billing as originally scoped). Deployed live to https://quickbite-5cde0.web.app. Remaining open items in Epic 1/2: the "call ever mistakes itself for a literal food order" rehearsal check, and further live-call rehearsal of the persona's investigative depth. Epic 7.1 dashboard side done and tested with the dev camera (free P2P video); the real sender needs Person A's native app. Epics 5 and 6 not started.
 
-**Phase 2 (planned 2026-09-25):** Epics 8–14 added at the end of this file: click-and-order, live call video + Google Drive storage, vision- and sound-aware call, heart double-tap silent SOS, native app foundation, icon/name personalisation (native only), and dashboard support. None started yet.
+**Phase 2 (2026-09-25, merged to `main` via PR #8):** Epics 8–14 built — click-and-order, live call video + Google Drive storage, vision- and sound-aware call, heart double-tap silent SOS, native app foundation (untested, no device/toolchain in the build env), icon/name personalisation (native only), and dashboard support. See each epic below for exact per-story status; several stories are marked `[~]` (partially done) or still need a live device/manual rehearsal test.
+
+**Phase 3 (planned 2026-09-26):** Epics 15–19 added at the end of this file, drawn from `covert_call/docs/extended_feature_brainstorm.md` (a 911-transcript-driven brainstorm, itself sourced from `docs/extended_video_transcripts.md`). Covers responder-facing UX/GenAI depth (reasoning trace, confidence dial, dispatch-bulletin formatting, annotated live transcript, live-redrawing scene sketch, replay scrubber, cross-incident correlation, nearby-services lookup) and persona/call-flow refinements (presence-filling chatter, guess-and-confirm fallback, dropped-call handling, bystander-live-event code). None started yet — sizing/priority against the remaining time budget still needs a decision before work begins. The brainstorm doc's explicitly-rejected "deep search a named person" idea is not included anywhere in Phase 3.
 
 ---
 
@@ -440,3 +442,153 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
 - Epic 4 (Dashboard) got real scope in a later planning pass — don't under-budget it as "just wire up the data feed."
 - Epics 6 and 7 are explicitly sequential stretch goals (7 only after 6), and within Epic 7, stories 7.1 and 7.2 are parallel, not sequential.
 - **Phase 2 build order**: Epic 8 (smallest, closes the dead "Place order" button) → 9 (video sender, which 10 and 11 reuse) → 10 → 11. Epic 12 (native foundation) runs in parallel from the start, and Epic 13 follows it. Epic 14 (Person B) tracks each app-side epic as its data lands. Agree the Phase 2 data-model changes with Person B before Epic 8 starts.
+- **Phase 3 build order**: Epic 15 (persona/call-flow refinements) has no dependencies and can start immediately — pure `persona.ts`/`liveSession.ts` changes. Epic 16 (dashboard reasoning/confidence/bulletin) is independent of 15. Epic 17 (annotated live transcript + replay scrubber) needs transcript lines persisted live to Firestore first (currently only held locally in `liveSession.ts` until call-end) — do this once, shared by both stories. Epic 18 (live-redrawing scene sketch) is its own build, no dependency on 15–17. Epic 19 (cross-incident correlation + nearby services) is independent of the others and safe to parallelize.
+
+---
+
+# PHASE 3 (planned 2026-09-26)
+
+*Drawn from `covert_call/docs/extended_feature_brainstorm.md` — see that doc for the full reasoning, the 911-transcript
+source material, and every feature discussed (including ones not brought into this backlog). Only the features
+below were selected to actually build; the brainstorm doc has more (larger bets like second-voice detection, the
+responder live-nudge channel, and the wow-factor items not listed here) kept as reference, not yet committed.
+Every coded question still follows Epic 1's RULE 1 — its real meaning is spoken in the same sentence.*
+
+---
+
+## EPIC 15 — Persona & Call-Flow Refinements 🟡
+
+*Small, low-risk changes to `persona.ts`/`liveSession.ts` informed by real 911-call patterns. No new data-model
+fields except where noted.*
+
+### User Story 15.1
+**As a caller pausing mid-thought, I want Mia to stay present during ordinary silence, so that the call doesn't feel like it's gone dead.**
+- [ ] Add an instruction to `persona.ts` for a short, in-character reassurance line ("no rush, take your time with the order") during a normal few-second pause — distinct from, and well before, `liveSession.ts`'s existing 3-strikes silence watchdog (~8s threshold)
+- [ ] Rehearse: a 2-4 second pause mid-answer gets a short reassurance, without tripping the silence-tracking counter
+
+### User Story 15.2
+**As a caller who can barely speak, I want Mia to guess and let me just confirm, so that I'm not forced to keep picking from menus when even that is too much.**
+- [ ] Add a fallback-mode instruction to `persona.ts`: when answers get shorter/quieter/more strained, switch from offering 2-3 options to stating a specific guess for a plain yes/no confirmation, reusing the same coded vocabulary
+- [ ] Rehearse: deliberately answering in short, quiet single words shifts Mia's questions from menus to single-guess confirmations within a round or two
+
+### User Story 15.3
+**As a responder, I want a call that drops unexpectedly to look different from one that ended normally, so that I know a dropped call may still be an active emergency.**
+- [ ] Track end reason in `liveSession.ts`: clean `end_call` (already sets `finished = true`) vs. `onclose` firing without that flag — the latter is an unexpected disconnect
+- [ ] Add `callEndReason: 'confirmed' | 'dropped' | 'silence-timeout'` (or similar) to `shared/incidents/types.ts`, set by `endIncident()` in `shared/incidents/client.ts`
+- [ ] Feed the dropped state into `deriveSeverity()` in `shared/incidents/severity.ts` — a call cut off mid-danger-report is its own severity signal
+- [ ] Dashboard: distinct visual treatment for a dropped call on `IncidentDetailPage.tsx` (e.g. a red "Call dropped — not confirmed ended" banner instead of the calm "Case record" banner)
+- [ ] Try once, don't build a retry system: on detecting a drop, show a short-lived "Attempting callback..." status before settling to its final label — an honest, protocol-accurate touch (no real telephony exists to actually call back on)
+- [ ] Test: killing the mic/network mid-call results in an incident marked dropped, not ended, with adjusted severity
+
+### User Story 15.4
+**As someone watching a live event happen to a third party, I want a scenario code for reporting it in progress, so that responders ask about what's happening right now, not treat it like a past-tense witness report.**
+- [ ] Add a new Round 1 disguised code to `persona.ts`'s Step 4 (and `shared/codes.ts`, so the call and any future coded-cart mapping stay in sync per Epic 8.1's shared-table pattern) for an ongoing third-party observation, distinct from the existing "family combo" (witnessed-crime, past-tense) code
+- [ ] Add Round 2+ drill-down questions specific to this code: still happening / can still see or hear them / which direction / which floor or unit
+- [ ] Rehearse: describing "I can see my neighbor's argument through the window right now" routes to these ongoing-observation questions, not the past-tense witnessed-crime ones
+
+---
+
+## EPIC 16 — Responder Decision Support (Reasoning, Confidence, Bulletin) 🟡
+
+*Turns the dashboard from "extraction system" into something closer to decision support — showing why, not just what, and formatting the case the way real dispatch bulletins read.*
+
+### User Story 16.1
+**As a responder, I want to see why the AI raised severity, not just the resulting chip, so that I can trust the system's reasoning instead of treating it as a black box.**
+- [ ] Add a `reasoningTrace[]` array to `shared/incidents/types.ts`; append one short, plain-language line (e.g. "Urgency raised to HIGH — weapon reported 12s ago, voice stress crossed 75") whenever `updateLiveFields()`/`recordVoiceStress()` in `shared/incidents/client.ts` actually changes severity or urgency — not on every write
+- [ ] New live-scrolling panel on `IncidentDetailPage.tsx` rendering the trace as it grows during a call
+- [ ] Test: during a live call, urgency escalating produces a new reasoning-trace line explaining the trigger in real time
+
+### User Story 16.2
+**As a responder, I want to see a field's confidence sharpen live during the call, so that I can tell "just mentioned once" from "confirmed" without waiting for the call to end.**
+- [ ] Extend `updateLiveFields()` to set a live confidence level per field it writes (inferred on first report, upgraded to confirmed for fields with an explicit confirmation path like `confirm_address`, or on repetition/elaboration across later rounds)
+- [ ] Animate the existing `Confidence` component on `IncidentDetailPage.tsx` to visibly move between states live, not just show the static post-consolidation value from `fieldConfidence`
+- [ ] Test: a field's confidence visual moves from a dim "uncertain" state to a solid "confirmed" state as Mia gathers more detail about it during the call
+
+### User Story 16.3
+**As a responder, I want one clear recommended action, not just a severity chip I have to interpret myself, so that I know what to actually do.**
+- [ ] Derive a short recommendation sentence (e.g. "Recommend immediate police dispatch") alongside `deriveSeverity()` in `shared/incidents/severity.ts`, from the same inputs (dangerIndicators, urgency, voiceStressScore) — deterministic/rule-based, not a separate Gemini call, so it stays explainable
+- [ ] Render prominently on `IncidentDetailPage.tsx` near the severity chip
+- [ ] Test: an incident with a weapon indicator and high urgency shows a clear recommendation line, not just a severity chip
+
+### User Story 16.4
+**As a responder, I want the consolidated case formatted like a real dispatch bulletin, so that I can scan it as fast as an actual broadcast, not read it like a report.**
+- [ ] Extend `consolidate.ts`'s `responseSchema` to also produce a rigid bulletin block (LOCATION / SUBJECTS / WEAPONS / VEHICLE / STATUS / RECOMMENDED ACTION — the last one reusing 16.3's recommendation), alongside the existing prose `consolidatedSummary`
+- [ ] Add the structured bulletin field to `shared/incidents/types.ts`; new styled (monospace, bulletin-look) card on `IncidentDetailPage.tsx`, visually distinct from the prose summary
+- [ ] Test: a consolidated case shows both the existing prose summary and a separate terse bulletin card
+
+### User Story 16.5
+**As a responder, I want a one-click shareable version of the current brief, so that I can hand it to someone dispatching over radio who isn't looking at this screen.**
+- [ ] Button on `IncidentDetailPage.tsx` that copies (and/or prints via a dedicated print stylesheet) 16.4's bulletin format as a point-in-time snapshot — build after 16.4 exists, reuse its fields rather than inventing a second format
+- [ ] Test: clicking the button on a test incident copies a clean, radio-readable bulletin of current known facts
+
+### User Story 16.6
+**As a responder, I want nearby police/fire/hospital contacts once a location is confirmed, so that I don't have to look them up myself before dispatching.**
+- [ ] New function alongside `shared/incidents/geocode.ts` (e.g. `nearbyServices.ts`) querying the free OpenStreetMap Overpass API (or Google Places Nearby Search if a Places-enabled key is ever configured), triggered once `location.confirmed` is set
+- [ ] New card on `IncidentDetailPage.tsx`: name, approximate distance, phone number where available, a `tel:` "Call station" link per result
+- [ ] Auto-suggest which service to lead with based on `dangerIndicators`/urgency (weapon/threat → police, fire/smoke → fire service, injury → hospital) as a simple highlight/ordering, not a hard rule
+- [ ] Test: a test incident with a confirmed address shows at least one real nearby police station and hospital with a working phone link, no paid API key required
+
+### User Story 16.7
+**As a responder already on an incident, I want a distinct sound the instant it escalates, so that I notice even if I'm not staring at the severity chip.**
+- [ ] `IncidentDetailPage.tsx`: play a short, distinct one-shot sound (separate audio asset from Epic 4.6's siren) the instant severity increases on the currently-open incident — deliberately does not respect Epic 4.6's "do not disturb while on an incident page" rule, since the responder is already on the exact incident that escalated
+- [ ] Test: a responder with the detail page open hears the distinct cue the instant severity increases during a live call
+
+### User Story 16.8
+**As a responder reopening an incident, I want to see just what changed since I last looked, so that I don't have to re-scan every field from memory.**
+- [ ] Snapshot field state alongside `response.viewedAt` updates (or reuse whatever change-tracking 16.1's reasoning trace ends up building — design these two together, both answer "what changed and when")
+- [ ] New banner on `IncidentDetailPage.tsx` summarizing the delta on reopen (e.g. "Since you last checked: address confirmed, urgency raised to high, 2 new notes")
+- [ ] Test: a responder who viewed an incident, left, and returns after new fields were reported sees a one-line summary of exactly what changed
+
+---
+
+## EPIC 17 — Live Transcript & Replay 🟡
+
+*Both stories below need transcript lines persisted live to Firestore, not just held locally in `liveSession.ts`'s `transcriptLines` array until call-end as today — solve this once, shared by both.*
+
+### User Story 17.1
+**As a developer, I want transcript lines written live during the call, so that both the annotated live view and the post-call replay scrubber have real timestamped data to work from.**
+- [ ] Write each transcript line (from `liveSession.ts`'s `appendTranscript()`) to Firestore progressively during the call — a new subcollection or timestamped array field, not just the end-of-call local array used today
+- [ ] Also track field-level update timestamps (currently only the latest value is stored in `extractedFieldsLive`, not a history of when each value changed) — needed for 17.3's scrubber to reconstruct "what was known at time T"
+
+### User Story 17.2
+**As a responder, I want to see the coded phrases in the live transcript automatically decoded, so that the disguise mechanism is obvious on screen without me explaining it.**
+- [ ] New transcript display component on `IncidentDetailPage.tsx`, fed by 17.1's live-written transcript data
+- [ ] Match transcript text against `shared/codes.ts` (the shared code table from Epic 8.1) client-side; render matched coded phrases with their real meaning shown inline (e.g. struck-through phrase + "→ weapon present")
+- [ ] Render with a streaming/typewriter reveal (not blocks appearing all at once), timed so a coded phrase's annotation pops in right as that phrase finishes appearing
+- [ ] Test: during a live demo call, the transcript streams in with coded phrases visibly highlighted and annotated in real time
+
+### User Story 17.3
+**As a responder reviewing a case afterward, I want to scrub to any moment and see the transcript, fields, and stress level as they were then, so that I can reconstruct the call without cross-referencing multiple views by eye.**
+- [ ] Timeline scrubber on `IncidentDetailPage.tsx` (shown once a case is consolidated), reading 17.1's timestamped transcript + field-update history + the existing `voiceStressTrend` (already timestamped)
+- [ ] Dragging to a point in time shows only the transcript up to then, only the fields extracted by then, and the stress value at that instant
+- [ ] Test: on a consolidated test case, dragging to the midpoint shows the partial picture as it stood then, not the full final state
+
+---
+
+## EPIC 18 — Live Scene Reconstruction 🟢
+
+*Stretch — schematic/iconographic only, never photorealistic, never an attempt to depict a real person's likeness (see the brainstorm doc's explicit safety framing). Spike the layout-generation approach before committing further.*
+
+### User Story 18.1
+**As a responder, I want to watch a simple scene diagram assemble itself live during the call, so that I get a visual sense of the situation without waiting for a final summary.**
+- [ ] Spike: can a structured layout description (positions/icons for people, weapon, vehicle) be reliably derived from `extractedFieldsLive` + `sceneObservations[]`, rendered as SVG/icons — check this works before building the full incremental-update version
+- [ ] Build as an incremental component: each relevant tool call (`report_situation`, `confirm_address`, `report_scene_observation`) triggers one small targeted SVG update (add/move/rotate one icon) rather than regenerating the whole image every time
+- [ ] Test: during a live test call, icons appear and change one at a time, timed to when each fact is actually reported
+
+### User Story 18.2
+**As a responder reviewing a consolidated case, I want one clean summary image of the incident, so that I have a single visual to anchor the case record (and the deck/demo).**
+- [ ] At consolidation time, generate one finished schematic composite (reusing 18.1's layout approach) — new field on the incident record, new card on `IncidentDetailPage.tsx`
+- [ ] Explicitly document (in the deck/video, not just code comments) that this is iconographic only, never a real-likeness depiction — this framing must travel with the feature anywhere it's described publicly
+
+---
+
+## EPIC 19 — Cross-Case Intelligence 🟢
+
+*Stays entirely inside data we already legitimately hold — no external identity lookups. See the brainstorm doc's explicit rejection of any "search a named person, pull public photos/records" feature; this epic is the honest, in-scope version of that idea.*
+
+### User Story 19.1
+**As a responder, I want to know if this incident's address, vehicle, or name matches another open or recent report, so that I can see patterns across cases, not just within one.**
+- [ ] New file alongside `consolidate.ts`/`leakageCheck.ts` (e.g. `correlate.ts`): at consolidation time, check the new incident's confirmed address, any vehicle description, and any name mentioned against other open/recent incidents already in Firestore — pull the last N incidents' key fields, ask a client-side Gemini text call (same structured-JSON pattern as `consolidate.ts`) whether any appear to describe the same person/vehicle/location
+- [ ] Write `correlatedIncidentIds: string[]` (or similar) to the incident record via a new `shared/incidents/client.ts` function
+- [ ] Small "Possibly related" card on `IncidentDetailPage.tsx` linking to matched incidents
+- [ ] Test: two test incidents seeded with the same address or vehicle description show a "possibly related" link to each other once consolidation runs on the second one
