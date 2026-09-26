@@ -78,7 +78,17 @@ export async function startLiveCall(
     for (let i = Math.max(0, lastFlushedIndex); i < upTo; i++) writeLine(i)
     lastFlushedIndex = Math.max(lastFlushedIndex, transcriptLines.length - 2)
   }
-  const appendTranscript = (speaker: string, text: string) => {
+  // The transcription API sometimes emits bracketed non-speech annotations instead of actual words —
+  // "<no speech>", "{pause}", "[silence]", "(inaudible)" — for a quiet stretch or breathing. These arrive as
+  // their own fragments (sometimes several concatenated back to back, e.g. "<no speech>{pause}") and are
+  // transcription artifacts, not something either side said — strip them out per fragment, not just when a
+  // whole line happens to be only one, since consecutive fragments get merged into the same line before this
+  // would otherwise be checked. Previously leaked straight into the responder-facing conversation view looking
+  // like Mia or the caller had spoken gibberish.
+  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silence|inaudible|noise|breathing|laughs?|sighs?)\s*[>}\])]/gi
+  const appendTranscript = (speaker: string, rawText: string) => {
+    const text = rawText.replace(NON_SPEECH_TOKEN, '')
+    if (!text) return
     const last = transcriptLines.at(-1)
     if (last?.speaker === speaker) last.text += text
     else {

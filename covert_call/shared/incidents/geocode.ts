@@ -59,6 +59,23 @@ function lastPlacePart(address: string): string | null {
   return last && last.length >= 3 ? last : null
 }
 
+// Nominatim requires every query token to roughly match — ONE mis-transcribed comma-separated segment (a street
+// or area name misheard, e.g. "Vaisheri" for "Vazhicherry") can silently sink the whole query to zero hits, even
+// when the OTHER segments include something specific and correct (a named landmark like "St George Auditorium").
+// Confirmed in testing: "St. George Auditorium, Vaisheri, Alappuzha" finds nothing, but dropping the bad middle
+// segment — "St. George Auditorium, Alappuzha" — finds the exact place immediately. Try dropping each segment in
+// turn (keeping the others) rather than falling all the way back to just the town, since a landmark name is far
+// more specific evidence of the caller's exact position than a town name alone.
+function droppingOneSegment(address: string): string[] {
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean)
+  if (parts.length < 3) return [] // need at least landmark + something + town to be worth trying without the middle
+  const out: string[] = []
+  for (let i = 0; i < parts.length - 1; i++) { // never drop the last part (the town) — it anchors the search
+    out.push(parts.filter((_, j) => j !== i).join(', '))
+  }
+  return out
+}
+
 export type GeocodeHit = Coordinates & {
   // 'exact': the full spoken address matched something, and (if a rough bias point existed) an unbiased search
   // agrees with the biased one, or none exists to disagree. 'approximate': only a pincode or the town/city
@@ -94,6 +111,14 @@ async function nominatimVerified(query: string, near: Coordinates | null): Promi
 async function viaNominatim(address: string, near: Coordinates | null): Promise<GeocodeHit | null> {
   const direct = await nominatimVerified(address, near)
   if (direct) return direct
+
+  // Try dropping one mis-transcribed segment at a time before falling back to just the town — this can still
+  // land on the exact landmark (a specific place, not just a general area) even when one part of what the
+  // caller said didn't come through clearly.
+  for (const variant of droppingOneSegment(address)) {
+    const hit = await nominatimSearch(variant, null)
+    if (hit) return { ...hit, precision: 'approximate' }
+  }
 
   // These two fallbacks are deliberately unambiguous ON THEIR OWN (a 6-digit pincode; a named town/city), so
   // there is nothing for a bias to usefully disambiguate — cross-checking would just cost an extra request for
