@@ -8,6 +8,7 @@ import type { Incident } from '../../../../shared/incidents/types'
 import IncidentMap from '../IncidentMap'
 import { useIncidents } from '../../lib/incidentsStore'
 import { nearbyIncidentIds, deriveEvidence, SLOT_OF, type Evidence, type EvidenceKind } from '../../lib/evidence'
+import { livePosition, routeProgress } from '../../lib/livePosition'
 import { nearbyServices, suggestedServiceKind, type NearbyService } from '../../../../shared/nav/nearbyServices.ts'
 import CaseHub from './CaseHub'
 import EvidenceTile from './EvidenceTile'
@@ -53,15 +54,12 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
   }
 
   const route = incident.safeRoute
+  const pos = livePosition(incident.location)
   if (route) evidence.nearby = { kind: 'nearby', label: 'Route to safety', values: [], tone: 'live' }
 
   // Responder picks a station: route from the caller's latest position; the caller's app follows it live.
-  // A "confirmed" address that failed to geocode has no lat/lng (see confirmAddress()) — skip it as a position
-  // source rather than route from `null, null`.
-  const c = incident.location.confirmed
-  const confirmedPin = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null
   const routeTo = async (s: NearbyService) => {
-    const t = incident.location.track?.at(-1) ?? confirmedPin ?? incident.location.rough
+    const t = pos
     if (!t) return
     const r = await bestSafeRoute({ lat: t.lat, lng: t.lng }, s.kind, 'Responder chose this station', 'responder', s)
     if (r) await setSafeRoute(db, incident.id, r)
@@ -79,8 +77,10 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
       return <StressWave trend={incident.voiceStressTrend} score={incident.voiceStressScore} />
     }
     if (e.kind === 'nearby' && route) {
-      const step = route.steps[route.stepIndex]
-      const km = route.distanceM >= 1000 ? `${(route.distanceM / 1000).toFixed(1)} km` : `${route.distanceM} m`
+      const prog = routeProgress(route, pos)
+      const step = route.steps[prog.stepIndex]
+      const m = prog.remainingM
+      const km = m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.max(10, Math.round(m / 10) * 10)} m`
       return (
         <div className="route-tile">
           <div className="route-dest">
@@ -88,8 +88,12 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
             <span className="tile-list-main">{route.destination.name}</span>
             {route.destination.phone && <a href={`tel:${route.destination.phone}`} className="tile-call">Call</a>}
           </div>
-          <div className="route-eta"><strong>{Math.max(1, Math.round(route.durationS / 60))} min</strong> · {km} · {route.requestedBy === 'responder' ? 'set by dispatcher' : 'chosen by AI'}</div>
-          {step && <div className="route-next"><span className="route-next-label">Next</span><DecodeText text={step.instruction} /></div>}
+          {prog.arrived ? (
+            <div className="route-eta"><strong>Arrived</strong> · {route.requestedBy === 'responder' ? 'set by dispatcher' : 'chosen by AI'}</div>
+          ) : (
+            <div className="route-eta"><strong>{Math.max(1, Math.round(prog.remainingS / 60))} min</strong> · {km} to go · {route.requestedBy === 'responder' ? 'set by dispatcher' : 'chosen by AI'}</div>
+          )}
+          {step && !prog.arrived && <div className="route-next"><span className="route-next-label">Next</span><DecodeText text={step.instruction} /></div>}
         </div>
       )
     }

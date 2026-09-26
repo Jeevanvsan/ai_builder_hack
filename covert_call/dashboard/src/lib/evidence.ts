@@ -1,4 +1,5 @@
 import type { Incident } from '../../../shared/incidents/types'
+import { livePosition } from './livePosition'
 
 // Sorts what an incident already knows into the case board's evidence tiles. Pure: no new data, no fetching.
 // Each tile has a fixed slot around the hub, so tiles never jump around as facts arrive, and a tile only exists
@@ -60,17 +61,23 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
   // still shown, but it's not treated as a located pin (no coordinates to fall back to for the ≈lat,lng display).
   const c = i.location.confirmed
   const pinned = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null
-  const loc = pinned ?? i.location.rough
-  if (loc || i.location.confirmed) {
+  const pos = livePosition(i.location)
+  if (pos || c) {
     const endedRecently = i.sessionEndedAt ? now - Date.parse(i.sessionEndedAt) < PENDING_WINDOW_MS : false
+    // Once the caller has moved past the confirmed address (a newer track point from GPS or a reported
+    // landmark), the tile says so, so it no longer contradicts the map by showing a stale or unpinned address.
+    const movedOn = pos?.source === 'track'
+    const ago = movedOn && pos.at ? Math.max(0, Math.round((now - Date.parse(pos.at)) / 1000)) : null
     out.location = {
       kind: 'location',
       label: 'Location',
-      values: [i.location.confirmed ? i.location.confirmed.address : loc ? `≈ ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}` : 'Unknown'],
-      sub: i.groundedContext ?? (pinned
-        ? (c?.confidence === 'uncertain' ? 'Approximate — the exact street could not be matched, area only' : undefined)
-        : i.location.confirmed ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
-      tone: pinned ? 'live' : 'neutral',
+      values: [c ? c.address : pos ? `≈ ${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}` : 'Unknown'],
+      sub: movedOn
+        ? `Moving — live position ${ago != null && ago < 90 ? `updated ${ago}s ago` : 'on the map'}${c ? ' · last address given above' : ''}`
+        : i.groundedContext ?? (pinned
+          ? (c?.confidence === 'uncertain' ? 'Approximate — the exact street could not be matched, area only' : undefined)
+          : c ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
+      tone: pinned || movedOn ? 'live' : 'neutral',
       pending: !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,
     }
   }
