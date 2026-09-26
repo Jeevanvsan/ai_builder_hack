@@ -142,3 +142,22 @@ export function suggestedServiceKind(dangerIndicators: string[]): ServiceKind {
   if (/injur|blood|stab|gunshot|hurt|bleeding/.test(text)) return 'hospital'
   return 'police'
 }
+
+// The most recognisable named place within ~60 m of a point (a shop, temple, bank, bus stop, petrol pump...), so a
+// spoken turn can say "turn right at the Federal Bank" instead of a bare "turn right". Null if none or unreachable.
+export async function landmarkNear(p: { lat: number; lng: number }): Promise<string | null> {
+  const q = `[out:json][timeout:8];(nwr(around:60,${p.lat},${p.lng})[name][~"^(amenity|shop|tourism|leisure|highway|railway|building|office|historic)$"~"."];);out center 15;`
+  for (const url of OVERPASS_URLS) {
+    const data = await queryOverpass(url, q)
+    if (!data) continue
+    const rank = (t: Record<string, string>) => (t.amenity === 'fuel' || t.amenity === 'place_of_worship' || t.amenity === 'bank' || t.highway === 'traffic_signals' || t.highway === 'bus_stop' ? 0 : t.amenity || t.shop ? 1 : 2)
+    const best = data.elements
+      .map((e) => ({ t: e.tags ?? {}, lat: e.lat ?? (e as { center?: { lat: number } }).center?.lat, lng: e.lon ?? (e as { center?: { lon: number } }).center?.lon }))
+      .filter((e) => e.t.name && e.lat != null)
+      .sort((a, b) => rank(a.t) - rank(b.t) || haversineKm(p, a as { lat: number; lng: number }) - haversineKm(p, b as { lat: number; lng: number }))[0]
+    if (!best) return null
+    const kind = best.t.amenity ?? best.t.shop ?? best.t.highway ?? best.t.tourism ?? ''
+    return `${best.t.name}${kind ? ` (${kind.replace(/_/g, ' ')})` : ''}`
+  }
+  return null
+}
