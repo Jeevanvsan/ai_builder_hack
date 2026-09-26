@@ -81,12 +81,20 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
 
   // A responder can pick a different station on the dashboard; follow it.
   const unsub = onSnapshot(doc(db, INCIDENTS, incidentId), (snap) => {
-    const r = (snap.data() as Incident | undefined)?.safeRoute
+    latestIncident = snap.data() as Incident | undefined
+    const r = latestIncident?.safeRoute
     if (r && r.requestedBy === 'responder' && r.updatedAt !== route?.updatedAt && r.destination.name !== route?.destination.name) {
       adopt(r)
       onTurnNote(`The dispatcher changed the destination to ${r.destination.name}. Next: ${r.steps[0]?.instruction ?? 'continue'}.`)
     }
   })
+
+  let latestIncident: Incident | undefined
+  async function knownLocation(): Promise<LatLng | null> {
+    const l = latestIncident?.location
+    const p = l?.confirmed ?? l?.rough
+    return p ? { lat: p.lat, lng: p.lng } : null
+  }
 
   // Landmark lookups are cached per turn point so repeated guidance calls don't re-query.
   const lmCache = new Map<string, Promise<string | null>>()
@@ -99,7 +107,10 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
 
   return {
     guidance: async (situation, landmark) => {
-      if (!pos) return 'No GPS fix from the caller yet — ask for a nearby landmark or junction name instead.'
+      // No GPS fix yet (desktop, denied, indoors): fall back to the incident's latest known location (IP or a
+      // confirmed address) so guidance still works instead of looping on "ask for a landmark".
+      if (!pos) pos = await knownLocation()
+      if (!pos) return `No location yet. ${landmark ? `The caller already said: "${landmark}" — do NOT ask for a landmark again; call confirm_address with it.` : 'Ask ONCE for a landmark or junction name.'} Meanwhile tell them to keep moving towards a busy, well-lit place (a shop, petrol pump, crowd).`
       if (!route) await reroute(situation ?? 'caller needs to reach safety')
       if (!route) return 'Could not find a route right now — ask for the nearest landmark and keep them moving somewhere busy and lit.'
       const r: SafeRoute = route
