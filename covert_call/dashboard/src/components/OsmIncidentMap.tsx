@@ -37,8 +37,8 @@ export default function OsmIncidentMap({ rough, confirmed, target, backdrop, tra
         <>
           {/* Route to safety: a soft glow under a bright line, then the destination station. */}
           {/* Navigation-style route: white casing under a solid blue line. */}
-          <Polyline positions={route.geometry} pathOptions={{ color: '#ffffff', weight: 11, opacity: 1, lineCap: 'round', lineJoin: 'round' }} interactive={false} />
-          <Polyline positions={route.geometry} pathOptions={{ color: '#1a73e8', weight: 7, opacity: 1, lineCap: 'round', lineJoin: 'round' }} interactive={false} />
+          <Polyline positions={route.geometry.map((p) => [p.lat, p.lng] as [number, number])} pathOptions={{ color: '#ffffff', weight: 11, opacity: 1, lineCap: 'round', lineJoin: 'round' }} interactive={false} />
+          <Polyline positions={route.geometry.map((p) => [p.lat, p.lng] as [number, number])} pathOptions={{ color: '#1a73e8', weight: 7, opacity: 1, lineCap: 'round', lineJoin: 'round' }} interactive={false} />
           {route.steps[route.stepIndex] && (
             <CircleMarker center={[route.steps[route.stepIndex].lat, route.steps[route.stepIndex].lng]} radius={7} pathOptions={{ color: '#1a73e8', weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
               <Tooltip permanent direction="top" offset={[0, -8]} className="map-turn-label">{route.steps[route.stepIndex].instruction}</Tooltip>

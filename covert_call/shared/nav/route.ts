@@ -10,7 +10,7 @@ export type SafeRoute = {
   reason: string
   distanceM: number
   durationS: number
-  geometry: [number, number][]
+  geometry: LatLng[]
   steps: RouteStep[]
   stepIndex: number
   requestedBy: 'ai' | 'responder'
@@ -56,7 +56,8 @@ export async function drivingRoute(from: LatLng, to: LatLng) {
     lat: s.maneuver.location[1],
     lng: s.maneuver.location[0],
   }))
-  const geometry: [number, number][] = r.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng])
+  // Firestore rejects nested arrays, so the line is stored as {lat, lng} points, not [lat, lng] pairs.
+  const geometry: LatLng[] = r.geometry.coordinates.map(([lng, lat]: [number, number]) => ({ lat, lng }))
   return { distanceM: Math.round(r.distance), durationS: Math.round(r.duration), steps, geometry }
 }
 
@@ -92,7 +93,7 @@ export function distanceM(a: LatLng, b: LatLng): number {
 // Where the caller is along the route: the next upcoming step, distance to it, and whether they've left the route.
 export function progressOnRoute(pos: LatLng, route: SafeRoute) {
   let nearestGeo = Infinity
-  for (const [lat, lng] of route.geometry) nearestGeo = Math.min(nearestGeo, distanceM(pos, { lat, lng }))
+  for (const p of route.geometry) nearestGeo = Math.min(nearestGeo, distanceM(pos, p))
   let stepIndex = route.stepIndex
   // Advance past any step the caller has reached (within 30 m).
   while (stepIndex < route.steps.length - 1 && distanceM(pos, route.steps[stepIndex]) < 30) stepIndex += 1
