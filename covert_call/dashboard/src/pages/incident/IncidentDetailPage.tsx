@@ -9,6 +9,7 @@ import LiveTranscript from '../../components/LiveTranscript'
 import LiveVideo from '../../components/LiveVideo'
 import NearbyServicesCard from '../../components/NearbyServicesCard'
 import NoteForm from '../../components/NoteForm'
+import PinnedCard from '../../components/PinnedCard'
 import ReplayScrubber from '../../components/ReplayScrubber'
 import ResponseActions from '../../components/ResponseActions'
 import SceneSketch from '../../components/SceneSketch'
@@ -148,17 +149,17 @@ export default function IncidentDetailPage() {
         </div>
       )}
 
-      <div className={incident.video || incident.videoFront ? 'detail-grid has-video' : 'detail-grid'}>
+      <div className={`board-surface ${incident.video || incident.videoFront ? 'detail-grid has-video' : 'detail-grid'}`}>
         {(incident.video || incident.videoFront) && (
-          <div className="card video-card">
+          <PinnedCard className="video-card">
             <div className="video-card-head">
               <h2>Live video</h2>
               <Link to={`/incident/${incident.id}/video`} className="btn btn-sm">Full screen</Link>
             </div>
             <LiveVideo incident={incident} />
-          </div>
+          </PinnedCard>
         )}
-        <div className="card map-card">
+        <PinnedCard className="map-card">
           <h2>Location</h2>
           <IncidentMap location={incident.location} />
           <div className="location-lines">
@@ -184,9 +185,9 @@ export default function IncidentDetailPage() {
               </LiveValue>
             )}
           </div>
-        </div>
+        </PinnedCard>
 
-        <div className="card fields-card">
+        <PinnedCard className="fields-card">
           <h2>Extracted fields</h2>
           <dl className="fields fields-lg">
             <dt>People present</dt>
@@ -205,7 +206,7 @@ export default function IncidentDetailPage() {
             <dt>Notes</dt>
             <dd><LiveValue value={f.notes}>{f.notes ?? <span className="pending">—</span>}</LiveValue></dd>
           </dl>
-        </div>
+        </PinnedCard>
 
         {confirmed && (
           <NearbyServicesCard location={{ lat: confirmed.lat, lng: confirmed.lng }} dangerIndicators={f.dangerIndicators} />
@@ -218,7 +219,7 @@ export default function IncidentDetailPage() {
         <SceneSketch incident={incident} />
 
         {incident.reasoningTrace && incident.reasoningTrace.length > 0 && (
-          <div className="card reasoning-card">
+          <PinnedCard className="reasoning-card">
             <h2>Why this severity</h2>
             <p className="sub">What triggered each change, as it happened — not just the resulting chip.</p>
             <ol className="reasoning-trace">
@@ -231,11 +232,11 @@ export default function IncidentDetailPage() {
                 </li>
               ))}
             </ol>
-          </div>
+          </PinnedCard>
         )}
 
         {incident.sceneObservations && incident.sceneObservations.length > 0 && (
-          <div className="card scene-card">
+          <PinnedCard className="scene-card">
             <h2>Seen &amp; heard</h2>
             <p className="sub">What the AI observed on camera or in the background — separate from what the caller said.</p>
             <ul className="scene-list">
@@ -250,18 +251,18 @@ export default function IncidentDetailPage() {
                 </li>
               ))}
             </ul>
-          </div>
+          </PinnedCard>
         )}
 
-        <div className="card stress-card">
+        <PinnedCard className="stress-card">
           <h2>Voice stress</h2>
           <LiveValue value={incident.voiceStressScore}>
             <StressMeter score={incident.voiceStressScore} />
           </LiveValue>
           <StressSparkline trend={incident.voiceStressTrend} live={live} />
-        </div>
+        </PinnedCard>
 
-        <div className="card timeline-card">
+        <PinnedCard className="timeline-card">
           <h2>Timeline</h2>
           <ol className="timeline">
             {buildTimeline(incident).map((e) => (
@@ -272,18 +273,18 @@ export default function IncidentDetailPage() {
             ))}
           </ol>
           <NoteForm incidentId={incident.id} />
-        </div>
+        </PinnedCard>
 
         {incident.hasRecording && (
-          <div className="card recording-card">
+          <PinnedCard className="recording-card">
             <h2>Call recording</h2>
             <CallRecordingPlayer incidentId={incident.id} />
             <p className="sub">Full call audio (mic + AI voice), for evidence and verification. Playable anytime.</p>
-          </div>
+          </PinnedCard>
         )}
 
         {incident.videoRecording && incident.videoRecording.length > 0 && (
-          <div className="card recording-card">
+          <PinnedCard className="recording-card">
             <h2>Call video</h2>
             <ul className="drive-videos">
               {incident.videoRecording.map((v) => (
@@ -300,7 +301,7 @@ export default function IncidentDetailPage() {
               ))}
             </ul>
             <p className="sub">Saved to the team's Google Drive for later review.</p>
-          </div>
+          </PinnedCard>
         )}
 
         {!live && incident.consolidatedSummary && <ReplayScrubber incident={incident} />}
@@ -309,7 +310,7 @@ export default function IncidentDetailPage() {
 
         {incident.correlatedIncidentIds && <CorrelatedIncidentsCard incidentIds={incident.correlatedIncidentIds} />}
 
-        <div className="card summary-card">
+        <PinnedCard className="summary-card">
           <h2>Consolidated summary</h2>
           {incident.consolidatedSummary ? (
             <>
@@ -330,7 +331,7 @@ export default function IncidentDetailPage() {
               {live ? 'Written by Gemini once the call ends. Fields above update live until then.' : 'Consolidating the call…'}
             </p>
           )}
-        </div>
+        </PinnedCard>
       </div>
     </section>
   )

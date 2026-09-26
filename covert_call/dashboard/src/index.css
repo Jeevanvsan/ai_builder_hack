@@ -27,6 +27,7 @@
 }
 
 * { box-sizing: border-box; }
+html, body { overflow-x: hidden; }
 body {
   margin: 0;
   background:
@@ -441,6 +442,7 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
 .card {
   position: relative;
+  overflow: hidden;
   background: var(--surface);
   backdrop-filter: blur(10px) saturate(1.2);
   -webkit-backdrop-filter: blur(10px) saturate(1.2);
@@ -534,6 +536,7 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 
 /* Incident detail */
 .detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1.5rem; flex-wrap: wrap; }
+.detail-head-hero { display: flex; align-items: center; gap: 1.25rem; }
 .call-banner {
   display: flex;
   flex-direction: column;
@@ -923,4 +926,75 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 /* Back/Front camera toggle on the live video (Epic 11 / 14.2). */
 .video-cam-toggle { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 2; display: flex; gap: 0.4rem; }
 .video-cam-toggle .btn { background: rgba(17, 20, 24, 0.75); color: #fff; border: 1px solid rgba(255,255,255,0.25); }
+
+/* ============================================================
+   INVESTIGATION BOARD — the incident detail page's surface. Structure
+   (an aligned grid of evidence items) stays exactly the existing
+   .detail-grid; only the surface texture and each card's reveal read
+   as a board being built, not a stack of plain panels.
+   ============================================================ */
+.board-surface {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(20, 30, 50, 0.05) 1px, transparent 0);
+  background-size: 22px 22px;
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin: 0 -1.5rem;
+}
+
+.pinned-card { position: relative; overflow: hidden; }
+/* A soft corner glow standing in for a pin — a light accent, not a literal pushpin graphic. */
+.pinned-card-glow {
+  position: absolute;
+  top: -1.2rem;
+  left: 1.25rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--pin-glow, var(--accent-glow)), transparent 70%);
+  opacity: 0.55;
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+/* ============================================================
+   LIVE QUEUE — card feed replacing the plain table. Severity/live/
+   new state read visually (color, position) at a glance.
+   ============================================================ */
+.incident-feed {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+  gap: 1rem;
+}
+.incident-card {
+  --tone: var(--low);
+  position: relative;
+  cursor: pointer;
+  background: var(--surface);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--tone);
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  box-shadow: 0 1px 2px rgba(20, 30, 50, 0.04), 0 8px 20px -12px rgba(20, 30, 50, 0.12);
+  transition: box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1), transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+.incident-card:hover, .incident-card:focus-visible { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(20, 30, 50, 0.05), 0 14px 28px -14px rgba(20, 30, 50, 0.2); outline: none; }
+.incident-card-medium { --tone: var(--medium); }
+.incident-card-high { --tone: var(--high); box-shadow: 0 1px 2px rgba(20, 30, 50, 0.04), 0 0 20px -8px var(--high-glow); }
+.incident-card-new { border-left-width: 6px; }
+.incident-card-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.incident-card-rank { color: var(--muted); font-size: 0.8rem; font-weight: 700; margin-right: 0.15rem; }
+.incident-card-id { font-weight: 700; font-size: 1.05rem; }
+.incident-card-body { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.incident-card-field { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
+.incident-card-label { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.incident-card-indicators { display: flex; flex-wrap: wrap; gap: 0.2rem; align-items: center; }
+.incident-card-location { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.incident-card-foot { display: flex; justify-content: space-between; align-items: center; }
+
 .video-cam-toggle .btn.active { background: #fff; color: #111418; }
