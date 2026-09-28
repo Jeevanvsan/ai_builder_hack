@@ -5,6 +5,7 @@ import StressMeter from '../../components/StressMeter'
 import DataState from '../../components/DataState'
 import Pagination from '../../components/Pagination'
 import SmartSearchBar, { useSmartSearch } from '../../components/SmartSearch'
+import { SORTS, sortIncidents } from '../../lib/sortIncidents'
 import { useIncidents } from '../../lib/incidentsStore'
 import { isUnviewed, rankOpenIncidents } from '../../lib/ranking'
 import { usePagination } from '../../lib/usePagination'
@@ -21,15 +22,17 @@ export default function QueuePage() {
   // Plain-language search (kept in the URL like Case history). Stats above always count the whole queue.
   const [params, setParams] = useSearchParams()
   const q = params.get('q') ?? ''
-  const setQ = (v: string) => {
+  const sort = params.get('sort') ?? ''
+  const setParam = (key: string, v: string) => {
     const next = new URLSearchParams(params)
-    if (v) next.set('q', v)
-    else next.delete('q')
+    if (v) next.set(key, v)
+    else next.delete(key)
     next.delete('page')
     setParams(next, { replace: true })
   }
+  const setQ = (v: string) => setParam('q', v)
   const search = useSmartSearch(queue, q)
-  const shown = search.results
+  const shown = sortIncidents(search.results, sort)
   const pager = usePagination(shown)
 
   const stats = [
@@ -58,6 +61,10 @@ export default function QueuePage() {
 
       <div className="filters">
         <SmartSearchBar value={q} onChange={setQ} onAsk={() => void search.runAi()} aiStatus={search.aiStatus} />
+        <select className="input" value={sort} onChange={(e) => setParam('sort', e.target.value)} aria-label="Sort by">
+          <option value="">Priority (new first)</option>
+          {Object.entries(SORTS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
         {q && <button type="button" className="btn" onClick={() => setQ('')}>Clear</button>}
       </div>
       {q && !loading && <p className="result-count">{shown.length} of {queue.length} open incidents</p>}
