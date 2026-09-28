@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
-import { recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { appendTranscriptLine, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { startMicCapture } from './audio.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { SILENT_OBSERVER_INSTRUCTION } from './persona.ts'
@@ -71,12 +71,42 @@ export async function startSilentObserver(
         if (typeof score === 'number') enqueueWrite(() => recordVoiceStress(db, incidentId, Math.max(0, Math.min(100, score))))
         break
       }
+      case 'report_caller_estimate': {
+        const ageGroup = args.ageGroup
+        const gender = args.gender
+        const AGE_GROUPS = ['child', 'teen', 'adult', 'elderly', 'unclear']
+        const GENDERS = ['male', 'female', 'unclear']
+        if (typeof ageGroup === 'string' && AGE_GROUPS.includes(ageGroup) && typeof gender === 'string' && GENDERS.includes(gender)) {
+          enqueueWrite(() => recordCallerEstimate(db, incidentId, {
+            ageGroup: ageGroup as 'child' | 'teen' | 'adult' | 'elderly' | 'unclear',
+            gender: gender as 'male' | 'female' | 'unclear',
+            confidence: typeof args.confidence === 'number' ? args.confidence : undefined,
+          }))
+        }
+        break
+      }
     }
+  }
+
+  // Speech-to-text arrives in word-sized fragments. Group them into one line per utterance (flushed after a short
+  // pause) and write each to the incident, so the dashboard's Conversation tab shows what the mic heard live.
+  let pending = ''
+  let flushTimer: ReturnType<typeof setTimeout> | null = null
+  const flushHeard = () => {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null }
+    const text = pending.trim()
+    pending = ''
+    if (text) enqueueWrite(() => appendTranscriptLine(db, incidentId, 'Caller', text))
   }
 
   const onMessage = (message: LiveServerMessage) => {
     const heard = message.serverContent?.inputTranscription?.text
-    if (heard) transcriptLines.push(heard)
+    if (heard) {
+      transcriptLines.push(heard)
+      pending += heard
+      if (flushTimer) clearTimeout(flushTimer)
+      flushTimer = setTimeout(flushHeard, 1500)
+    }
     const newHandle = message.sessionResumptionUpdate?.newHandle
     if (newHandle) resumptionHandle = newHandle
 
@@ -186,6 +216,7 @@ export async function startSilentObserver(
       if (ended) return
       ended = true
       finished = true
+      flushHeard()
       samplers.forEach((s) => s.stop())
       mic.stop()
       session.close()
