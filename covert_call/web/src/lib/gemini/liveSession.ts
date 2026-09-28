@@ -90,7 +90,7 @@ export async function startLiveCall(
   // whole line happens to be only one, since consecutive fragments get merged into the same line before this
   // would otherwise be checked. Previously leaked straight into the responder-facing conversation view looking
   // like Mia or the caller had spoken gibberish.
-  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silence|inaudible|noise|breathing|laughs?|sighs?)\s*[>}\])]/gi
+  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]|-{2,}/gi
   const appendTranscript = (speaker: string, rawText: string) => {
     const text = rawText.replace(NON_SPEECH_TOKEN, '')
     if (!text) return
@@ -108,6 +108,10 @@ export async function startLiveCall(
   const SPEAKING_LEVEL = 0.02
   let lastActivityAt = Date.now()
   let silentNudges = 0
+  // Set only once the caller has said they're being followed/chased or are on the move. Route guidance is gated on
+  // it: a caller hiding at home who describes the ATTACKER's bike was being routed to a police station.
+  let movementReported = false
+  const MOVEMENT = /follow|chas|stalk|on the move|moving around|abduct|taken somewhere|running|fleeing|in the road/i
   // True once anything dangerous has been reported this call (a weapon, a gunshot/scream heard, high urgency).
   // Silence after that point is a reason to stay connected, not the ordinary "no answer, end the call" case —
   // see the silence timer below and persona.ts's SILENCE section.
@@ -156,6 +160,7 @@ export async function startLiveCall(
         // Once real danger has been reported, going silent is a reason to STAY on the line, not hang up — see
         // the silence-timer guard below. Never reset back to false: danger doesn't un-happen mid-call.
         if (args.urgency === 'high' || (Array.isArray(args.dangerIndicators) && args.dangerIndicators.length)) dangerReported = true
+        if ([...(Array.isArray(args.dangerIndicators) ? args.dangerIndicators : []), args.notes].some((t) => typeof t === 'string' && MOVEMENT.test(t))) movementReported = true
         enqueueWrite(() => updateLiveFields(db, incidentId, patch))
         break
       }
@@ -166,7 +171,9 @@ export async function startLiveCall(
           return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
         }
         enqueueWrite(() => confirmAddress(db, incidentId, address))
-        return 'Saved. If they are being chased, followed or need to move, call get_route_guidance now and guide them to the police station/hospital it gives.'
+        return movementReported
+          ? 'Saved. They are on the move — call get_route_guidance now and guide them to the police station/hospital it gives.'
+          : 'Saved. Do NOT give directions — they have not said they are being followed or moving. Keep them safe where they are.'
       }
       case 'report_stress_level': {
         const score = args.score
@@ -276,6 +283,12 @@ export async function startLiveCall(
       // Route guidance needs a real answer (live GPS + routing), so it's answered once the tracker resolves.
       for (const call of routeCalls) {
         const args = (call.args ?? {}) as { situation?: string; landmark?: string }
+        // Mia's own situation text counts only if it says the CALLER is followed/chased/moving ("attacker on bike" doesn't).
+        if (args.situation && /follow|chas|stalk|running|fleeing|on the move/i.test(args.situation)) movementReported = true
+        if (!movementReported) {
+          void session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response: { output: 'NOT needed: the caller has not said they are being followed, chased or on the move. Do NOT give any directions or mention a route. A vehicle answer describes the ATTACKER, not the caller moving. If they are inside (home, a room), help them stay safe where they are. Only if they say they are being followed or need to move: report_situation with that, then call this again.' } }] })
+          continue
+        }
         void (tracker ? tracker.guidance(args.situation, args.landmark) : Promise.resolve('No GPS yet — ask for the nearest landmark.'))
           .catch(() => 'Routing is unavailable right now — ask for the nearest landmark and keep them moving somewhere busy and lit.')
           .then((output) => session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response: { output } }] }))
