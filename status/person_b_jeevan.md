@@ -181,17 +181,25 @@ refactoring shared code out of web.
    native build**, so please shout if you plan to. Editing their contents is fine and needs nothing from us —
    native picks it up automatically.
 
-2. **Dashboard, small fix needed in your area (I did not touch it):**
-   `dashboard/src/components/CallRecordingPlayer.tsx` maps the recording's mimeType to a download extension and
-   falls back to `webm`. Native records **`audio/wav`** (no audio encoder is available on React Native, so the
-   mic and Mia's replies are mixed in JS and written as WAV). Playback still works — the browser sniffs the data
-   URL — but the **download filename gets `.webm` for a WAV file**. One extra branch alongside the existing
-   `ogg`/`mp4` cases fixes it.
+2. **Dashboard — one line changed in your area, with Ameen's go-ahead (commit `df48d74`).**
+   `dashboard/src/components/CallRecordingPlayer.tsx` mapped an unrecognised mimeType to a `.webm` download
+   name. Native records **`audio/wav`** (React Native has no audio encoder available, so the mic and Mia's
+   replies are mixed in JS and written as WAV), so its recordings downloaded mislabelled. Playback was always
+   fine. Added a `wav` branch beside the existing `ogg`/`mp4` ones — nothing else in the dashboard was touched.
+   Heads-up in case you have that file open.
 
-3. **Native SOS is audio-only for now.** No camera feeds are published from the phone yet, so for a
-   native-raised SOS the dashboard's live-video tiles and camera-sourced observations simply won't appear
-   (sound observations, stress trend and caller estimate all do). Camera is the next phase and needs a native
-   frame source, because WebRTC holds the camera for the live feed and React Native has no canvas to sample it.
+3. **Live video from the phone now works — your viewer needs no changes.** The call publishes the back
+   camera and the SOS publishes every camera it can open (falling back to back-only and reporting the same
+   `cameraMode` you already handle). The streams come from `react-native-webrtc`, which is exactly what
+   `shared/video/publisher.ts` expects, so that file and the dashboard side are used completely unchanged.
+   Two caveats worth knowing when you see a native case:
+   - **No camera-sourced scene observations yet.** Gemini can hear but not see on native: sampling ~1 fps JPEGs
+     out of a WebRTC track needs a native frame source React Native doesn't provide. Sound observations, the
+     stress trend and the caller estimate all work.
+   - **No frozen-camera check.** The web compares two canvas samples to drop a camera that opened but produces
+     no frames; there's no canvas on RN, so a native SOS could show a stalled second tile rather than dropping
+     it. Worth knowing before you chase it as a dashboard bug.
+   - **No video recordings to Drive from native yet** — audio only. Same missing native piece.
 
 **Status: unrun on a device.** It typechecks and Metro bundles it, and I verified the bundle contains the right
 Gemini build (the cross-platform one throws on `live.connect()`; the web one is what's bundled). But nothing
