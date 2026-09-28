@@ -156,6 +156,17 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
 ## Notes for Ameen (Person A)
+- **2026-09-28: user wants full parity — native mobile app should have every feature the web app has, including the actual Gemini Live call.** Right now native has none of it: `covert_call/native/src/lib/nativeCall.ts` is a documented stub (`startNativeCall` throws immediately), and `CallScreen.tsx` is a timer-only placeholder with no audio/video wired up. This is your area (Gemini Live + persona wiring) — flagging it for you rather than starting it myself. Scoping notes from checking the repo:
+  - **What's already shared and needs no porting:** everything under `covert_call/shared/` (geocode, severity, nav/routing, incidents client + types) — both apps import these unchanged, so every fix from this week's testing session already applies to native the moment the call feature exists.
+  - **What's missing, per `nativeCall.ts`'s own plan:**
+    1. Mic capture as raw 16kHz PCM16 — no Web Audio API on RN; needs a native audio module (the file suggests `@dr.pogodin/react-native-audio-api` or a LiveAudioStream-style lib). Not in `package.json` yet.
+    2. Playback of the model's 24kHz PCM16 response — same library, output side.
+    3. ~1fps camera frames via `react-native-vision-camera` (not installed yet) for the scene-observation feature.
+    4. Live video/WebRTC — `react-native-webrtc` is already installed and `registerGlobals()` is already called, so `shared/video/publisher.ts` should work with no changes.
+    5. Drive recording upload — same Apps Script endpoint as web, just needs `EXPO_PUBLIC_DRIVE_UPLOAD_URL` instead of `VITE_DRIVE_UPLOAD_URL`.
+  - **The Gemini Live session itself (`@google/genai`), the persona, the tools, and every `shared/incidents` write in `web/src/lib/gemini/liveSession.ts` are meant to be reused as-is** — worth confirming early that `@google/genai`'s SDK actually works under React Native's JS runtime (it likely assumes browser `WebSocket`/`fetch` globals, which Hermes/RN mostly but not always provides identically) before wiring the rest around it.
+  - Needs a dev-client rebuild (`expo prebuild` + new native modules), not just a JS/Metro change — can't be tested in Expo Go.
+  - I added a mandatory rule to root `CLAUDE.md` ("web/native parity") so this gets checked on every future change to the call/persona logic once you've built it.
 - **2026-09-26 ~21:30 IST: live-call testing fixes, all deployed (web + dashboard + Firestore rules), branch `phase-3-epic-16-decision-support`, not pushed yet.** Web/persona changes need your review:
   - **Persona (`persona.ts`):** call `confirm_address` the moment the caller mentions any place, and again for every new landmark; call `get_route_guidance` with each reported landmark; answer the question the caller actually asked (e.g. "any shop nearby?") instead of repeating the standing instruction; say a warm goodbye before `end_call`.
   - **`liveSession.ts`:** `end_call` now waits for the goodbye audio to finish playing (it used to cut off after a fixed 4 s); `<no speech>` / `{pause}` transcription tokens are stripped out of the transcript.
