@@ -30,6 +30,11 @@ type LiveCallCallbacks = {
   // Fired when the model calls end_call (Story: auto-end once the caller confirms, or after 3 silent retries) —
   // the page reacts to this the same way it reacts to the user pressing the End button.
   onCallEnd: () => void
+  // Fired when the connection drops and every reconnect attempt has failed (or failed before ever getting a
+  // resumption handle) — a genuine, unrecoverable disconnection, distinct from a normal hangup. The page must
+  // still close out the incident (save the recording, run consolidation, mark it ended) exactly as if the caller
+  // had said goodbye, since otherwise it's left stuck 'active' forever with nothing telling a responder why.
+  onCallDropped: () => void
 }
 
 // Opens a Gemini Live session for the disguised call, streams the mic to it, plays the response back, and wires
@@ -321,10 +326,14 @@ export async function startLiveCall(
         ...(USE_PLAIN_LIVE ? {} : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
         systemInstruction: PERSONA_SYSTEM_INSTRUCTION,
         tools: LIVE_CALL_TOOLS,
-        // Only for video calls (Epic 10): compression stretches the shorter audio+video session, and resumption
-        // lets us reopen it if it drops. Audio-only calls keep the exact proven config, so their behaviour is
-        // unchanged. `resume` carries the handle from a previous session when reconnecting.
-        ...(useVideo ? { contextWindowCompression: { slidingWindow: {} }, sessionResumption: resume ? { handle: resume } : {} } : {}),
+        // Session resumption lets a dropped connection (bad signal, a backgrounded tab, a network blip) reopen
+        // transparently instead of silently ending the call — this used to be video-only, but a dropped
+        // audio-only call is the far more common real case and previously had NO reconnect at all: onclose just
+        // fired 'ended' straight away with no attempt to call back. `resume` carries the handle when reconnecting.
+        sessionResumption: resume ? { handle: resume } : {},
+        // Compression genuinely only matters for video (a shorter session cap with audio+video together); keep
+        // audio-only calls on the exact proven config otherwise.
+        ...(useVideo ? { contextWindowCompression: { slidingWindow: {} } } : {}),
       },
       callbacks: {
         // onopen can fire before `client.live.connect()`'s own promise resolves and assigns `session` below —
@@ -338,17 +347,33 @@ export async function startLiveCall(
         },
         onclose: (e) => {
           console.warn('[QuickBite call] Gemini Live closed:', e?.code, e?.reason)
-          // A video session that drops before the call is done and still has a resumption handle is reopened
-          // transparently, so the caller never sees the call end mid-conversation.
-          if (!finished && useVideo && resumptionHandle && reconnects < MAX_RECONNECTS) {
+          // A session that drops before the caller has actually ended the call and still has a resumption
+          // handle is reopened transparently — audio-only calls now get this too (see sessionResumption above),
+          // since a dropped connection with nobody calling back is exactly the failure this feature exists for.
+          if (!finished && resumptionHandle && reconnects < MAX_RECONNECTS) {
             reconnects += 1
             callbacks.onStatusChange('connecting')
             void openSession(resumptionHandle)
-              .then((s) => { session = s })
-              .catch(() => callbacks.onStatusChange('ended'))
+              .then((s) => {
+                session = s
+                // Reconnecting mid-conversation needs a nudge (the model has no memory of "we just reconnected")
+                // so Mia picks the thread back up instead of greeting the caller again as if this were a new call.
+                s.sendClientContent({
+                  turns: '(System note, not the caller: the connection dropped briefly and has just reconnected. Do NOT greet them again or restart the call — say one short line like "sorry, I lost you for a second — are you still there?" and continue exactly where you left off.)',
+                })
+              })
+              .catch(() => {
+                if (!finished) callbacks.onCallDropped()
+              })
             return
           }
-          if (!finished) callbacks.onStatusChange('ended')
+          // Ran out of reconnect attempts, or there was no resumption handle yet (the drop happened before the
+          // first server message arrived) — this is a real, unrecoverable disconnection, not a normal hangup.
+          // Previously this just flipped local UI state to 'ended' with nothing telling CallPage to actually
+          // close out the incident: the recording was never saved, consolidation never ran, and the incident
+          // stayed callState:'active' on Firestore forever with no way for a responder to tell a genuine drop
+          // apart from a call that's merely gone quiet.
+          if (!finished) callbacks.onCallDropped()
         },
       },
     })
