@@ -363,16 +363,23 @@ Derived from `docs/quickbite_plan.md` (authoritative plan — refer there for fu
   - Time-sliced alternating fallback — native only (Epic 12); web uses dual-or-back-only
   - [x] Capability detected at SOS start; `cameraMode` recorded
 - [x] No preview/flash/shutter from either camera; OS camera indicator disclosed as unavoidable
-- [x] Three taps in the top-left corner (within 1.5s) end the SOS, stop everything, and `zeroTraceExit()` home
+- [x] Three taps anywhere on the screen (within 1.5s) end the SOS, stop everything, and `zeroTraceExit()` home. Every teardown step is time-capped (consolidation 8s), so the exit can't hang
 - [ ] Test in a dark room for any visible light/flicker — pending manual test
 
 ### User Story 11.3
 **As a responder, I want the AI to watch and listen to the silent SOS and fill in the incident live, so that I know what is happening even though nobody is talking to me.**
-- [x] `silentSession.ts`: mic + ~1 fps frames from both cameras in, TEXT response modality so nothing is ever played into the room
+- [x] `silentSession.ts`: mic + ~1 fps frames from both cameras in. AUDIO response modality (`gemini-3.8-live` rejects TEXT with close 1007); the model's audio is never played, so nothing is heard in the room
 - [x] `SILENT_OBSERVER_INSTRUCTION` covers captor/hostage counts, weapons, injuries, overheard names/demands, background sounds, location clues, changes over time; uses `report_situation`/`report_scene_observation`/`report_stress_level`
 - [x] Both cameras stream live to the dashboard (switchable Back/Front) and both are recorded to Drive (one file per camera)
 - [x] Compression + session resumption + auto-reconnect in `silentSession.ts`
 - [x] Consolidation + leakage check run on SOS end, same as a call
+- [x] Reconnects after idle closes even without a resumption handle (a quiet SOS idles out early); counter resets on each reopen
+- [x] What the mic hears is written live to `transcriptLines` (one line per utterance), so the dashboard Conversation tab fills during the SOS
+- [x] `report_caller_estimate` handled (caller age/gender estimate in the bulletin)
+- [x] Mic-only listen-in feed published, so the dashboard's live audio panel works for SOS
+- [x] Mic audio is recorded inside each camera's Drive file (no separate audio file); files go in one Drive subfolder per incident. Verified 2026-09-28: `back.webm` plays with audio (Drive's preview can't play it, so download it first). Dashboard notes this under Evidence recordings
+- [x] Verified end to end on desktop (INC-MUL29YGP, INC-MUL2NRUT): threats, weapon, headcount, voice stress, transcript, bulletin
+- [ ] Test on a real iPhone — pending
 
 ---
 

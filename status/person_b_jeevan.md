@@ -365,3 +365,7 @@ Confirmed working on a real test (INC-MUL29YGP): distress sounds, threat indicat
 
 User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camera," no audio row, despite full voice detection (transcript, stress 90) working. Checked: this is expected, not a bug — a silent SOS never gets a separate `audioRecording` (that's a call-only field, set by `CallPage.tsx`); the mic's audio track is muxed directly into each camera's `MediaStream` before recording (`SosPage.tsx`), so the voice is inside the "Back camera" file already. Just wasn't obvious from the panel. Added a one-line note in `SidePanel.tsx`'s Evidence recordings section for `silent-sos` incidents explaining the voice is inside the camera recording(s). Dashboard redeployed.
 - 2026-09-28 (IST, ~16:00): Checked on INC-MUL2NRUT: the downloaded `back.webm` plays with audio, so the SOS recording has sound. Drive's own preview can't handle browser-recorded webm (it shows a clapperboard icon), so download the file to play it.
+- 2026-09-28 (IST, ~16:10): Updated `covert_call/docs/backlog.md` Epic 11:
+  - 11.2: exit gesture is now three taps anywhere
+  - 11.3: switched to AUDIO modality; added reconnect, live transcript, caller estimate, listen-in feed, Drive subfolders and the audio-in-video check. Real iPhone test is still open.
+  - Committed the SidePanel SOS recording note (it was deployed earlier but hadn't been committed).
