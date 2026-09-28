@@ -135,8 +135,15 @@ export async function startSilentObserver(
   // Nudge it to start observing immediately.
   session.sendClientContent({ turns: 'A silent SOS has started. Begin observing and reporting through tools now.' })
 
+  let ended = false
   return {
     end: async () => {
+      // end() can be called twice in quick succession (e.g. a fast double-tap on the exit gesture, or a second
+      // trigger racing the first) — session.close() on an already-closing socket spams "WebSocket is already in
+      // CLOSING or CLOSED state" into the console for every subsequent chunk still in flight. Guard so the real
+      // teardown only ever runs once.
+      if (ended) return
+      ended = true
       finished = true
       samplers.forEach((s) => s.stop())
       mic.stop()

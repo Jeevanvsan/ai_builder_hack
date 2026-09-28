@@ -1270,12 +1270,3 @@ img {
   user-select: none;
   cursor: default;
 }
-.sos-exit-hotspot {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 84px;
-  height: 84px;
-  /* Invisible; only the person who knows the gesture uses it. */
-  background: transparent;
-}
