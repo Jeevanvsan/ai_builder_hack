@@ -18,6 +18,12 @@ import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/vid
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
 
+// Caps a slow/hung best-effort step (an AI call with no timeout of its own) so it can never block the rest of
+// call teardown — see the call site for what this fixed.
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([p, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))])
+}
+
 const STATUS_LABEL: Record<CallStatus, string> = {
   connecting: 'Connecting…',
   live: 'Connected',
@@ -156,40 +162,48 @@ export function CallPage() {
     }
 
     if (id) {
+      // Every step below is best-effort AI/network work with no timeout of its own — a hung or very slow request
+      // (bad connection, quota, a stalled retry) previously blocked this whole block from ever finishing, which
+      // blocked zeroTraceExit() at the end of this function from ever running: the caller's screen stayed stuck
+      // on "ending call" no matter how many times they pressed End, since finishCall() awaits this in sequence.
+      // The recording and every live-extracted field are already saved regardless of whether this finishes, so
+      // capping it at 8s (generous for two Gemini calls including one retry) can only help, never lose data.
       try {
-        const snap = await getDoc(doc(db, INCIDENTS, id))
-        const incident = snap.data() as Omit<Incident, 'id'> | undefined
-        const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
-        const stressTrend = incident?.voiceStressTrend ?? []
-        const address = incident?.location.confirmed?.address ?? null
+        await withTimeout((async () => {
+          const snap = await getDoc(doc(db, INCIDENTS, id))
+          const incident = snap.data() as Omit<Incident, 'id'> | undefined
+          const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
+          const stressTrend = incident?.voiceStressTrend ?? []
+          const address = incident?.location.confirmed?.address ?? null
 
-        // Retry once on failure (a transient network blip or rate limit shouldn't permanently lose the case
-        // summary) before giving up and flagging it for the dashboard. One request now covers both the case
-        // summary/bulletin and the privacy (leakage) check — was two separate model calls on the same
-        // transcript, which needlessly doubled how often a single call could hit the shared free-tier rate limit.
-        const withRetry = <T,>(fn: () => Promise<T>) => fn().catch(() => fn())
-        try {
-          const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address))
-          await Promise.all([
-            consolidateIncident(db, id, consolidation),
-            recordLeakageCheck(db, id, consolidation.redactions),
-          ])
-        } catch (e) {
-          console.error('[QuickBite call] consolidation failed after retry:', e)
-          await updateDoc(doc(db, INCIDENTS, id), { consolidationFailed: true }).catch(() => {})
-        }
+          // Retry once on failure (a transient network blip or rate limit shouldn't permanently lose the case
+          // summary) before giving up and flagging it for the dashboard. One request now covers both the case
+          // summary/bulletin and the privacy (leakage) check — was two separate model calls on the same
+          // transcript, which needlessly doubled how often a single call could hit the shared free-tier rate limit.
+          const withRetry = <T,>(fn: () => Promise<T>) => fn().catch(() => fn())
+          try {
+            const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address))
+            await Promise.all([
+              consolidateIncident(db, id, consolidation),
+              recordLeakageCheck(db, id, consolidation.redactions),
+            ])
+          } catch (e) {
+            console.error('[QuickBite call] consolidation failed after retry:', e)
+            await updateDoc(doc(db, INCIDENTS, id), { consolidationFailed: true }).catch(() => {})
+          }
 
-        if (address) {
-          void groundedLocationContext(address).then((context) => {
-            if (context) void recordGroundedContext(db, id, context)
-          })
-        }
+          if (address) {
+            void groundedLocationContext(address).then((context) => {
+              if (context) void recordGroundedContext(db, id, context)
+            })
+          }
 
-        if (incident) {
-          void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
-            if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
-          })
-        }
+          if (incident) {
+            void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
+              if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
+            })
+          }
+        })(), 8000)
       } catch {
         // Best-effort: the incident's live-extracted fields are already saved even if consolidation/leakage
         // check fails here (e.g. no key configured) — a responder still sees everything gathered during the call.
