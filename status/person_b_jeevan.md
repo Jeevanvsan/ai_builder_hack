@@ -369,3 +369,8 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
   - 11.2: exit gesture is now three taps anywhere
   - 11.3: switched to AUDIO modality; added reconnect, live transcript, caller estimate, listen-in feed, Drive subfolders and the audio-in-video check. Real iPhone test is still open.
   - Committed the SidePanel SOS recording note (it was deployed earlier but hadn't been committed).
+- 2026-09-28 (IST, ~16:40), branch `feature/nl-incident-search` (created from `phase-3-epic-16-decision-support`): **plain-language incident search** in the Live queue and Case history.
+  - Typing filters instantly with no AI call. It matches summary, danger tags, what was seen/heard, transcript, bulletin, address and caller estimate, and uses synonyms ("woman hit with a hammer" finds "female" + "weapon: hammer"). A case needs to match at least half the words.
+  - Enter or **Ask AI** sends short case digests to `gemini-3.5-flash-lite`, which returns matching cases ranked, each with a one-line reason shown on the row. If the AI fails (e.g. quota), the keyword results stay.
+  - Queue stats still count the whole queue. The query is kept in the URL.
+  - Files: `dashboard/src/lib/nlSearch.ts`, `dashboard/src/components/SmartSearch.tsx`, `QueuePage.tsx`, `HistoryPage.tsx`, `index.css`. Dashboard redeployed. Dashboard-only, nothing to port.

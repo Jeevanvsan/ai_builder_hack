@@ -1,9 +1,10 @@
 import { motion } from 'motion/react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Chip from '../../components/Chip'
 import StressMeter from '../../components/StressMeter'
 import DataState from '../../components/DataState'
 import Pagination from '../../components/Pagination'
+import SmartSearchBar, { useSmartSearch } from '../../components/SmartSearch'
 import { useIncidents } from '../../lib/incidentsStore'
 import { isUnviewed, rankOpenIncidents } from '../../lib/ranking'
 import { usePagination } from '../../lib/usePagination'
@@ -17,7 +18,19 @@ export default function QueuePage() {
   const navigate = useNavigate()
   const { data, loading, error } = useIncidents('open')
   const queue = rankOpenIncidents(data)
-  const pager = usePagination(queue)
+  // Plain-language search (kept in the URL like Case history). Stats above always count the whole queue.
+  const [params, setParams] = useSearchParams()
+  const q = params.get('q') ?? ''
+  const setQ = (v: string) => {
+    const next = new URLSearchParams(params)
+    if (v) next.set('q', v)
+    else next.delete('q')
+    next.delete('page')
+    setParams(next, { replace: true })
+  }
+  const search = useSmartSearch(queue, q)
+  const shown = search.results
+  const pager = usePagination(shown)
 
   const stats = [
     { label: 'Not yet opened', value: queue.filter(isUnviewed).length, tone: 'new' },
@@ -43,10 +56,18 @@ export default function QueuePage() {
         ))}
       </div>
 
+      <div className="filters">
+        <SmartSearchBar value={q} onChange={setQ} onAsk={() => void search.runAi()} aiStatus={search.aiStatus} />
+        {q && <button type="button" className="btn" onClick={() => setQ('')}>Clear</button>}
+      </div>
+      {q && !loading && <p className="result-count">{shown.length} of {queue.length} open incidents</p>}
+
       {loading || error ? (
         <DataState loading={loading} error={error} />
       ) : queue.length === 0 ? (
         <div className="card empty">No open incidents.</div>
+      ) : shown.length === 0 ? (
+        <div className="card empty">No open incidents match this description.</div>
       ) : (
         <>
           <div className="incident-feed">
@@ -76,6 +97,7 @@ export default function QueuePage() {
                       {channelLabel(i.channel)}
                       {i.incidentType === 'sos' && <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>}
                     </span>
+                    {search.reasons.get(i.id) && <span className="search-reason">AI: {search.reasons.get(i.id)}</span>}
                   </div>
                   <div className="row-cell row-state">
                     {i.callState === 'active' ? <span className="live"><span className="live-dot" />Live</span> : <span className="muted-inline">Ended</span>}
