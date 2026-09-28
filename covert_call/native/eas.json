@@ -1,17 +1,23 @@
 {
   "cli": { "version": ">= 12.0.0", "appVersionSource": "remote" },
+  "//": "Cloud builds do NOT read native/.env.local. Push the same values once per environment before building: npx eas-cli env:push --environment preview --path .env.local",
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
+      "environment": "development",
       "android": { "buildType": "apk" }
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" },
-      "env": {}
+      "channel": "preview",
+      "environment": "preview",
+      "android": { "buildType": "apk" }
     },
     "production": {
+      "channel": "production",
+      "environment": "production",
       "android": { "buildType": "app-bundle" }
     }
   },

@@ -1,5 +1,6 @@
 import { registerRootComponent } from 'expo'
 import App from './App'
+import { installGeolocation } from './src/lib/platform/geolocation'
 
 // react-native-webrtc's globals must be registered before any peer connection (Epic 9/11 native path). Its native
 // module isn't present in Expo Go, so guard the call: this lets the app boot from an Expo Go QR for testing the
@@ -10,5 +11,10 @@ try {
 } catch {
   console.warn('[QuickBite] react-native-webrtc not available (Expo Go?) — live video is disabled in this build.')
 }
+
+// navigator.geolocation doesn't exist on React Native. shared/incidents/location.ts and the live route guidance
+// both read it, and both are reused from the web unchanged — install the expo-location backing before any screen
+// mounts, or every incident silently falls back to a city-level IP fix.
+installGeolocation()
 
 registerRootComponent(App)
