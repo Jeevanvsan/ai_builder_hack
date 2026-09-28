@@ -30,9 +30,14 @@ export default function CallRecordingPlayer({ incidentId }: { incidentId: string
   if (loading) return <p className="muted">Loading recording…</p>
   if (error || !recording) return <p className="muted">Recording couldn't be loaded.</p>
 
+  const src = `data:${recording.mimeType};base64,${recording.base64}`
+  const ext = recording.mimeType.includes('ogg') ? 'ogg' : recording.mimeType.includes('mp4') ? 'm4a' : 'webm'
   return (
-    <audio controls src={`data:${recording.mimeType};base64,${recording.base64}`} className="recording-player">
-      Your browser doesn't support audio playback.
-    </audio>
+    <div className="recording-row">
+      <audio controls src={src} className="recording-player">
+        Your browser doesn't support audio playback.
+      </audio>
+      <a className="btn btn-secondary recording-download" href={src} download={`${incidentId}-call.${ext}`}>Download</a>
+    </div>
   )
 }

@@ -101,7 +101,8 @@ export function computeIncidentAnalytics(incidents: Incident[]): IncidentAnalyti
     const peopleKey = people === null ? 'Unknown' : people >= 5 ? '5+' : String(people)
     peopleCounts.set(peopleKey, (peopleCounts.get(peopleKey) ?? 0) + 1)
 
-    const spot = i.location.confirmed ?? i.location.rough
+    const c = i.location.confirmed
+    const spot = (c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null) ?? i.location.rough
     if (spot) {
       points.push({ id: i.id, lat: spot.lat, lng: spot.lng, severity: i.severity, label: i.id })
 

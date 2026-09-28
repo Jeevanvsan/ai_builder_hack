@@ -46,6 +46,24 @@ export const REPORT_STRESS_LEVEL: FunctionDeclaration = {
   },
 }
 
+export const REPORT_CALLER_ESTIMATE: FunctionDeclaration = {
+  name: 'report_caller_estimate',
+  description:
+    "Report your best rough guess of the caller's approximate age group and gender, from their voice (and camera " +
+    'image if visible) — NOT something the caller stated. This is only ever a rough estimate a responder should ' +
+    'treat as unconfirmed, useful mainly to flag a child or elderly caller (different urgency/handling). Call it ' +
+    'once, early in the call, as soon as you have a reasonable impression — do not ask the caller about it.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      ageGroup: { type: Type.STRING, enum: ['child', 'teen', 'adult', 'elderly', 'unclear'], description: 'Rough age bracket' },
+      gender: { type: Type.STRING, enum: ['male', 'female', 'unclear'], description: "Rough guess of the caller's gender, from voice/appearance" },
+      confidence: { type: Type.NUMBER, description: '0-100 how sure you are — usually low-to-moderate for this' },
+    },
+    required: ['ageGroup', 'gender'],
+  },
+}
+
 export const REPORT_SCENE_OBSERVATION: FunctionDeclaration = {
   name: 'report_scene_observation',
   description:
@@ -79,6 +97,22 @@ export const REPORT_ADVICE: FunctionDeclaration = {
   },
 }
 
+export const GET_ROUTE_GUIDANCE: FunctionDeclaration = {
+  name: 'get_route_guidance',
+  description:
+    "Get live turn-by-turn directions from the caller's current GPS position to the best place of safety (police for " +
+    'chasing/threats, hospital for injury, fire station for fire). Call it when the caller is being chased, is moving, ' +
+    'is in the road, or is unsafe where they are, and again whenever they say they reached a junction or landmark. ' +
+    'Returns the destination, distance, and the next instruction.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      situation: { type: Type.STRING, description: 'Short reason, e.g. "being chased by a car", "injured", "fire nearby"' },
+      landmark: { type: Type.STRING, description: 'Where the caller says they are now, e.g. "at a junction near a petrol pump"' },
+    },
+  },
+}
+
 export const END_CALL: FunctionDeclaration = {
   name: 'end_call',
   description: 'Call this the moment you finish your closing line (e.g. "your order\'s on its way, thanks for calling") — after the caller has confirmed they\'re done, whether that means they gave a clear closing signal or you\'ve gathered what you reasonably can. This actually ends the call, so only call it once you are done speaking.',
@@ -86,11 +120,11 @@ export const END_CALL: FunctionDeclaration = {
 }
 
 export const LIVE_CALL_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_ADVICE, END_CALL] },
+  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_ADVICE, GET_ROUTE_GUIDANCE, END_CALL] },
 ]
 
 // Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools
 // (no address confirmation, no end_call — the person ends the SOS with the secret gesture).
 export const REPORT_SCENE_OBSERVATION_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION] },
+  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE] },
 ]

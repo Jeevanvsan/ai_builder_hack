@@ -7,6 +7,8 @@ import {
   upsertVideoRecording,
   consolidateIncident,
   recordLeakageCheck,
+  recordGroundedContext,
+  recordCorrelatedIncidents,
   INCIDENTS,
 } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
@@ -17,13 +19,22 @@ import { startSilentObserver, type SilentObserverHandle } from '../lib/gemini/si
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { consolidateCall } from '../lib/gemini/consolidate'
-import { runLeakageCheck } from '../lib/gemini/leakageCheck'
+import { groundedLocationContext } from '../lib/gemini/groundedContext'
+import { findCorrelatedIncidents } from '../lib/gemini/correlate'
 import { zeroTraceExit } from '../lib/gemini/exit'
+
+// Caps any single teardown step so leaving the SOS screen can never hang: a MediaRecorder stuck in 'recording'
+// state (camera killed by the OS, permission revoked mid-session) or a Gemini Live session slow to close would
+// otherwise block the whole exit gesture forever, since it awaits each step in sequence before navigating away.
+const TEARDOWN_STEP_TIMEOUT_MS = 3000
+function withTimeout<T>(p: Promise<T>, fallback: T, ms = TEARDOWN_STEP_TIMEOUT_MS): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))])
+}
 
 // The silent SOS screen (Epic 11). Reached ONLY by double-tapping the heart on the home screen. It shows a
 // full-black "the phone is off" overlay while it silently records both cameras + the mic, streams the back camera
 // to the dashboard, and lets a silent Gemini observer build the incident. The person leaves with a secret gesture:
-// three taps in the top-left corner.
+// three taps anywhere on the screen.
 export function SosPage() {
   const navigate = useNavigate()
   const startedRef = useRef(false)
@@ -37,7 +48,7 @@ export function SosPage() {
   const streamsRef = useRef<MediaStream[]>([])
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
 
-  // Secret exit: three taps in the top-left corner within 1.5s.
+  // Secret exit: three taps anywhere on the screen within 1.5s.
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -74,19 +85,38 @@ export function SosPage() {
             micStream: media.mic,
             videoStreams: media.cameras.map((c) => c.stream),
           })
-        } catch {
-          // No AI observer (e.g. no key) — the live feed and recordings still run.
+        } catch (e) {
+          // This previously swallowed EVERY possible failure (bad/missing key, quota, malformed config, network)
+          // with zero logging anywhere — the single biggest reason repeated SOS tests showed "no transcript, no
+          // observations" with no way to tell why. Now surfaced loudly so the real cause is visible next time.
+          console.error('[QuickBite SOS] silent observer failed to start — no AI observation this session:', e)
+        }
+      } else {
+        console.warn('[QuickBite SOS] no mic stream acquired — silent observer was never started')
+      }
+
+      // Live listen-in audio for the responder (same mic-only feed the voice call publishes). Stopped with the
+      // camera publishers on exit.
+      if (media.mic) {
+        try {
+          const stop = await startVideoPublisher(db, id, new MediaStream(media.mic.getAudioTracks()), { camera: 'mic' })
+          publisherStopsRef.current.push(stop)
+        } catch (e) {
+          console.error('[QuickBite SOS] live listen-in audio publisher failed:', e)
         }
       }
 
       // Live video to the dashboard: publish EVERY camera so a responder can switch between front and back (Epic
       // 11 / 14.2). Each camera signals independently under its own feed.
+      console.log(`[QuickBite SOS] cameras that passed the frame check and will be published: ${media.cameras.map((c) => c.facing).join(', ') || 'none'}`)
       for (const cam of media.cameras) {
         try {
           const stop = await startVideoPublisher(db, id, videoOnly(cam.stream), { camera: cam.facing })
           publisherStopsRef.current.push(stop)
-        } catch {
-          // Blocked WebRTC for one camera just means no live feed for it; the others still stream.
+        } catch (e) {
+          // Blocked WebRTC for one camera just means no live feed for it; the others still stream. Previously
+          // silent — now logged, since "which camera failed and why" was invisible in every prior test.
+          console.error(`[QuickBite SOS] live feed publisher failed for ${cam.facing} camera:`, e)
         }
       }
 
@@ -118,27 +148,53 @@ export function SosPage() {
 
     if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
     // Stop the Drive recorders while the camera tracks are still live, then kick off uploads in the background.
-    const recordings = await Promise.all(
-      recordersRef.current.map(async ({ facing, rec }) => ({ facing, blob: await rec.stop(), mimeType: rec.mimeType })),
-    )
+    // Each recorder's own stop() now has an internal timeout too (videoRecorder.ts) — this outer one is defence in
+    // depth so a single stuck recorder can't hold up the others or the rest of the exit sequence.
     const transcript = observerRef.current?.getTranscript() ?? ''
-    await observerRef.current?.end()
-    await Promise.all(publisherStopsRef.current.map((stop) => stop().catch(() => {})))
+    const recordings = await withTimeout(
+      Promise.all(recordersRef.current.map(async ({ facing, rec }) => ({ facing, blob: await rec.stop(), mimeType: rec.mimeType }))),
+      recordersRef.current.map(({ facing, rec }) => ({ facing, blob: null, mimeType: rec.mimeType })),
+    )
+    // observer.end() closes the Gemini Live session — confirmed hang risk if the session's own close() is slow or
+    // the socket is already in a bad state (see silentSession.ts's onclose reconnect handling).
+    await withTimeout(observerRef.current?.end() ?? Promise.resolve(), undefined)
+    await withTimeout(Promise.all(publisherStopsRef.current.map((stop) => stop().catch(() => {}))), [])
     streamsRef.current.forEach((s) => s.getTracks().forEach((t) => t.stop()))
     await wakeLockRef.current?.release().catch(() => {})
 
     if (id) {
-      // Consolidate + leakage-check, same as a call end (best-effort).
+      // Consolidate (case summary/bulletin + the leakage/privacy check, one request), same as a call end
+      // (best-effort). This is a real network call to Gemini with NO timeout of its own — a slow/hung request
+      // here previously blocked zeroTraceExit() from ever running, leaving the black screen stuck no matter how
+      // many times the exit gesture fired (all the teardown-step timeouts above only guard steps BEFORE this
+      // block). Capped at 8s so a slow AI call can never hold the exit hostage; the recording and every
+      // live-extracted field are already saved regardless of whether this finishes.
       try {
-        const snap = await getDoc(doc(db, INCIDENTS, id))
-        const incident = snap.data() as Omit<Incident, 'id'> | undefined
-        const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
-        const stressTrend = incident?.voiceStressTrend ?? []
-        const [consolidation, redactions] = await Promise.all([
-          consolidateCall(transcript, fields, stressTrend),
-          runLeakageCheck(transcript),
-        ])
-        await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, redactions)])
+        await withTimeout(
+          (async () => {
+            const snap = await getDoc(doc(db, INCIDENTS, id))
+            const incident = snap.data() as Omit<Incident, 'id'> | undefined
+            const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
+            const stressTrend = incident?.voiceStressTrend ?? []
+            const address = incident?.location.confirmed?.address ?? null
+            const consolidation = await consolidateCall(transcript, fields, stressTrend, address)
+            await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, consolidation.redactions)])
+
+            if (address) {
+              void groundedLocationContext(address).then((context) => {
+                if (context) void recordGroundedContext(db, id, context)
+              })
+            }
+
+            if (incident) {
+              void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
+                if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
+              })
+            }
+          })(),
+          undefined,
+          8000,
+        )
       } catch {
         // Best-effort: the live-extracted fields are already saved.
       }
@@ -167,7 +223,10 @@ export function SosPage() {
     }
   }
 
-  const onCornerTap = () => {
+  // Three taps ANYWHERE on the screen, within 1.5s of each other, end the SOS. onPointerDown covers touch, mouse
+  // and pen uniformly, and the whole overlay (not just a corner) listens, so the gesture works no matter where on
+  // the dead-looking black screen the person taps.
+  const onExitTap = () => {
     tapCountRef.current += 1
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current)
     if (tapCountRef.current >= 3) {
@@ -178,15 +237,11 @@ export function SosPage() {
     tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 1500)
   }
 
-  // The whole screen is black and swallows touches so nothing shows the phone is active; only the hidden
-  // top-left corner responds, and only to the three-tap exit.
   return (
     <div
       className="sos-blackout"
-      onPointerDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => { e.preventDefault(); onExitTap() }}
       onContextMenu={(e) => e.preventDefault()}
-    >
-      <div className="sos-exit-hotspot" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onCornerTap() }} />
-    </div>
+    />
   )
 }

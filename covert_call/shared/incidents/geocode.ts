@@ -7,17 +7,35 @@ async function viaGoogle(address: string, key: string): Promise<Coordinates | nu
   return loc ? { lat: loc.lat, lng: loc.lng } : null
 }
 
+// Nominatim's place_rank is coarser the bigger the area: countries/states are ~4-8, districts ~10-12, a
+// town/city/village lands at 14+, a street or POI higher still. A district-or-larger "hit" is a real place, but
+// its lat/lng is the CENTROID OF ITS WHOLE BOUNDING BOX — for a district the size of Alappuzha (45km x 65km) that
+// centroid can be a rural point tens of km from the caller, from the town itself, from anything they mentioned.
+// Confirmed in testing: bare "Alappuzha" resolves to the district boundary (place_rank 10), landing nowhere near
+// the actual town. Never trust a hit this coarse as a pin — it looks like a normal, confident result but isn't
+// one at the precision an emergency pin needs.
+const MIN_USABLE_PLACE_RANK = 14
+
 async function nominatimSearch(query: string, near: Coordinates | null): Promise<Coordinates | null> {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1' })
   // Bias (not restrict) results toward the caller's rough location so "12th Main Road" resolves in the right city.
-  // Tighter than before (~0.05deg, ~5km) — a wide box let unrelated same-named streets in far-off areas win.
   if (near) params.set('viewbox', [near.lng - 0.05, near.lat + 0.05, near.lng + 0.05, near.lat - 0.05].join(','))
   // Browsers send their own User-Agent; Node's default one is rejected by Nominatim's usage policy.
   const headers: Record<string, string> = typeof window === 'undefined' ? { 'User-Agent': 'QuickBite-hackathon-prototype' } : {}
   const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers })
   if (!res.ok) return null
   const [hit] = await res.json()
-  return hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null
+  if (!hit) return null
+  if (typeof hit.place_rank === 'number' && hit.place_rank < MIN_USABLE_PLACE_RANK) return null
+  return { lat: Number(hit.lat), lng: Number(hit.lon) }
+}
+
+function distanceKm(a: Coordinates, b: Coordinates): number {
+  const R = 6371
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.asin(Math.sqrt(h))
 }
 
 // A street/locality name spoken over voice can come through the Live API's transcription slightly garbled
@@ -31,24 +49,124 @@ function extractPincodeAndCity(address: string): string | null {
   return cityMatch ? `${pinMatch[0]}, ${cityMatch[1].trim()}` : pinMatch[0]
 }
 
-async function viaNominatim(address: string, near: Coordinates | null): Promise<Coordinates | null> {
-  const direct = await nominatimSearch(address, near)
+// Last resort when even the street/area name is too garbled to match anything: the town/city name alone (the
+// last comma-separated part, or the whole string if there are no commas) is short and common enough that a
+// mis-transcribed street ("Vaisheri" for "Vazhicherry") doesn't drag it down with it. Lands in the right town,
+// not the right street — still far better than the caller's device GPS, which can be tens of km off.
+function lastPlacePart(address: string): string | null {
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean)
+  const last = parts.at(-1)?.replace(/-?\s*\d{5,6}\s*$/, '').trim()
+  return last && last.length >= 3 ? last : null
+}
+
+// Last structured attempt before the bare-town fallback: callers join the town onto the road ("Alappuzha-
+// Vazhicherry Market Road, Alappuzha") and add filler words, and Nominatim needs every word to match, so these
+// fail outright even though "Vazhicherry Market, Alappuzha" resolves to the right neighbourhood. Clean up
+// separators and the repeated town, then try progressively shorter phrases, then each distinctive word + town.
+const FILLER = /^(road|rd|street|st|lane|junction|jn|near|nearby|opposite|opp|board|signboard|the|at|by|in|on|area|side|of)$/i
+function relaxedQueries(address: string): string[] {
+  const parts = address.replace(/[-/]+/g, ' ').split(',').map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean)
+  if (parts.length < 2) return []
+  const town = parts.at(-1)!.replace(/\s*\d{5,6}\s*$/, '').trim()
+  const townRe = new RegExp(`\\b${town.replace(/[.*+?^${}()|[\]\\]/g, '')}\\b`, 'gi')
+  const words = parts.slice(0, -1).join(' ').replace(townRe, ' ').split(/\s+/).filter(Boolean)
+  if (!words.length || !town) return []
+  const out: string[] = []
+  const add = (w: string[]) => { const q = `${w.join(' ')}, ${town}`; if (w.length && !out.includes(q) && q !== address) out.push(q) }
+  for (let n = words.length; n >= 1; n--) add(words.slice(0, n))
+  const distinctive = words.filter((w) => !FILLER.test(w) && w.length > 3)
+  add(distinctive)
+  for (const w of distinctive) add([w])
+  return out.slice(0, 6)
+}
+
+// Nominatim requires every query token to roughly match — ONE mis-transcribed comma-separated segment (a street
+// or area name misheard, e.g. "Vaisheri" for "Vazhicherry") can silently sink the whole query to zero hits, even
+// when the OTHER segments include something specific and correct (a named landmark like "St George Auditorium").
+// Confirmed in testing: "St. George Auditorium, Vaisheri, Alappuzha" finds nothing, but dropping the bad middle
+// segment — "St. George Auditorium, Alappuzha" — finds the exact place immediately. Try dropping each segment in
+// turn (keeping the others) rather than falling all the way back to just the town, since a landmark name is far
+// more specific evidence of the caller's exact position than a town name alone.
+function droppingOneSegment(address: string): string[] {
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean)
+  if (parts.length < 3) return [] // need at least landmark + something + town to be worth trying without the middle
+  const out: string[] = []
+  for (let i = 0; i < parts.length - 1; i++) { // never drop the last part (the town) — it anchors the search
+    out.push(parts.filter((_, j) => j !== i).join(', '))
+  }
+  return out
+}
+
+export type GeocodeHit = Coordinates & {
+  // 'exact': the full spoken address matched something, and (if a rough bias point existed) an unbiased search
+  // agrees with the biased one, or none exists to disagree. 'approximate': only a pincode or the town/city
+  // matched, OR the biased and unbiased searches disagreed and the unbiased one was trusted instead — either way
+  // the pin is in the right general area, not verified down to the exact street. Consumers should mark an
+  // 'approximate' hit as uncertain, not confirmed.
+  precision: 'exact' | 'approximate'
+}
+
+// Verified against `near` bias silently overriding a genuinely correct match: bias is data Nominatim itself
+// admits is only a "bias, not a restriction" — a short/ambiguous query (a bare town name, an area with no house
+// number) can let it swing the result tens of km away from the real place, while still reporting as a normal,
+// confident hit. Found in testing: "Alappuzha, Kerala" biased toward a bad Kochi-area point returned a Kochi
+// street literally named "Alappuzha ... Road" instead of the real town, with no sign anything was wrong.
+// The fix: ALWAYS also run the unbiased query. If both agree (within ~10km), the bias only helped disambiguate
+// and the result is trusted as exact. If they disagree, the bias cannot be trusted to have picked correctly —
+// prefer the unbiased match (closer to what the query text literally says) and mark it approximate, since we no
+// longer have independent confirmation it's in the right specific area either.
+const AGREEMENT_KM = 10
+
+async function nominatimVerified(query: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+  const unbiased = await nominatimSearch(query, null)
+  if (!near) return unbiased ? { ...unbiased, precision: 'exact' } : null
+
+  const biased = await nominatimSearch(query, near)
+  if (!biased) return unbiased ? { ...unbiased, precision: 'exact' } : null
+  if (!unbiased) return { ...biased, precision: 'approximate' } // bias was the only result; can't cross-check it
+
+  if (distanceKm(biased, unbiased) <= AGREEMENT_KM) return { ...biased, precision: 'exact' }
+  return { ...unbiased, precision: 'approximate' }
+}
+
+async function viaNominatim(address: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+  const direct = await nominatimVerified(address, near)
   if (direct) return direct
 
-  const fallbackQuery = extractPincodeAndCity(address)
-  if (!fallbackQuery) return null
-  return nominatimSearch(fallbackQuery, near)
+  // Try dropping one mis-transcribed segment at a time before falling back to just the town — this can still
+  // land on the exact landmark (a specific place, not just a general area) even when one part of what the
+  // caller said didn't come through clearly.
+  for (const variant of [...droppingOneSegment(address), ...relaxedQueries(address)]) {
+    const hit = await nominatimSearch(variant, null)
+    if (hit) return { ...hit, precision: 'approximate' }
+  }
+
+  // These two fallbacks are deliberately unambiguous ON THEIR OWN (a 6-digit pincode; a named town/city), so
+  // there is nothing for a bias to usefully disambiguate — cross-checking would just cost an extra request for
+  // no benefit. Bias is skipped entirely here, not just cross-checked, since these queries don't need it.
+  const pincodeQuery = extractPincodeAndCity(address)
+  if (pincodeQuery) {
+    const hit = await nominatimSearch(pincodeQuery, null)
+    if (hit) return { ...hit, precision: 'approximate' }
+  }
+
+  const town = lastPlacePart(address)
+  if (town && town !== address) {
+    const hit = await nominatimSearch(town, null)
+    if (hit) return { ...hit, precision: 'approximate' }
+  }
+  return null
 }
 
 // Google Geocoding when a key with Geocoding access is supplied, otherwise (or on failure) free OpenStreetMap Nominatim.
 export async function geocodeAddress(
   address: string,
   opts: { near?: Coordinates | null; googleMapsKey?: string } = {},
-): Promise<Coordinates | null> {
+): Promise<GeocodeHit | null> {
   try {
     if (opts.googleMapsKey) {
       const hit = await viaGoogle(address, opts.googleMapsKey).catch(() => null)
-      if (hit) return hit
+      if (hit) return { ...hit, precision: 'exact' }
     }
     return await viaNominatim(address, opts.near ?? null)
   } catch {
