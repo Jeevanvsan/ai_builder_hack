@@ -95,6 +95,17 @@ export function SosPage() {
         console.warn('[QuickBite SOS] no mic stream acquired — silent observer was never started')
       }
 
+      // Live listen-in audio for the responder (same mic-only feed the voice call publishes). Stopped with the
+      // camera publishers on exit.
+      if (media.mic) {
+        try {
+          const stop = await startVideoPublisher(db, id, new MediaStream(media.mic.getAudioTracks()), { camera: 'mic' })
+          publisherStopsRef.current.push(stop)
+        } catch (e) {
+          console.error('[QuickBite SOS] live listen-in audio publisher failed:', e)
+        }
+      }
+
       // Live video to the dashboard: publish EVERY camera so a responder can switch between front and back (Epic
       // 11 / 14.2). Each camera signals independently under its own feed.
       console.log(`[QuickBite SOS] cameras that passed the frame check and will be published: ${media.cameras.map((c) => c.facing).join(', ') || 'none'}`)
