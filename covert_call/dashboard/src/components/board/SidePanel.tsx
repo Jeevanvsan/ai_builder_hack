@@ -129,6 +129,13 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                   <p className="panel-empty">No audio recording — saving it failed ({incident.recordingFailed}).</p>
                 )}
                 {incident.audioRecording?.status === 'failed' && incident.hasRecording && <CallRecordingPlayer incidentId={incident.id} />}
+                {/* A silent SOS never records a separate audio-only file — the mic's audio track is muxed into
+                    each camera recording below, so with one camera the "missing" voice recording is actually
+                    inside that video. Callers of this panel previously had no way to tell the two apart from a
+                    call (which does get its own "Call audio" row above), so this looked like a bug. */}
+                {incident.channel === 'silent-sos' && (incident.videoRecording?.length ?? 0) > 0 && (
+                  <p className="sub">Voice is captured inside the camera recording(s) below — there's no separate audio file for an SOS.</p>
+                )}
                 {incident.videoRecording?.map((v) => (
                   <div key={v.camera} className="drive-row">
                     <span>{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>
