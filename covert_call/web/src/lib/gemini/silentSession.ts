@@ -114,6 +114,12 @@ export async function startSilentObserver(
         // generates is simply received and ignored, not silenced after the fact.
         responseModalities: [Modality.AUDIO],
         inputAudioTranscription: {},
+        // Added alongside the AUDIO fix: liveSession.ts's working config always pairs AUDIO responseModalities
+        // with outputAudioTranscription, and never leaves the model's spoken response completely unacknowledged
+        // by the client. This closes that gap for parity with the one config on this project that's been proven
+        // to hold a stable Live session — the observer still never reads the text this produces, since nothing
+        // plays it or forwards it anywhere.
+        outputAudioTranscription: {},
         systemInstruction: SILENT_OBSERVER_INSTRUCTION,
         tools: REPORT_SCENE_OBSERVATION_TOOLS,
         // An SOS can run long and carries video, so compress the context and keep a resumption handle to reopen on
