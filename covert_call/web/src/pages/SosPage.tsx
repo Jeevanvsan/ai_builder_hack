@@ -27,8 +27,8 @@ import { zeroTraceExit } from '../lib/gemini/exit'
 // state (camera killed by the OS, permission revoked mid-session) or a Gemini Live session slow to close would
 // otherwise block the whole exit gesture forever, since it awaits each step in sequence before navigating away.
 const TEARDOWN_STEP_TIMEOUT_MS = 3000
-function withTimeout<T>(p: Promise<T>, fallback: T): Promise<T> {
-  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), TEARDOWN_STEP_TIMEOUT_MS))])
+function withTimeout<T>(p: Promise<T>, fallback: T, ms = TEARDOWN_STEP_TIMEOUT_MS): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))])
 }
 
 // The silent SOS screen (Epic 11). Reached ONLY by double-tapping the heart on the home screen. It shows a
@@ -144,27 +144,38 @@ export function SosPage() {
     await wakeLockRef.current?.release().catch(() => {})
 
     if (id) {
-      // Consolidate (case summary/bulletin + the leakage/privacy check, one request), same as a call end (best-effort).
+      // Consolidate (case summary/bulletin + the leakage/privacy check, one request), same as a call end
+      // (best-effort). This is a real network call to Gemini with NO timeout of its own — a slow/hung request
+      // here previously blocked zeroTraceExit() from ever running, leaving the black screen stuck no matter how
+      // many times the exit gesture fired (all the teardown-step timeouts above only guard steps BEFORE this
+      // block). Capped at 8s so a slow AI call can never hold the exit hostage; the recording and every
+      // live-extracted field are already saved regardless of whether this finishes.
       try {
-        const snap = await getDoc(doc(db, INCIDENTS, id))
-        const incident = snap.data() as Omit<Incident, 'id'> | undefined
-        const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
-        const stressTrend = incident?.voiceStressTrend ?? []
-        const address = incident?.location.confirmed?.address ?? null
-        const consolidation = await consolidateCall(transcript, fields, stressTrend, address)
-        await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, consolidation.redactions)])
+        await withTimeout(
+          (async () => {
+            const snap = await getDoc(doc(db, INCIDENTS, id))
+            const incident = snap.data() as Omit<Incident, 'id'> | undefined
+            const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
+            const stressTrend = incident?.voiceStressTrend ?? []
+            const address = incident?.location.confirmed?.address ?? null
+            const consolidation = await consolidateCall(transcript, fields, stressTrend, address)
+            await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, consolidation.redactions)])
 
-        if (address) {
-          void groundedLocationContext(address).then((context) => {
-            if (context) void recordGroundedContext(db, id, context)
-          })
-        }
+            if (address) {
+              void groundedLocationContext(address).then((context) => {
+                if (context) void recordGroundedContext(db, id, context)
+              })
+            }
 
-        if (incident) {
-          void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
-            if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
-          })
-        }
+            if (incident) {
+              void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
+                if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
+              })
+            }
+          })(),
+          undefined,
+          8000,
+        )
       } catch {
         // Best-effort: the live-extracted fields are already saved.
       }
