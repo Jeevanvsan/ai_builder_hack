@@ -52,7 +52,9 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
             lines={incident.transcriptLines ?? []}
             emptyText={incident.channel === 'live-call'
               ? (live ? 'Waiting for the caller to speak…' : 'No transcript was captured for this call.')
-              : `${channelLabel(incident.channel)}: no spoken conversation for this incident.`}
+              : incident.channel === 'silent-sos'
+                ? (live ? 'Listening through the mic — nothing heard yet…' : 'Nothing was heard during this SOS.')
+                : `${channelLabel(incident.channel)}: no spoken conversation for this incident.`}
           />
         ) : (
           <div className="case-file">
