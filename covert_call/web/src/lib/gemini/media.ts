@@ -53,6 +53,11 @@ async function openCamera(facing: 'environment' | 'user'): Promise<MediaStream |
   }
 }
 
+// The deviceId a stream's video track actually came from, if the browser reports one.
+function videoDeviceId(stream: MediaStream): string | undefined {
+  return stream.getVideoTracks()[0]?.getSettings().deviceId
+}
+
 export async function acquireSosMedia(): Promise<SosMedia> {
   let mic: MediaStream | null = null
   try {
@@ -65,7 +70,16 @@ export async function acquireSosMedia(): Promise<SosMedia> {
   const back = await openCamera('environment')
   if (back) cameras.push({ facing: 'back', stream: back })
   const front = await openCamera('user')
-  if (front) cameras.push({ facing: 'front', stream: front })
+  // A device with only one physical camera (most laptops, some emulators) can still satisfy an 'exact:user'
+  // request by loosely matching — both `back` and `front` then point at the SAME camera device, doubling every
+  // frame sent to the silent observer (two samplers reading the identical feed) instead of genuinely covering two
+  // angles. Confirmed a real, concrete way to overload/duplicate the Gemini Live stream on non-phone hardware.
+  // Drop the duplicate rather than silently double-sampling one camera as if it were two independent feeds.
+  if (front && back && videoDeviceId(front) && videoDeviceId(front) === videoDeviceId(back)) {
+    front.getTracks().forEach((t) => t.stop())
+  } else if (front) {
+    cameras.push({ facing: 'front', stream: front })
+  }
 
   return { mic, cameras, mode: cameras.length >= 2 ? 'dual' : 'back-only' }
 }
