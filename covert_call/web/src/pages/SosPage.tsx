@@ -40,7 +40,7 @@ export function SosPage() {
   const streamsRef = useRef<MediaStream[]>([])
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null)
 
-  // Secret exit: three taps in the top-left corner within 1.5s.
+  // Secret exit: three taps anywhere on the screen within 1.5s.
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -191,15 +191,15 @@ export function SosPage() {
     tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 1500)
   }
 
-  // The whole screen is black and swallows touches so nothing shows the phone is active; only the hidden
-  // top-left corner responds, and only to the three-tap exit.
+  // The whole screen is black and swallows touches so nothing shows the phone is active. Every tap anywhere on
+  // the screen counts toward the three-tap exit gesture — a corner-only hotspot was too easy to miss under real
+  // stress (a shaking hand, glancing at the phone in the dark), and it gave away that the corner specifically was
+  // the "active" part of an otherwise dead-looking screen.
   return (
     <div
       className="sos-blackout"
-      onPointerDown={(e) => e.preventDefault()}
+      onPointerDown={(e) => { e.preventDefault(); onCornerTap() }}
       onContextMenu={(e) => e.preventDefault()}
-    >
-      <div className="sos-exit-hotspot" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onCornerTap() }} />
-    </div>
+    />
   )
 }

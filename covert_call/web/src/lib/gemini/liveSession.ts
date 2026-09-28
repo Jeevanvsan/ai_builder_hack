@@ -453,8 +453,14 @@ export async function startLiveCall(
     }
   }, 1_000)
 
+  let ended = false
   return {
     end: async () => {
+      // Both the End button and the model's own end_call tool call reach here (see onCallEnd above) — they can
+      // race each other close together. session.close() on an already-closing socket spams "WebSocket is already
+      // in CLOSING or CLOSED state" into the console for every subsequent chunk; guard so teardown runs once.
+      if (ended) return null
+      ended = true
       finished = true
       flushTranscript(true)
       clearInterval(silenceTimer)
