@@ -341,3 +341,22 @@ at all. Now built and **verified working end-to-end with a real spoken test call
   - **Recording save failures were silently swallowed**, same bug class as the earlier consolidation one: `saveCallRecording` failing (most likely Firestore's ~1MB doc cap on a longer call) never surfaced anywhere. Spot-checked 5 recent real incidents: 3 had `hasRecording: true`, 2 didn't — confirms it's a real, occasional failure, not total breakage. Now sets `incident.recordingFailed` (new field, types + rules updated) with the reason, and the Case file shows "No audio recording — saving it failed (...)" instead of the section just not appearing.
   - **Live queue rows now show the actual reported time** (date+time), not just "X min ago" — it was already computed for a tooltip, now also shown as text.
   - Web app + dashboard + Firestore rules redeployed.
+
+## 2026-09-28 (IST, afternoon ~15:30) — Silent SOS observer finally working end to end, Drive folders, routing fix
+
+Confirmed working on a real test (INC-MUL29YGP): distress sounds, threat indicators, headcount, voice stress, caller estimate and case summary all populate live.
+
+- **Root cause of "SOS detects nothing" (every prior test):** `gemini-3.8-live` rejects `responseModalities: [TEXT]` (close 1007). Silent observer now uses AUDIO like the call, and simply never plays the model's audio back. Also added `outputAudioTranscription` for parity.
+- **Quiet SOS died on its first idle close (1000):** reconnect required a resumption handle, which a quiet session may never receive. Now reconnects regardless, and the attempt counter resets on each successful reopen (long quiet SOS survives repeated idle closes). Same change in `liveSession.ts`.
+- **SOS heard speech but never wrote it:** transcript only lived in memory for the final summary. Now written live via `appendTranscriptLine` (grouped per utterance). `report_caller_estimate` was offered to the SOS but never handled — now saved.
+- **SOS had no listen-in audio feed** on the dashboard (call had one, SOS didn't) — now publishes the mic-only feed.
+- **SOS exit hang:** consolidation had no timeout and blocked `zeroTraceExit`. Capped at 8s in both SosPage and CallPage; every teardown step has its own timeout; `videoRecorder.stop()` has a 2s fallback.
+- **Connection-health gating:** sends now require a live socket (`connected && !finished`) — fixed the "WebSocket already CLOSING/CLOSED" console flood. Double-close guards on `end()`. Silent catch blocks now log.
+- **Camera:** same physical camera opened twice on single-camera devices is deduped; cameras that open but produce no frames are dropped with a console warning. Mic is never dropped for silence (hiding is the use case).
+- **Drive:** base64 upload corruption fixed (`indexOf(',')` hit the comma inside `codecs=vp8,opus`). Uploads now go into one subfolder per incident — Jeevan redeployed the Apps Script (see `covert_call/docs/setup/drive-uploader.md`) and updated `VITE_DRIVE_UPLOAD_URL`.
+- **Routing:** `drivingRoute()` had no try/catch, so one failed OSRM request killed `bestSafeRoute` for all candidates. Fixed (shared, applies to native too).
+- **Dashboard:** Case History search now matches channel ("sos"); critical-mode banner + popup; SceneSketch removed; negated danger tags ("no weapon") no longer escalate severity.
+- **Docs:** new `covert_call/docs/e2e-test-cases.md` — full manual test script for web app + dashboard.
+- All deployed (web + dashboard) and pushed on `phase-3-epic-16-decision-support`.
+
+**Notes for Ameen:** `silentSession.ts`, `liveSession.ts`, `SosPage.tsx`, `CallPage.tsx`, `media.ts`, `audio.ts`, `videoRecorder.ts`, `videoUpload.ts` all changed (your area) — worth a review. Web-only; native call flow is still a stub, so nothing to port yet.
