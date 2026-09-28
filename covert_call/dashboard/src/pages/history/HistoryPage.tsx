@@ -3,6 +3,7 @@ import Chip from '../../components/Chip'
 import DataState from '../../components/DataState'
 import Pagination from '../../components/Pagination'
 import SmartSearchBar, { useSmartSearch } from '../../components/SmartSearch'
+import { SORTS, sortIncidents } from '../../lib/sortIncidents'
 import { channelLabel, formatElapsed, formatTime } from '../../lib/format'
 import { useIncidents } from '../../lib/incidentsStore'
 import type { Incident } from '../../../../shared/incidents/types'
@@ -28,6 +29,7 @@ export default function HistoryPage() {
   const channel = params.get('channel') ?? ''
   const handledBy = params.get('by') ?? ''
   const period = (params.get('period') ?? 'all') as Period
+  const sort = params.get('sort') ?? ''
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params)
@@ -50,7 +52,7 @@ export default function HistoryPage() {
     .sort((a, b) => Date.parse(b.response.resolvedAt ?? '') - Date.parse(a.response.resolvedAt ?? ''))
   // Plain-language search on top of the dropdown filters (AI order wins when it has answered).
   const search = useSmartSearch(narrowed, q)
-  const filtered = search.results
+  const filtered = sortIncidents(search.results, sort)
   const pager = usePagination(filtered)
   const anyFilter = Boolean(q || severity || channel || handledBy || period !== 'all')
 
@@ -82,6 +84,10 @@ export default function HistoryPage() {
         </select>
         <select className="input" value={period} onChange={(e) => setFilter('period', e.target.value)} aria-label="Resolved">
           {Object.entries(PERIODS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <select className="input" value={sort} onChange={(e) => setFilter('sort', e.target.value)} aria-label="Sort by">
+          <option value="">Recently resolved</option>
+          {Object.entries(SORTS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         {anyFilter && (
           <button type="button" className="btn" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
