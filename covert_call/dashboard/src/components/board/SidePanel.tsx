@@ -99,7 +99,13 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                     <span>Call audio</span>
                     {incident.audioRecording.status === 'uploaded' && incident.audioRecording.driveUrl ? (
                       incident.audioRecording.driveFileId ? (
-                        <a className="btn btn-sm" href={`https://drive.google.com/uc?export=download&id=${incident.audioRecording.driveFileId}`}>Download</a>
+                        <a
+                          className="btn btn-sm"
+                          href={`https://drive.google.com/uc?export=download&id=${incident.audioRecording.driveFileId}`}
+                          download={`${incident.id}-audio.webm`}
+                        >
+                          Download
+                        </a>
                       ) : (
                         <a className="btn btn-sm" href={incident.audioRecording.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
                       )
@@ -126,7 +132,13 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                     <span>{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>
                     {v.status === 'uploaded' && v.driveUrl ? (
                       v.driveFileId ? (
-                        <a className="btn btn-sm" href={`https://drive.google.com/uc?export=download&id=${v.driveFileId}`}>Download</a>
+                        <a
+                          className="btn btn-sm"
+                          href={`https://drive.google.com/uc?export=download&id=${v.driveFileId}`}
+                          download={`${incident.id}-${v.camera}.webm`}
+                        >
+                          Download
+                        </a>
                       ) : (
                         <a className="btn btn-sm" href={v.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
                       )
