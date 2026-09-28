@@ -40,7 +40,7 @@ export interface DriveUploadResult {
 // as failed rather than silently dropping it.
 export async function uploadCallVideo(
   blob: Blob,
-  meta: { incidentId: string; camera: 'back' | 'front'; mimeType: string },
+  meta: { incidentId: string; camera: 'back' | 'front' | 'audio'; mimeType: string },
 ): Promise<DriveUploadResult | null> {
   if (!UPLOAD_URL) return null
   const base64 = await blobToBase64(blob)
@@ -52,7 +52,9 @@ export async function uploadCallVideo(
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({
       incidentId: meta.incidentId,
-      filename: `${meta.incidentId}-${meta.camera}.${ext}`,
+      // The incidentId no longer needs to be IN the filename — each incident gets its own Drive subfolder (see
+      // drive-uploader.md), keyed by incidentId server-side. Just the recording's own name inside that folder.
+      filename: `${meta.camera}.${ext}`,
       mimeType: meta.mimeType,
       base64,
     }),

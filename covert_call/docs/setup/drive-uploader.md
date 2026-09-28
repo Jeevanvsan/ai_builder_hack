@@ -1,13 +1,15 @@
 # Google Drive uploader (Epic 9.2)
 
-The QuickBite app saves each call's back-camera video to **one shared Google Drive folder** owned by the team.
+The QuickBite app saves each call's recordings — audio, back-camera video, and (for a Silent SOS) front-camera
+video too — to Google Drive, **one subfolder per incident** inside a single root folder owned by the team.
 Callers never sign in, and this needs **no billing** (unlike Firebase Storage, which requires the Blaze plan).
 
-A tiny **Google Apps Script web app** receives the video and drops it into a Drive folder as the team account.
-The app posts to it from `web/src/lib/gemini/videoUpload.ts`.
+A tiny **Google Apps Script web app** receives each recording and drops it into that incident's subfolder as the
+team account. The app posts to it from `web/src/lib/gemini/videoUpload.ts`.
 
 ## 1. Create the Drive folder
-1. In the team Google account, make a folder (e.g. `QuickBite Call Videos`).
+1. In the team Google account, make a folder (e.g. `QuickBite Call Videos`) — this becomes the root; every
+   incident gets its own subfolder inside it (e.g. `QuickBite Call Videos/INC-MUKRJ1SF/`).
 2. Open it and copy the folder ID from the URL: `drive.google.com/drive/folders/<FOLDER_ID>`.
 
 ## 2. Create the Apps Script
@@ -18,23 +20,39 @@ The app posts to it from `web/src/lib/gemini/videoUpload.ts`.
    - Who has access: **Anyone**.
 4. Copy the **Web app URL** (ends in `/exec`).
 
+**If you already have this script deployed from before the per-incident-folder change**, replace `Code.gs` with
+the version below and use **Deploy → Manage deployments → Edit → New version** (keeps the same `/exec` URL, no
+env var change needed) rather than creating a brand new deployment.
+
 ```javascript
-// Apps Script: receives a base64 video from the QuickBite app and saves it to one Drive folder.
-const FOLDER_ID = 'PASTE_YOUR_FOLDER_ID_HERE'
+// Apps Script: receives a base64 recording from the QuickBite app and saves it into that incident's own
+// subfolder (one subfolder per incidentId) inside one root Drive folder.
+const ROOT_FOLDER_ID = 'PASTE_YOUR_FOLDER_ID_HERE'
+
+// Reuses an existing subfolder by exact name if one exists (Drive allows duplicate folder names, so a plain
+// createFolder() on every call would eventually make two "INC-XXXX" folders for the same incident — this looks
+// first).
+function getOrCreateIncidentFolder(root, incidentId) {
+  const existing = root.getFoldersByName(incidentId)
+  if (existing.hasNext()) return existing.next()
+  return root.createFolder(incidentId)
+}
 
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents)
     const bytes = Utilities.base64Decode(body.base64)
     const filename = body.filename || 'call.webm'
-    const folder = DriveApp.getFolderById(FOLDER_ID)
+    const root = DriveApp.getFolderById(ROOT_FOLDER_ID)
+    const folder = body.incidentId ? getOrCreateIncidentFolder(root, body.incidentId) : root
     // The app re-uploads the same filename periodically during a call (Epic 9.2 snapshots), then once more at the
     // end — so remove any earlier version of this file first and keep just the latest, complete one.
-    const existing = folder.getFilesByName(filename)
-    while (existing.hasNext()) existing.next().setTrashed(true)
+    const existingFiles = folder.getFilesByName(filename)
+    while (existingFiles.hasNext()) existingFiles.next().setTrashed(true)
     const blob = Utilities.newBlob(bytes, body.mimeType || 'video/webm', filename)
     const file = folder.createFile(blob)
-    // Anyone in the team with the folder can already view it; return a link responders can open.
+    // Anyone in the team with the root folder can already view every subfolder under it; return a link
+    // responders can open straight from the dashboard.
     return ContentService
       .createTextOutput(JSON.stringify({ fileId: file.getId(), url: file.getUrl() }))
       .setMimeType(ContentService.MimeType.JSON)
