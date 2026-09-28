@@ -43,9 +43,18 @@ export function startVideoRecording(stream: MediaStream): VideoRecorderHandle | 
       new Promise((resolve) => {
         if (stopped) return resolve(null)
         stopped = true
-        recorder.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: mimeType }) : null)
+        const finish = () => resolve(chunks.length ? new Blob(chunks, { type: mimeType }) : null)
+        // onstop only fires once the underlying stream's tracks are still alive when stop() is called. If the
+        // camera was already killed by the OS (permissions revoked, device sleep/wake, a background tab) the
+        // recorder can be stuck in 'recording' state with onstop never firing — with no timeout here, that hung
+        // this promise forever, which hung the exit gesture's Promise.all indefinitely (confirmed: the SOS
+        // three-tap exit stopped responding, and the mic kept streaming to a socket whose end() was never reached
+        // because the code never got past awaiting this). 2s is generous for a real onstop but short enough that
+        // a stuck recorder can never block someone trying to leave the SOS screen.
+        const timeout = setTimeout(finish, 2000)
+        recorder.onstop = () => { clearTimeout(timeout); finish() }
         if (recorder.state !== 'inactive') recorder.stop()
-        else resolve(chunks.length ? new Blob(chunks, { type: mimeType }) : null)
+        else { clearTimeout(timeout); finish() }
       }),
   }
 }

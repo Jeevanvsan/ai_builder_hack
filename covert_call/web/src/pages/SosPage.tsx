@@ -23,10 +23,18 @@ import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { findCorrelatedIncidents } from '../lib/gemini/correlate'
 import { zeroTraceExit } from '../lib/gemini/exit'
 
+// Caps any single teardown step so leaving the SOS screen can never hang: a MediaRecorder stuck in 'recording'
+// state (camera killed by the OS, permission revoked mid-session) or a Gemini Live session slow to close would
+// otherwise block the whole exit gesture forever, since it awaits each step in sequence before navigating away.
+const TEARDOWN_STEP_TIMEOUT_MS = 3000
+function withTimeout<T>(p: Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), TEARDOWN_STEP_TIMEOUT_MS))])
+}
+
 // The silent SOS screen (Epic 11). Reached ONLY by double-tapping the heart on the home screen. It shows a
 // full-black "the phone is off" overlay while it silently records both cameras + the mic, streams the back camera
 // to the dashboard, and lets a silent Gemini observer build the incident. The person leaves with a secret gesture:
-// three taps in the top-left corner.
+// three taps anywhere on the screen.
 export function SosPage() {
   const navigate = useNavigate()
   const startedRef = useRef(false)
@@ -121,12 +129,17 @@ export function SosPage() {
 
     if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
     // Stop the Drive recorders while the camera tracks are still live, then kick off uploads in the background.
-    const recordings = await Promise.all(
-      recordersRef.current.map(async ({ facing, rec }) => ({ facing, blob: await rec.stop(), mimeType: rec.mimeType })),
-    )
+    // Each recorder's own stop() now has an internal timeout too (videoRecorder.ts) — this outer one is defence in
+    // depth so a single stuck recorder can't hold up the others or the rest of the exit sequence.
     const transcript = observerRef.current?.getTranscript() ?? ''
-    await observerRef.current?.end()
-    await Promise.all(publisherStopsRef.current.map((stop) => stop().catch(() => {})))
+    const recordings = await withTimeout(
+      Promise.all(recordersRef.current.map(async ({ facing, rec }) => ({ facing, blob: await rec.stop(), mimeType: rec.mimeType }))),
+      recordersRef.current.map(({ facing, rec }) => ({ facing, blob: null, mimeType: rec.mimeType })),
+    )
+    // observer.end() closes the Gemini Live session — confirmed hang risk if the session's own close() is slow or
+    // the socket is already in a bad state (see silentSession.ts's onclose reconnect handling).
+    await withTimeout(observerRef.current?.end() ?? Promise.resolve(), undefined)
+    await withTimeout(Promise.all(publisherStopsRef.current.map((stop) => stop().catch(() => {}))), [])
     streamsRef.current.forEach((s) => s.getTracks().forEach((t) => t.stop()))
     await wakeLockRef.current?.release().catch(() => {})
 
@@ -180,7 +193,10 @@ export function SosPage() {
     }
   }
 
-  const onCornerTap = () => {
+  // Three taps ANYWHERE on the screen, within 1.5s of each other, end the SOS. onPointerDown covers touch, mouse
+  // and pen uniformly, and the whole overlay (not just a corner) listens, so the gesture works no matter where on
+  // the dead-looking black screen the person taps.
+  const onExitTap = () => {
     tapCountRef.current += 1
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current)
     if (tapCountRef.current >= 3) {
@@ -191,14 +207,10 @@ export function SosPage() {
     tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0 }, 1500)
   }
 
-  // The whole screen is black and swallows touches so nothing shows the phone is active. Every tap anywhere on
-  // the screen counts toward the three-tap exit gesture — a corner-only hotspot was too easy to miss under real
-  // stress (a shaking hand, glancing at the phone in the dark), and it gave away that the corner specifically was
-  // the "active" part of an otherwise dead-looking screen.
   return (
     <div
       className="sos-blackout"
-      onPointerDown={(e) => { e.preventDefault(); onCornerTap() }}
+      onPointerDown={(e) => { e.preventDefault(); onExitTap() }}
       onContextMenu={(e) => e.preventDefault()}
     />
   )
