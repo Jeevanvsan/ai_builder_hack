@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
@@ -47,7 +47,7 @@ export function CallPage() {
   // finishCall is called from two places (the End button, and the model's end_call tool call once the caller
   // confirms or after 3 silent retries) — guard so whichever fires first wins and the other is a no-op.
   const endingRef = useRef(false)
-  const finishCallRef = useRef<() => void>(() => {})
+  const finishCallRef = useRef<(opts?: { dropped?: boolean }) => void>(() => {})
 
   useEffect(() => {
     // startedRef makes this a true one-shot for the component's whole lifetime, including across React
@@ -71,7 +71,7 @@ export function CallPage() {
         const handle = await startLiveCall(
           db,
           id,
-          { onStatusChange: setStatus, onCallEnd: () => finishCallRef.current() },
+          { onStatusChange: setStatus, onCallEnd: () => finishCallRef.current(), onCallDropped: () => finishCallRef.current({ dropped: true }) },
           {
             micStream: media ? new MediaStream(media.stream.getAudioTracks()) : undefined,
             videoStream: media?.hasVideo ? videoOnly(media.stream) : undefined,
@@ -125,7 +125,10 @@ export function CallPage() {
     return () => clearInterval(timer)
   }, [status])
 
-  const finishCall = async () => {
+  // `dropped: true` means the connection failed and every reconnect attempt gave up — not the caller saying
+  // goodbye. Recorded as its own danger indicator so a responder can tell "the call was cut off, possibly
+  // mid-emergency" apart from a normal, confirmed-safe hangup — otherwise the case file reads identically either way.
+  const finishCall = async (opts: { dropped?: boolean } = {}) => {
     if (endingRef.current) return
     endingRef.current = true
     const id = incidentIdRef.current
@@ -143,6 +146,14 @@ export function CallPage() {
     await micPublisherStopRef.current?.()
     mediaRef.current?.getTracks().forEach((t) => t.stop())
     setStatus('ended')
+
+    if (id && opts.dropped) {
+      void updateLiveFields(db, id, {
+        dangerIndicators: ['call disconnected unexpectedly - not a confirmed hangup, reconnect attempts failed'],
+        urgency: 'high',
+        notes: 'The call dropped and could not reconnect. This is not the caller confirming they are safe.',
+      })
+    }
 
     if (id) {
       try {
@@ -260,7 +271,7 @@ export function CallPage() {
   }
 
   useEffect(() => {
-    finishCallRef.current = () => void finishCall()
+    finishCallRef.current = (opts) => void finishCall(opts)
   })
 
   const toggleMute = () => {
