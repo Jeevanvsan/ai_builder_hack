@@ -46,20 +46,30 @@ function instructionOf(s: OsrmStep): string {
 
 export async function drivingRoute(from: LatLng, to: LatLng) {
   const url = `${OSRM}/${from.lng},${from.lat};${to.lng},${to.lat}?steps=true&geometries=geojson&overview=full`
-  const res = await fetch(url)
-  if (!res.ok) return null
-  const data = await res.json()
-  const r = data.routes?.[0]
-  if (!r) return null
-  const steps: RouteStep[] = (r.legs?.[0]?.steps ?? []).map((s: OsrmStep) => ({
-    instruction: instructionOf(s),
-    distanceM: Math.round(s.distance),
-    lat: s.maneuver.location[1],
-    lng: s.maneuver.location[0],
-  }))
-  // Firestore rejects nested arrays, so the line is stored as {lat, lng} points, not [lat, lng] pairs.
-  const geometry: LatLng[] = r.geometry.coordinates.map(([lng, lat]: [number, number]) => ({ lat, lng }))
-  return { distanceM: Math.round(r.distance), durationS: Math.round(r.duration), steps, geometry }
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const data = await res.json()
+    const r = data.routes?.[0]
+    if (!r) return null
+    const steps: RouteStep[] = (r.legs?.[0]?.steps ?? []).map((s: OsrmStep) => ({
+      instruction: instructionOf(s),
+      distanceM: Math.round(s.distance),
+      lat: s.maneuver.location[1],
+      lng: s.maneuver.location[0],
+    }))
+    // Firestore rejects nested arrays, so the line is stored as {lat, lng} points, not [lat, lng] pairs.
+    const geometry: LatLng[] = r.geometry.coordinates.map(([lng, lat]: [number, number]) => ({ lat, lng }))
+    return { distanceM: Math.round(r.distance), durationS: Math.round(r.duration), steps, geometry }
+  } catch {
+    // A network failure (CORS block, timeout, DNS) here previously threw uncaught — bestSafeRoute's
+    // Promise.all(candidates.map(...)) below then rejected ENTIRELY the moment any ONE candidate's route request
+    // failed, even if the other candidates would have succeeded. Confirmed on a real incident: nearby stations
+    // were found fine (nearbyServices() already had its own try/catch), but routing silently produced nothing.
+    // Returning null here instead lets bestSafeRoute skip just this one candidate and still pick the best of the
+    // rest, the same way a bad OSRM response (caught by `if (!res.ok)` above) was already handled.
+    return null
+  }
 }
 
 export function kindForSituation(indicators: string[]): ServiceKind {
