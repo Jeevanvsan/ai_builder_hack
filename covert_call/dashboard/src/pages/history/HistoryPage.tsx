@@ -21,6 +21,8 @@ function matchesSearch(i: Incident, q: string): boolean {
   if (!q) return true
   const haystack = [
     i.id,
+    i.channel,
+    channelLabel(i.channel),
     i.location.confirmed?.address,
     i.response.acknowledgedBy,
     i.consolidatedSummary,

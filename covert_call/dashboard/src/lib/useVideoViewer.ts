@@ -19,10 +19,15 @@ const CONNECT_TIMEOUT_MS = 20_000
 
 type Connection = { key: string; state: 'live' | 'failed'; stream: MediaStream | null }
 
-// Opens a receive-only peer connection to one of the incident's live camera feeds (`camera`, default 'back').
-// Reconnects automatically when the phone starts a new feed session (new startedAt), when the responder switches
-// camera, or when they hit retry.
-export function useVideoViewer(incidentId: string, video: Incident['video'], viewerName: string, camera: Camera = 'back') {
+// Opens a receive-only peer connection to one of the incident's live feeds (`camera`, default 'back'). Works for
+// both video feeds ('back'/'front') and the caller-mic listen-in feed ('mic', audio-only) — the transceiver kind
+// is the only thing that differs, since the signaling/reconnect logic is identical either way.
+export function useVideoViewer(
+  incidentId: string,
+  video: Incident['video'] | Incident['audioListen'],
+  viewerName: string,
+  camera: Camera = 'back',
+) {
   const [attempt, setAttempt] = useState(0)
   const [conn, setConn] = useState<Connection | null>(null)
   const now = useNow(5_000)
@@ -36,7 +41,7 @@ export function useVideoViewer(incidentId: string, video: Incident['video'], vie
   useEffect(() => {
     if (!live) return
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
-    pc.addTransceiver('video', { direction: 'recvonly' })
+    pc.addTransceiver(camera === 'mic' ? 'audio' : 'video', { direction: 'recvonly' })
     const viewerRef = doc(viewersCollection(db, incidentId, camera))
     const pending: RTCIceCandidateInit[] = []
     const unsubscribers: (() => void)[] = []

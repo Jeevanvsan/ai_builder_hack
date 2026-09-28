@@ -10,16 +10,18 @@ function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
   return null
 }
 
-export default function GoogleIncidentMap({ rough, confirmed, target, apiKey }: MapProps & { apiKey: string }) {
+export default function GoogleIncidentMap({ rough, confirmed, target, apiKey, backdrop }: MapProps & { apiKey: string }) {
   return (
     <APIProvider apiKey={apiKey}>
       <Map
         className="map"
         defaultCenter={{ lat: target.lat, lng: target.lng }}
-        defaultZoom={15}
+        defaultZoom={backdrop ? 16 : 15}
         mapId="DEMO_MAP_ID"
         disableDefaultUI
-        zoomControl
+        zoomControl={!backdrop}
+        gestureHandling={backdrop ? 'none' : 'auto'}
+        keyboardShortcuts={!backdrop}
       >
         {rough && (
           <AdvancedMarker position={{ lat: rough.lat, lng: rough.lng }} title="Approximate location">

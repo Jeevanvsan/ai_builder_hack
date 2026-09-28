@@ -77,7 +77,7 @@ export default function AiInsightsPanel({
     <div className="insights-panel">
       <div className="insights-toolbar">
         <div className="insights-toolbar-text">
-          <span className="ai-badge">✨ Gemini</span>
+          <span className="ai-badge">✨ AI</span>
           <p className="muted">
             Reads the stats above (no personal data) and suggests concrete next steps. Refreshes itself once a
             day automatically — anyone can refresh sooner.
