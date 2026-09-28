@@ -241,8 +241,14 @@ export function CallPage() {
               driveUrl: result?.driveUrl ?? null,
               endedAt: new Date().toISOString(),
             })
-          } catch {
-            await upsertVideoRecording(db, id, { camera: 'back', status: 'failed', endedAt: new Date().toISOString() }).catch(() => {})
+          } catch (e) {
+            console.error('[QuickBite call] Drive video upload failed:', e)
+            await upsertVideoRecording(db, id, {
+              camera: 'back',
+              status: 'failed',
+              failReason: e instanceof Error ? e.message.slice(0, 200) : 'Unknown error',
+              endedAt: new Date().toISOString(),
+            }).catch(() => {})
           }
         })()
       }

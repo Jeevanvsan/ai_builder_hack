@@ -128,6 +128,9 @@ export interface Incident {
     driveUrl?: string | null
     startedAt: string
     endedAt?: string | null
+    // Why the upload failed (e.g. "Drive upload rejected: <Apps Script error>"), so a responder/Ameen can tell a
+    // real bug from Apps Script's own request-size limit instead of just seeing "failed" with no reason.
+    failReason?: string | null
   }[]
   // True once the full call recording (mic + AI voice) has been saved to the incidents/{id}/recording/audio
   // subcollection doc — kept off the main document since Firestore caps a document at 1MiB. Absent/false if
