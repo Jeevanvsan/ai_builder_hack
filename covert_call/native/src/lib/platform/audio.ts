@@ -27,7 +27,7 @@ const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 // Hermes has btoa, but it takes a binary *string*, so using it means building a multi-megabyte intermediate
 // string per call via String.fromCharCode. Encoding the bytes directly is both faster and avoids the argument
 // -count limits that bite on large frames.
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   let out = ''
   let i = 0
   for (; i + 2 < bytes.length; i += 3) {
@@ -51,7 +51,7 @@ const B64_LOOKUP = (() => {
   return t
 })()
 
-function base64ToBytes(base64: string): Uint8Array {
+export function base64ToBytes(base64: string): Uint8Array {
   let len = base64.length
   while (len > 0 && base64[len - 1] === '=') len--
   const byteLength = (len * 3) >> 2
@@ -108,16 +108,21 @@ function pcm16ToFloat32(bytes: Uint8Array): Float32Array {
 
 export type MicHandle = { stop: () => void }
 
-// Captures the mic and calls `onChunk` with base64 16 kHz mono PCM16, ready for
-// session.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } }), plus an RMS level so the
-// call can tell the caller is talking before any transcript arrives (the web uses this for its silence
-// watchdog, and the SOS uses it to log — never to act on — a silent room).
-export async function startMicCapture(onChunk: (base64Pcm: string, level: number) => void): Promise<MicHandle> {
+// What each captured frame hands back:
+//   base64Pcm — 16 kHz mono PCM16, ready for
+//               session.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } })
+//   level     — RMS, so the call can tell the caller is talking before any transcript arrives (the silence
+//               watchdog uses this; the SOS uses it only to log, never to act on, a silent room)
+//   pcm       — the same frame as raw 16 kHz samples, so the call recorder can mix it without decoding the
+//               base64 back again
+export type MicChunk = (base64Pcm: string, level: number, pcm: Float32Array) => void
+
+export async function startMicCapture(onChunk: MicChunk): Promise<MicHandle> {
   if (AUDIO_BACKEND === 'two-way') return startMicTwoWay(onChunk)
   return startMicAudioApi(onChunk)
 }
 
-async function startMicAudioApi(onChunk: (base64Pcm: string, level: number) => void): Promise<MicHandle> {
+async function startMicAudioApi(onChunk: MicChunk): Promise<MicHandle> {
   const permission = await AudioManager.requestRecordingPermissions()
   if (permission !== 'Granted') throw new Error('Microphone permission denied')
 
@@ -137,7 +142,7 @@ async function startMicAudioApi(onChunk: (base64Pcm: string, level: number) => v
     // The recorder is asked for 16 kHz and Android resamples to it, but the delivered buffer reports its own
     // rate — resample from whatever actually arrived rather than assuming the request was honoured.
     const resampled = resample(channel, buffer.sampleRate, INPUT_SAMPLE_RATE)
-    onChunk(bytesToBase64(floatTo16BitPCM(resampled)), rms(channel))
+    onChunk(bytesToBase64(floatTo16BitPCM(resampled)), rms(channel), resampled)
   })
 
   recorder.start()
@@ -155,7 +160,7 @@ async function startMicAudioApi(onChunk: (base64Pcm: string, level: number) => v
   }
 }
 
-async function startMicTwoWay(onChunk: (base64Pcm: string, level: number) => void): Promise<MicHandle> {
+async function startMicTwoWay(onChunk: MicChunk): Promise<MicHandle> {
   const permission = await TwoWay.requestMicrophonePermissionsAsync()
   if (!permission.granted) throw new Error('Microphone permission denied')
 
@@ -167,7 +172,8 @@ async function startMicTwoWay(onChunk: (base64Pcm: string, level: number) => voi
   const subscription = TwoWay.addExpoTwoWayAudioEventListener('onMicrophoneData', (event) => {
     if (stopped) return
     const bytes = event.data
-    onChunk(bytesToBase64(bytes), rms(pcm16ToFloat32(bytes)))
+    const pcm = pcm16ToFloat32(bytes)
+    onChunk(bytesToBase64(bytes), rms(pcm), pcm)
   })
 
   TwoWay.toggleRecording(true)
