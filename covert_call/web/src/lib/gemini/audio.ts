@@ -54,7 +54,14 @@ export async function startMicCapture(
   const silentSink = context.createGain()
   silentSink.gain.value = 0
 
+  // disconnect() below takes effect asynchronously relative to already-queued audio callback invocations — a few
+  // frames already scheduled can still fire onaudioprocess right after stop() is called. Checking this flag
+  // INSIDE the callback (not just relying on disconnect() timing) closes that gap: without it, those straggler
+  // frames still called onChunk(), which downstream (silentSession.ts / liveSession.ts) can mean a handful of
+  // sendRealtimeInput calls onto an already-closed Gemini Live socket even after stop() has returned.
+  let stopped = false
   processor.onaudioprocess = (e) => {
+    if (stopped) return
     const input = e.inputBuffer.getChannelData(0)
     // RMS level of this frame, so the call can tell the caller is talking before any transcript arrives.
     let sum = 0
@@ -67,7 +74,6 @@ export async function startMicCapture(
   processor.connect(silentSink)
   silentSink.connect(context.destination)
 
-  let stopped = false
   return {
     stream,
     stop: () => {
