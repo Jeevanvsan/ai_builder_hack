@@ -109,6 +109,12 @@ npx expo export -p android       # proves Metro resolves and bundles everything
 That last one is worth the 30 seconds: it has already caught two problems that would otherwise have cost a
 ~1 hour cloud build each.
 
+## Before demoing: grant permissions once
+The first time the app needs the mic, camera or location, Android shows its permission dialog — including on the
+SOS screen, where it appears over the black overlay and undercuts the "phone is off" illusion. This is
+unavoidable for any app, so **run one call and one SOS on the device before a demo or a judged run**, accept
+everything, and every later trigger is silent.
+
 ## Fastest way to see it working
 Open the dashboard (https://quickbite-5cde0-dashboard.web.app) beside the phone and watch incidents land:
 - **Coded order** — add a coded item (e.g. Extra Pepperoni) → Checkout → Place order.

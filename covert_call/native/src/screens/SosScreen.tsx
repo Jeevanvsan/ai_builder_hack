@@ -6,9 +6,11 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../../App'
 import { db } from '../lib/firebase'
-import { startIncident, endIncident } from '../../../shared/incidents/client'
+import { startIncident, endIncident, setCameraMode } from '../../../shared/incidents/client'
+import { startVideoPublisher } from '../../../shared/video/publisher'
 import { startSilentObserver, type SilentObserverHandle } from '../lib/gemini/silentSession'
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
+import { acquireSosCameras, stopStream, type RtcStream } from '../lib/platform/camera'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
 
@@ -18,10 +20,10 @@ type Nav = NativeStackNavigationProp<RootStackParamList>
 // while a silent Gemini observer builds the incident from what the mic hears. The person leaves with a secret
 // gesture: three taps anywhere on the screen within 1.5s.
 //
-// Not yet ported (Epic 12 phase 3): the cameras — the dual-camera capture, the live feeds to the dashboard, and
-// camera-sourced observations. Those need a native frame source that doesn't exist yet, so this is audio-only
-// for now. Everything else — the immediate high-severity incident, the observer, teardown, consolidation and the
-// recording upload — matches the web.
+// Still missing versus the web: camera-sourced observations. Gemini sees nothing here, because sampling ~1 fps
+// JPEGs out of a WebRTC track needs a native frame source React Native doesn't provide. The live feeds below and
+// every sound-based observation do work. The web's frozen-camera check is absent for the same reason — it
+// compares two canvas samples, and there is no canvas.
 
 // Caps any single teardown step so leaving can never hang: a slow Gemini close or a stuck upload would otherwise
 // block the exit gesture, which is the one thing that must always work.
@@ -39,6 +41,9 @@ export function SosScreen() {
   const incidentIdRef = useRef<string | null>(null)
   const observerRef = useRef<SilentObserverHandle | null>(null)
   const previousBrightnessRef = useRef<number | null>(null)
+  // Every camera the phone will give us, each published as its own feed so a responder can switch between them.
+  const streamsRef = useRef<RtcStream[]>([])
+  const publisherStopsRef = useRef<(() => Promise<void>)[]>([])
 
   // Secret exit: three taps anywhere on the screen within 1.5s.
   const tapCountRef = useRef(0)
@@ -67,6 +72,24 @@ export function SosScreen() {
         previousBrightnessRef.current = null
       }
 
+      // Live video to the dashboard. Started before the observer so a responder can see the scene as early as
+      // possible; each camera signals independently, so one failing doesn't stop the others.
+      try {
+        const { cameras, mode } = await acquireSosCameras()
+        streamsRef.current = cameras.map((c) => c.stream)
+        void setCameraMode(db, id, mode)
+        console.log(`[QuickBite SOS] publishing cameras: ${cameras.map((c) => c.facing).join(', ') || 'none'}`)
+        for (const cam of cameras) {
+          try {
+            publisherStopsRef.current.push(await startVideoPublisher(db, id, cam.stream, { camera: cam.facing }))
+          } catch (e) {
+            console.error(`[QuickBite SOS] live feed publisher failed for the ${cam.facing} camera:`, e)
+          }
+        }
+      } catch (e) {
+        console.error('[QuickBite SOS] camera acquisition failed — continuing audio-only:', e)
+      }
+
       try {
         observerRef.current = await startSilentObserver(db, id)
       } catch (e) {
@@ -84,6 +107,9 @@ export function SosScreen() {
     const id = incidentIdRef.current
     const transcript = observerRef.current?.getTranscript() ?? ''
     const recording = await withTimeout(observerRef.current?.end() ?? Promise.resolve(null), null)
+    await withTimeout(Promise.all(publisherStopsRef.current.map((stop) => stop().catch(() => {}))), [])
+    streamsRef.current.forEach(stopStream)
+    streamsRef.current = []
 
     if (previousBrightnessRef.current != null) {
       await Brightness.setBrightnessAsync(previousBrightnessRef.current).catch(() => {})
