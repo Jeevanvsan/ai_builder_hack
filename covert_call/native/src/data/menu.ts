@@ -1,37 +1,317 @@
-// Native menu data (Epic 12.2). Mirrors the web menu's items and their coded meanings, but without bundled images
-// (add require()'d assets later). The `code` field ties an item to a coded meaning in shared/codes.ts.
+import type { ImageSourcePropType } from 'react-native'
+
+// Native port of web/src/data/menu.ts — same 22 items, ids, prices and code mappings, so an incident raised from
+// the phone decodes identically to one raised from the browser (shared/codes.ts resolves both). The only
+// difference is how images are referenced: Metro's require() instead of the web bundler's import.
+
+export type CategoryId = 'pizza' | 'burgers' | 'biryani' | 'sides' | 'desserts' | 'drinks' | 'addons'
+
+export const CATEGORIES: { id: CategoryId; label: string }[] = [
+  { id: 'pizza', label: 'Pizza' },
+  { id: 'burgers', label: 'Burgers' },
+  { id: 'biryani', label: 'Biryani' },
+  { id: 'sides', label: 'Sides' },
+  { id: 'desserts', label: 'Desserts' },
+  { id: 'drinks', label: 'Drinks' },
+  { id: 'addons', label: 'Add-ons' },
+]
+
 export interface MenuItem {
   id: string
   name: string
   description: string
   price: number
+  image: ImageSourcePropType
   veg: boolean
-  category: string
+  category: CategoryId
+  rating?: number
+  ratingCount?: string
+  bestseller?: boolean
+  // Links this item to a coded meaning in shared/codes.ts (Epic 8, click & order). Ordinary customers never
+  // notice it; a person in danger long-presses to see what it reports and adds it like any normal item.
   code?: string
 }
 
+// Metro needs a static string literal in require(), so the images are named once here and reused below.
+const IMG = {
+  margherita: require('../../assets/food/margherita.jpg'),
+  farmhouse: require('../../assets/food/farmhouse.jpg'),
+  chickenTikkaPizza: require('../../assets/food/chicken-tikka-pizza.jpg'),
+  familyCombo: require('../../assets/food/family-combo.jpg'),
+  vegBurger: require('../../assets/food/veg-burger.jpg'),
+  chickenBurger: require('../../assets/food/chicken-burger.jpg'),
+  chickenBiryani: require('../../assets/food/chicken-biryani.jpg'),
+  vegBiryani: require('../../assets/food/veg-biryani.jpg'),
+  garlicBread: require('../../assets/food/garlic-bread.jpg'),
+  fries: require('../../assets/food/fries.jpg'),
+  lavaCake: require('../../assets/food/lava-cake.jpg'),
+  coldCoffee: require('../../assets/food/cold-coffee.jpg'),
+  lemonade: require('../../assets/food/lemonade.jpg'),
+  hotSauce: require('../../assets/food/hot-sauce.jpg'),
+  cheeseDip: require('../../assets/food/cheese-dip.jpg'),
+} as const
+
+export const BANNER_IMAGE = require('../../assets/food/banner.jpg')
+
 export const MENU: MenuItem[] = [
-  { id: 'margherita', name: 'Margherita Pizza', description: 'Classic tomato, mozzarella, basil.', price: 249, veg: true, category: 'Pizza' },
-  { id: 'chicken-tikka-pizza', name: 'Chicken Tikka Pizza', description: 'Tandoori chicken, onion, peppers.', price: 399, veg: false, category: 'Pizza' },
-  { id: 'family-combo', name: 'Family Combo — Large', description: 'Two pizzas, garlic bread, a drink.', price: 699, veg: false, category: 'Pizza', code: 'crime-witnessed' },
-  { id: 'party-platter', name: 'Party Platter', description: 'Four large pizzas for a crowd.', price: 899, veg: false, category: 'Pizza', code: 'group-fight' },
-  { id: 'chicken-burger', name: 'Crispy Chicken Burger', description: 'Fried chicken, lettuce, peri mayo.', price: 199, veg: false, category: 'Burgers' },
-  { id: 'kids-meal', name: "Kids' Meal Box", description: 'Mini burger, fries, a small treat.', price: 199, veg: true, category: 'Burgers', code: 'child-danger' },
-  { id: 'chicken-biryani', name: 'Chicken Dum Biryani', description: 'Slow-cooked basmati and chicken.', price: 299, veg: false, category: 'Biryani' },
-  { id: 'garlic-bread', name: 'Cheesy Garlic Bread', description: 'Garlic butter, herbs, mozzarella.', price: 129, veg: true, category: 'Sides', code: 'followed' },
-  { id: 'fries', name: 'Salted Fries', description: 'Golden, crispy, lightly salted.', price: 99, veg: true, category: 'Sides' },
-  { id: 'lava-cake', name: 'Choco Lava Cake', description: 'Warm cake, molten centre.', price: 109, veg: true, category: 'Desserts', code: 'domestic' },
-  { id: 'lemonade', name: 'Mint Lemonade', description: 'Lime, mint and soda over ice.', price: 79, veg: true, category: 'Drinks', code: 'hazard' },
-  { id: 'extra-pepperoni', name: 'Extra Pepperoni', description: 'Add extra pepperoni to any pizza.', price: 49, veg: false, category: 'Add-ons', code: 'weapon' },
-  { id: 'extra-spicy', name: 'Extra Spicy', description: 'Make any order extra spicy.', price: 0, veg: true, category: 'Add-ons', code: 'harmed-now' },
-  { id: 'extra-cheese', name: 'Extra Cheese', description: 'An extra layer of melted cheese.', price: 49, veg: true, category: 'Add-ons', code: 'confined' },
-  { id: 'extra-napkins', name: 'Extra Napkins', description: 'A pack of extra napkins.', price: 0, veg: true, category: 'Add-ons', code: 'injured' },
-  { id: 'to-go-box', name: 'Sealed To-Go Box', description: 'Extra sealed packaging.', price: 19, veg: true, category: 'Add-ons', code: 'taken' },
+  {
+    id: 'margherita',
+    name: 'Margherita Pizza',
+    description: 'Classic tomato sauce, fresh mozzarella and basil on a hand-stretched base. Serves 1–2.',
+    price: 249,
+    image: IMG.margherita,
+    veg: true,
+    category: 'pizza',
+    rating: 4.4,
+    ratingCount: '2.1k',
+    bestseller: true,
+  },
+  {
+    id: 'farmhouse',
+    name: 'Farmhouse Veggie Pizza',
+    description: 'Capsicum, onion, tomato, mushroom and sweet corn with a double layer of cheese.',
+    price: 349,
+    image: IMG.farmhouse,
+    veg: true,
+    category: 'pizza',
+    rating: 4.3,
+    ratingCount: '980',
+  },
+  {
+    id: 'chicken-tikka-pizza',
+    name: 'Chicken Tikka Pizza',
+    description: 'Tandoori-spiced chicken tikka, red onion and peppers on a spicy tomato base.',
+    price: 399,
+    image: IMG.chickenTikkaPizza,
+    veg: false,
+    category: 'pizza',
+    rating: 4.5,
+    ratingCount: '1.6k',
+    bestseller: true,
+  },
+  {
+    id: 'family-combo',
+    name: 'Family Combo — Large',
+    description: 'Two medium pizzas of your choice, cheesy garlic bread and a 1.25L soft drink. Feeds a group.',
+    price: 699,
+    image: IMG.familyCombo,
+    veg: false,
+    category: 'pizza',
+    rating: 4.6,
+    ratingCount: '740',
+    code: 'crime-witnessed',
+  },
+  {
+    id: 'veg-burger',
+    name: 'Classic Veg Burger',
+    description: 'Crispy bean-and-veg patty, lettuce, tomato and our house mayo in a toasted bun.',
+    price: 149,
+    image: IMG.vegBurger,
+    veg: true,
+    category: 'burgers',
+    rating: 4.1,
+    ratingCount: '1.2k',
+  },
+  {
+    id: 'chicken-burger',
+    name: 'Crispy Chicken Burger',
+    description: 'Buttermilk-fried chicken fillet, lettuce and peri-peri mayo in a sesame bun.',
+    price: 199,
+    image: IMG.chickenBurger,
+    veg: false,
+    category: 'burgers',
+    rating: 4.4,
+    ratingCount: '1.9k',
+    bestseller: true,
+  },
+  {
+    id: 'chicken-biryani',
+    name: 'Chicken Dum Biryani',
+    description: 'Slow-cooked basmati and tender chicken, sealed and dum-cooked. Served with raita.',
+    price: 299,
+    image: IMG.chickenBiryani,
+    veg: false,
+    category: 'biryani',
+    rating: 4.5,
+    ratingCount: '3.4k',
+    bestseller: true,
+  },
+  {
+    id: 'veg-biryani',
+    name: 'Veg Dum Biryani',
+    description: 'Fragrant basmati layered with seasonal vegetables and whole spices. Served with raita.',
+    price: 229,
+    image: IMG.vegBiryani,
+    veg: true,
+    category: 'biryani',
+    rating: 4.2,
+    ratingCount: '860',
+  },
+  {
+    id: 'garlic-bread',
+    name: 'Cheesy Garlic Bread',
+    description: 'Oven-baked baguette with garlic butter, herbs and melted mozzarella.',
+    price: 129,
+    image: IMG.garlicBread,
+    veg: true,
+    category: 'sides',
+    rating: 4.3,
+    ratingCount: '1.1k',
+    code: 'followed',
+  },
+  {
+    id: 'fries',
+    name: 'Salted Fries',
+    description: 'Golden, crispy and lightly salted. Comes with a ketchup dip.',
+    price: 99,
+    image: IMG.fries,
+    veg: true,
+    category: 'sides',
+    rating: 4.2,
+    ratingCount: '2.5k',
+  },
+  {
+    id: 'lava-cake',
+    name: 'Choco Lava Cake',
+    description: 'Warm chocolate cake with a molten centre. Best eaten straight away.',
+    price: 109,
+    image: IMG.lavaCake,
+    veg: true,
+    category: 'desserts',
+    rating: 4.6,
+    ratingCount: '2.8k',
+    bestseller: true,
+    code: 'domestic',
+  },
+  {
+    id: 'cold-coffee',
+    name: 'Cold Coffee',
+    description: 'Chilled, creamy coffee blended with milk and a touch of sugar.',
+    price: 129,
+    image: IMG.coldCoffee,
+    veg: true,
+    category: 'drinks',
+    rating: 4.3,
+    ratingCount: '690',
+  },
+  {
+    id: 'lemonade',
+    name: 'Mint Lemonade',
+    description: 'Fresh lime, mint and soda over ice.',
+    price: 79,
+    image: IMG.lemonade,
+    veg: true,
+    category: 'drinks',
+    rating: 4.1,
+    ratingCount: '420',
+    code: 'hazard',
+  },
+  {
+    id: 'hot-sauce',
+    name: 'Extra Hot Sauce',
+    description: 'Add-on, goes with any order.',
+    price: 0,
+    image: IMG.hotSauce,
+    veg: true,
+    category: 'addons',
+  },
+  {
+    id: 'cheese-dip',
+    name: 'Cheese Dip',
+    description: 'Creamy cheddar dip. Add-on, goes with any order.',
+    price: 39,
+    image: IMG.cheeseDip,
+    veg: true,
+    category: 'addons',
+  },
+  {
+    id: 'party-platter',
+    name: 'Party Platter',
+    description: 'Four large pizzas, garlic bread and dips. Built for a crowd or a big group.',
+    price: 899,
+    image: IMG.familyCombo,
+    veg: false,
+    category: 'pizza',
+    rating: 4.5,
+    ratingCount: '310',
+    code: 'group-fight',
+  },
+  {
+    id: 'kids-meal',
+    name: "Kids' Meal Box",
+    description: 'A mini burger, fries and a small treat. Just right for one child.',
+    price: 199,
+    image: IMG.vegBurger,
+    veg: true,
+    category: 'burgers',
+    rating: 4.2,
+    ratingCount: '520',
+    code: 'child-danger',
+  },
+  {
+    id: 'extra-pepperoni',
+    name: 'Extra Pepperoni',
+    description: 'Add extra pepperoni to any pizza.',
+    price: 49,
+    image: IMG.chickenTikkaPizza,
+    veg: false,
+    category: 'addons',
+    code: 'weapon',
+  },
+  {
+    id: 'extra-spicy',
+    name: 'Extra Spicy',
+    description: 'Make any order extra spicy.',
+    price: 0,
+    image: IMG.hotSauce,
+    veg: true,
+    category: 'addons',
+    code: 'harmed-now',
+  },
+  {
+    id: 'extra-cheese',
+    name: 'Extra Cheese',
+    description: 'An extra layer of melted cheese on any order.',
+    price: 49,
+    image: IMG.cheeseDip,
+    veg: true,
+    category: 'addons',
+    code: 'confined',
+  },
+  {
+    id: 'extra-napkins',
+    name: 'Extra Napkins',
+    description: 'A pack of extra napkins with your order.',
+    price: 0,
+    image: IMG.fries,
+    veg: true,
+    category: 'addons',
+    code: 'injured',
+  },
+  {
+    id: 'to-go-box',
+    name: 'Sealed To-Go Box',
+    description: 'Extra sealed packaging so your order travels well.',
+    price: 19,
+    image: IMG.fries,
+    veg: true,
+    category: 'addons',
+    code: 'taken',
+  },
 ]
 
 export const MENU_BY_ID: Record<string, MenuItem> = Object.fromEntries(MENU.map((m) => [m.id, m]))
 
-export const DELIVERY_ADDRESS = { label: 'Home', line: '12th Main Rd, HAL 2nd Stage, Indiranagar, Bengaluru' }
-export const OUTLET = { name: 'QuickBite Kitchen', area: 'Indiranagar', eta: '18–25 min' }
+export const OUTLET = {
+  name: 'QuickBite Kitchen',
+  area: 'Indiranagar',
+  cuisines: 'Pizzas · Burgers · Biryani',
+  rating: 4.4,
+  ratingCount: '12k+',
+  eta: '18–25 min',
+}
 
-export const formatRupees = (amount: number) => `₹${amount.toLocaleString('en-IN')}`
+export const DELIVERY_ADDRESS = {
+  label: 'Home',
+  line: '12th Main Rd, HAL 2nd Stage, Indiranagar, Bengaluru',
+}

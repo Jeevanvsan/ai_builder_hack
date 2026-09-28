@@ -1,0 +1,6 @@
+.expo/
+.export-check/
+dist/
+android/
+ios/
+*.local

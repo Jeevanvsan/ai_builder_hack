@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.quickbite.app",
       "infoPlist": {
         "NSCameraUsageDescription": "QuickBite uses your camera for order support.",
-        "NSMicrophoneUsageDescription": "QuickBite uses your microphone for calls to the order desk."
+        "NSMicrophoneUsageDescription": "QuickBite uses your microphone for calls to the order desk.",
+        "NSLocationWhenInUseUsageDescription": "QuickBite uses your location to find your delivery address."
       },
       "bitcode": false
     },
@@ -23,6 +24,8 @@
         "RECORD_AUDIO",
         "android.permission.WRITE_SETTINGS",
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.CAMERA",
         "android.permission.INTERNET",
         "android.permission.MODIFY_AUDIO_SETTINGS",
@@ -40,10 +43,34 @@
           "cameraPermission": "QuickBite uses your camera for order support.",
           "microphonePermission": "QuickBite uses your microphone for calls to the order desk."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "QuickBite uses your location to find your delivery address."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "QuickBite uses your camera so you can add a photo to your delivery instructions."
+        }
+      ],
+      [
+        "react-native-audio-api",
+        {
+          "iosMicrophonePermission": "QuickBite uses your microphone for calls to the order desk."
+        }
       ]
     ],
+    "updates": {
+      "url": "https://u.expo.dev/d31b71ff-8472-4920-985c-ede5eb1b13b4"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
-      "//": "Epic 13 — alternate app icons are configured with a config plugin (e.g. expo-alternate-app-icons) once the icon assets exist; see src/lib/appearance.ts and README.md.",
+      "//": "Epic 13 — alternate app icons are configured with a config plugin (e.g. expo-alternate-app-icons) once the icon assets exist; see src/lib/appearance.tsx and README.md.",
       "eas": {
         "projectId": "d31b71ff-8472-4920-985c-ede5eb1b13b4"
       }
