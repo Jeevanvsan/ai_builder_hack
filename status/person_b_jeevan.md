@@ -381,3 +381,9 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
   - **Filler and tokens in the transcript.** The transcript cleaner now also strips silent/silence, music, static, noise and cough tokens, plus `---`. Persona: when repeating after silence, say only the question; no "I'm listening", "I'm waiting" or "still there", and never say "silent" aloud.
   - The "pepperoniweapon present" text in a copied transcript is the dashboard's inline code-meaning chip, not speech.
   - Web app redeployed. Web-only, nothing to port to native.
+- 2026-09-28 (IST, ~18:25): **Notes for Ameen (web call + persona, please review), follow-up to the 18:10 fix:**
+  - **Still routed on INC-MUL8261B.** The movement check read Mia's free-text notes as well, and a match on words like "follow-up" routed a caller hiding at home. It now reads danger tags and Mia's route situation only, with whole-word patterns (followed/chased/stalked/escaping/abducted, "leaving the house", and so on). Checked against sample tags: weapon, injury, attacker-on-bike and silent tags no longer trigger a route.
+  - **New coded question, CAN THEY GET OUT?** "Collect it outside, or should the rider bring it in?" Mia asks it when the caller is inside with danger near. "Collect" tags "caller escaping - leaving the house" and starts routing. "Bring it in" means no directions, just stay-safe advice.
+  - **Covert directions now name the real place as the meeting point** ("the rider is waiting outside Alappuzha South police station"), instead of an unnamed "rider/pickup point".
+  - **"Caller silent after danger" tag:** the silence window went from 12 s to 20 s, and the tag is removed as soon as the caller speaks again.
+  - Web app redeployed.
