@@ -205,7 +205,7 @@ export function CallPage() {
           }).catch(() => {})
           void (async () => {
             try {
-              const result = await uploadCallVideo(recording, { incidentId: id, camera: 'back', mimeType: recording.type || 'audio/webm' })
+              const result = await uploadCallVideo(recording, { incidentId: id, camera: 'audio', mimeType: recording.type || 'audio/webm' })
               await setAudioRecording(db, id, {
                 status: 'uploaded',
                 driveFileId: result?.driveFileId ?? null,
