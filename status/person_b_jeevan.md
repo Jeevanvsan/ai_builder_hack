@@ -387,3 +387,4 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
   - **Covert directions now name the real place as the meeting point** ("the rider is waiting outside Alappuzha South police station"), instead of an unnamed "rider/pickup point".
   - **"Caller silent after danger" tag:** the silence window went from 12 s to 20 s, and the tag is removed as soon as the caller speaks again.
   - Web app redeployed.
+  - (~18:35) A route the responder picks on the dashboard (or a re-route) no longer gets passed to Mia unless the caller is moving (on the road, chased or leaving). It still shows on the dashboard. Web redeployed.
