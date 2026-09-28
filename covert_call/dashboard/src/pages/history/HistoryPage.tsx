@@ -2,6 +2,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Chip from '../../components/Chip'
 import DataState from '../../components/DataState'
 import Pagination from '../../components/Pagination'
+import SmartSearchBar, { useSmartSearch } from '../../components/SmartSearch'
 import { channelLabel, formatElapsed, formatTime } from '../../lib/format'
 import { useIncidents } from '../../lib/incidentsStore'
 import type { Incident } from '../../../../shared/incidents/types'
@@ -15,23 +16,6 @@ function matchesPeriod(i: Incident, period: Period, now: number): boolean {
   if (period === 'all' || !i.response.resolvedAt) return period === 'all'
   const age = now - Date.parse(i.response.resolvedAt)
   return age <= (period === 'today' ? 1 : 7) * 86_400_000
-}
-
-function matchesSearch(i: Incident, q: string): boolean {
-  if (!q) return true
-  const haystack = [
-    i.id,
-    i.channel,
-    channelLabel(i.channel),
-    i.location.confirmed?.address,
-    i.response.acknowledgedBy,
-    i.consolidatedSummary,
-    ...i.extractedFieldsLive.dangerIndicators,
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase()
-  return haystack.includes(q.toLowerCase())
 }
 
 export default function HistoryPage() {
@@ -55,16 +39,18 @@ export default function HistoryPage() {
 
   const now = useNow(60_000)
   const responders = [...new Set(data.map((i) => i.response.acknowledgedBy).filter((r): r is string => Boolean(r)))].sort()
-  const filtered = data
+  const narrowed = data
     .filter(
       (i) =>
-        matchesSearch(i, q) &&
         (!severity || i.severity === severity) &&
         (!channel || i.channel === channel) &&
         (!handledBy || i.response.acknowledgedBy === handledBy) &&
         matchesPeriod(i, period, now),
     )
     .sort((a, b) => Date.parse(b.response.resolvedAt ?? '') - Date.parse(a.response.resolvedAt ?? ''))
+  // Plain-language search on top of the dropdown filters (AI order wins when it has answered).
+  const search = useSmartSearch(narrowed, q)
+  const filtered = search.results
   const pager = usePagination(filtered)
   const anyFilter = Boolean(q || severity || channel || handledBy || period !== 'all')
 
@@ -76,14 +62,7 @@ export default function HistoryPage() {
       </div>
 
       <div className="filters">
-        <input
-          className="input filter-search"
-          type="search"
-          value={q}
-          onChange={(e) => setFilter('q', e.target.value)}
-          placeholder="Search ID, address, responder, danger indicator…"
-          aria-label="Search cases"
-        />
+        <SmartSearchBar value={q} onChange={(v) => setFilter('q', v)} onAsk={() => void search.runAi()} aiStatus={search.aiStatus} />
         <select className="input" value={severity} onChange={(e) => setFilter('severity', e.target.value)} aria-label="Severity">
           <option value="">All severities</option>
           <option value="high">High</option>
@@ -151,6 +130,7 @@ export default function HistoryPage() {
                     </td>
                     <td>{i.location.confirmed?.address ?? <span className="muted-inline">Not confirmed</span>}</td>
                     <td title={i.consolidatedSummary ?? undefined}>
+                      {search.reasons.get(i.id) && <span className="search-reason">AI: {search.reasons.get(i.id)}</span>}
                       <span className="summary-cell">{i.consolidatedSummary ?? '—'}</span>
                     </td>
                   </tr>

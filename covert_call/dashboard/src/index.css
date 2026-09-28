@@ -1177,3 +1177,9 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 @keyframes critical-frame { 50% { box-shadow: 0 0 0 3px var(--high), 0 0 6px color-mix(in srgb, var(--high) 20%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .case-board.is-critical, .critical-dot { animation: none; } }
 @media (max-width: 1100px) { .critical-banner { position: static; margin: 0.75rem; flex-wrap: wrap; } .critical-banner-action { margin-left: 0; text-align: left; } .case-board.is-critical .board-grid { padding-top: 1.25rem; } }
+
+/* Plain-language incident search (queue + case history) */
+.smart-search { display: flex; flex: 1 1 28rem; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.smart-search .filter-search { flex: 1 1 18rem; }
+.smart-search-note { flex-basis: 100%; }
+.search-reason { display: block; font-size: 0.78rem; color: var(--accent, #d9480f); margin-bottom: 0.15rem; }
