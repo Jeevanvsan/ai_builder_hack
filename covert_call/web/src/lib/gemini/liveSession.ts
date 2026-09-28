@@ -116,6 +116,9 @@ export async function startLiveCall(
   // one-off reminder goes out once the caller has spoken for a while — see the estimate timer below.
   let estimateReported = false
   let finished = false
+  // Tracks real socket health (set on onopen/onclose), independent of `finished` (which only means the caller/AI
+  // ended the call). Every send must check both — see canSend() below.
+  let connected = false
   // Session resumption (Epic 10.1): a session with video attached hits a shorter cap, so we keep the latest
   // resumption handle and transparently reopen the session if it drops mid-call. Only used when video is on.
   const useVideo = Boolean(opts.videoStream)
@@ -339,13 +342,14 @@ export async function startLiveCall(
         // onopen can fire before `client.live.connect()`'s own promise resolves and assigns `session` below —
         // sending the greeting nudge from here throws (session is still undefined). Just flip status here;
         // the greeting itself is sent right after the `await` completes instead, once `session` definitely exists.
-        onopen: () => callbacks.onStatusChange('live'),
+        onopen: () => { connected = true; callbacks.onStatusChange('live') },
         onmessage: onMessage,
         onerror: (e) => {
           console.error('[QuickBite call] Gemini Live error:', e)
           callbacks.onStatusChange('failed')
         },
         onclose: (e) => {
+          connected = false
           console.warn('[QuickBite call] Gemini Live closed:', e?.code, e?.reason)
           // A session that drops before the caller has actually ended the call and still has a resumption
           // handle is reopened transparently — audio-only calls now get this too (see sessionResumption above),
@@ -396,10 +400,15 @@ export async function startLiveCall(
     })
   })
 
+  const canSend = () => connected && !finished
+
   const mic = await startMicCapture((base64Pcm, level) => {
     // The caller is speaking (transcripts arrive late, after they finish): don't treat a long answer as silence.
     if (level > SPEAKING_LEVEL && !player.isPlaying()) lastActivityAt = Date.now()
-    if (!muted) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
+    // Previously gated only on !muted, with no check that the socket was actually alive — the same class of bug
+    // just fixed in silentSession.ts (SOS): if the connection drops and can't reconnect, every mic frame kept
+    // hitting a dead socket for the rest of the call, spamming "WebSocket is already in CLOSING or CLOSED state".
+    if (!muted && canSend()) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
   }, opts.micStream)
   micStop = mic.stop
 
@@ -409,7 +418,7 @@ export async function startLiveCall(
   let frameSampler: FrameSampler | null = null
   if (opts.videoStream) {
     frameSampler = startFrameSampler(opts.videoStream, (base64Jpeg) => {
-      if (!finished) session.sendRealtimeInput({ video: { data: base64Jpeg, mimeType: 'image/jpeg' } })
+      if (canSend()) session.sendRealtimeInput({ video: { data: base64Jpeg, mimeType: 'image/jpeg' } })
     })
   }
 
