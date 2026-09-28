@@ -388,3 +388,4 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
   - **"Caller silent after danger" tag:** the silence window went from 12 s to 20 s, and the tag is removed as soon as the caller speaks again.
   - Web app redeployed.
   - (~18:35) A route the responder picks on the dashboard (or a re-route) no longer gets passed to Mia unless the caller is moving (on the road, chased or leaving). It still shows on the dashboard. Web redeployed.
+  - (~18:45) The caller transcript misheard code answers (for example 'Kola' for 'cola') while Mia's detection was right. The live transcript comes from a separate, weaker speech-to-text step than the model that actually understands the audio. It now gets every code phrase from shared/codes.ts plus the answers to Mia's follow-up questions as vocabulary hints. Checked that the Live API accepts 75 entries. Web redeployed.

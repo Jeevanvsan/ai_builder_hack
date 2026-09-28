@@ -4,6 +4,7 @@ import { INCIDENTS, appendTranscriptLine, confirmAddress, recordAdvice, recordCa
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
+import { ALL_CODES } from '../../../../shared/codes.ts'
 import { startCallRecording, type CallRecorder } from './recorder.ts'
 import { LIVE_CALL_TOOLS } from './tools.ts'
 import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
@@ -328,7 +329,13 @@ export async function startLiveCall(
         inputAudioTranscription: {
           languageCodes: ['en-IN', 'ml-IN', 'hi-IN', 'ta-IN'],
           customVocabulary: [
-            'QuickBite', 'Mia', 'talk', 'order', 'garlic bread', 'pepperoni', 'extra spicy', 'kids meal', 'family combo',
+            'QuickBite', 'Mia', 'talk', 'order',
+            // Every code phrase plus the answers to Mia's follow-ups, so a whispered "cola" isn't heard as "Kola".
+            ...ALL_CODES.map((c) => c.food),
+            'cola', 'lemon', 'orange', 'a few napkins', 'a whole pack', 'small', 'medium', 'large', 'one pizza', 'two pizzas',
+            'a few', 'hand it to me', 'leave it at the door', 'right now', 'pre-order', 'as soon as possible', 'within the hour',
+            'whenever', 'pick up', 'bike', 'car', 'barbecue', 'mayo', 'ketchup', 'regular crust', 'large crust', 'the usual',
+            'collect it outside', 'bring it in', 'for myself', 'for someone else', 'one address', 'moving around',
             'Alappuzha', 'Alleppey', 'Vazhicherry', 'Muhamma', 'Mullakkal', 'Kalavoor', 'Cherthala', 'Kochi', 'Ernakulam',
             'Kottayam', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Bengaluru', 'HSR Layout', 'Koramangala',
             'petrol pump', 'junction', 'police station',
