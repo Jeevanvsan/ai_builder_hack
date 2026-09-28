@@ -374,3 +374,4 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
   - Enter or **Ask AI** sends short case digests to `gemini-3.5-flash-lite`, which returns matching cases ranked, each with a one-line reason shown on the row. If the AI fails (e.g. quota), the keyword results stay.
   - Queue stats still count the whole queue. The query is kept in the URL.
   - Files: `dashboard/src/lib/nlSearch.ts`, `dashboard/src/components/SmartSearch.tsx`, `QueuePage.tsx`, `HistoryPage.tsx`, `index.css`. Dashboard redeployed. Dashboard-only, nothing to port.
+- 2026-09-28 (IST, ~17:15): Added `covert_call/docs/demo_video_scripts.md`, the demo video scripts: covert call (attacker in the room), chase call (followed on foot), optional silent SOS clip, opening and ending shots, ChatGPT caller setup prompts and a pre-take checklist. **Note for Ameen:** the caller's lines use the real code words from `shared/codes.ts`; Mia's lines are expected wording only.
