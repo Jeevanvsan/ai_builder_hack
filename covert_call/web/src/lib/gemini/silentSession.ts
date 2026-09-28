@@ -104,9 +104,15 @@ export async function startSilentObserver(
     client.live.connect({
       model: LIVE_MODEL,
       config: {
-        // TEXT, not AUDIO: the observer must never speak into the room. We ignore the text; the value is the tool
-        // calls and the transcription of what it hears.
-        responseModalities: [Modality.TEXT],
+        // gemini-3.8-live rejects TEXT-only responseModalities outright ("requested combination of response
+        // modalities (TEXT) is not supported by the model") — confirmed via a real onclose event (code 1007) on
+        // a real device test: every SOS session was rejected before it could ever hear or see anything, which is
+        // why nothing was ever detected in any test. AUDIO is the only modality this model actually supports for
+        // a Live session. The observer still never speaks into the room: onMessage below only ever reads
+        // inputTranscription (what the mic heard) and tool calls — it never touches
+        // message.serverContent.modelTurn's audio parts or plays them back, so the spoken response Gemini
+        // generates is simply received and ignored, not silenced after the fact.
+        responseModalities: [Modality.AUDIO],
         inputAudioTranscription: {},
         systemInstruction: SILENT_OBSERVER_INSTRUCTION,
         tools: REPORT_SCENE_OBSERVATION_TOOLS,
