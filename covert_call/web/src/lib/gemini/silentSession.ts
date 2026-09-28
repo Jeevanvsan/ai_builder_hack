@@ -90,6 +90,15 @@ export async function startSilentObserver(
   }
 
   let session: Session
+  // The previous check before every send was only `!finished` — true until the person actively ends the SOS.
+  // If the very first connection attempt fails or closes before a resumption handle ever arrives (drops in the
+  // first second, never truly opens), `resumptionHandle` stays undefined, the reconnect condition below is
+  // false, NOTHING reconnects, and the session sits dead — but `finished` never becomes true either, since only
+  // end() sets it. Every mic/frame callback kept calling sendRealtimeInput on that dead socket for as long as the
+  // SOS ran, which is the actual, confirmed source of the "WebSocket is already in CLOSING or CLOSED state" flood
+  // (previously misdiagnosed as a stray-frame timing issue — that was real too, but not this). `connected` tracks
+  // real socket health independent of `finished`/the resumption handle, and every send now checks both.
+  let connected = false
 
   const openSession = (resume?: string) =>
     client.live.connect({
@@ -107,13 +116,21 @@ export async function startSilentObserver(
         sessionResumption: resume ? { handle: resume } : {},
       },
       callbacks: {
-        onopen: () => {},
+        onopen: () => { connected = true },
         onmessage: onMessage,
         onerror: (e) => console.error('[QuickBite SOS] observer error:', e),
-        onclose: () => {
+        onclose: (e) => {
+          connected = false
+          console.warn('[QuickBite SOS] observer closed:', e?.code, e?.reason)
           if (!finished && resumptionHandle && reconnects < MAX_RECONNECTS) {
             reconnects += 1
-            void openSession(resumptionHandle).then((s) => { session = s }).catch(() => {})
+            void openSession(resumptionHandle).then((s) => { session = s }).catch((err) => {
+              console.error('[QuickBite SOS] reconnect failed:', err)
+            })
+            return
+          }
+          if (!finished) {
+            console.warn('[QuickBite SOS] observer could not reconnect — no resumption handle or attempts exhausted; mic/frame sends now suppressed until the SOS ends.')
           }
         },
       },
@@ -121,19 +138,21 @@ export async function startSilentObserver(
 
   session = await openSession()
 
+  const canSend = () => connected && !finished
+
   const mic = await startMicCapture((base64Pcm) => {
-    if (!finished) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
+    if (canSend()) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
   }, opts.micStream)
 
   // One frame sampler per camera (front + back). Both feed the same observer.
   const samplers: FrameSampler[] = opts.videoStreams.map((stream) =>
     startFrameSampler(stream, (base64Jpeg) => {
-      if (!finished) session.sendRealtimeInput({ video: { data: base64Jpeg, mimeType: 'image/jpeg' } })
+      if (canSend()) session.sendRealtimeInput({ video: { data: base64Jpeg, mimeType: 'image/jpeg' } })
     }),
   )
 
   // Nudge it to start observing immediately.
-  session.sendClientContent({ turns: 'A silent SOS has started. Begin observing and reporting through tools now.' })
+  if (canSend()) session.sendClientContent({ turns: 'A silent SOS has started. Begin observing and reporting through tools now.' })
 
   let ended = false
   return {
