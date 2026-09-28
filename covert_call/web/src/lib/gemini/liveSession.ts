@@ -342,7 +342,7 @@ export async function startLiveCall(
         // onopen can fire before `client.live.connect()`'s own promise resolves and assigns `session` below —
         // sending the greeting nudge from here throws (session is still undefined). Just flip status here;
         // the greeting itself is sent right after the `await` completes instead, once `session` definitely exists.
-        onopen: () => { connected = true; callbacks.onStatusChange('live') },
+        onopen: () => { connected = true; reconnects = 0; callbacks.onStatusChange('live') },
         onmessage: onMessage,
         onerror: (e) => {
           console.error('[QuickBite call] Gemini Live error:', e)
@@ -351,10 +351,14 @@ export async function startLiveCall(
         onclose: (e) => {
           connected = false
           console.warn('[QuickBite call] Gemini Live closed:', e?.code, e?.reason)
-          // A session that drops before the caller has actually ended the call and still has a resumption
-          // handle is reopened transparently — audio-only calls now get this too (see sessionResumption above),
-          // since a dropped connection with nobody calling back is exactly the failure this feature exists for.
-          if (!finished && resumptionHandle && reconnects < MAX_RECONNECTS) {
+          // A session that drops before the caller has actually ended the call is reopened transparently —
+          // audio-only calls now get this too (see sessionResumption above), since a dropped connection with
+          // nobody calling back is exactly the failure this feature exists for. Reconnect even without a
+          // resumption handle: a quiet stretch on the call can hit Gemini's own idle timeout (a clean 1000 close)
+          // before the server ever sends a sessionResumptionUpdate, so requiring a handle here could leave a
+          // legitimately-still-connected caller stranded. `finished` (set by the End button or the model's own
+          // end_call) is what actually distinguishes a real hangup from a drop — not whether a handle arrived yet.
+          if (!finished && reconnects < MAX_RECONNECTS) {
             reconnects += 1
             callbacks.onStatusChange('connecting')
             void openSession(resumptionHandle)
@@ -371,8 +375,7 @@ export async function startLiveCall(
               })
             return
           }
-          // Ran out of reconnect attempts, or there was no resumption handle yet (the drop happened before the
-          // first server message arrived) — this is a real, unrecoverable disconnection, not a normal hangup.
+          // Ran out of reconnect attempts — this is a real, unrecoverable disconnection, not a normal hangup.
           // Previously this just flipped local UI state to 'ended' with nothing telling CallPage to actually
           // close out the incident: the recording was never saved, consolidation never ran, and the incident
           // stayed callState:'active' on Firestore forever with no way for a responder to tell a genuine drop

@@ -128,13 +128,23 @@ export async function startSilentObserver(
         sessionResumption: resume ? { handle: resume } : {},
       },
       callbacks: {
-        onopen: () => { connected = true },
+        // A quiet SOS can idle-timeout and reconnect many times over a long session — that's expected, not a
+        // failure, so a successful reopen resets the counter. Otherwise a 20-minute silent SOS that idles out
+        // every few minutes would permanently die after its 4th otherwise-successful reconnect.
+        onopen: () => { connected = true; reconnects = 0 },
         onmessage: onMessage,
         onerror: (e) => console.error('[QuickBite SOS] observer error:', e),
         onclose: (e) => {
           connected = false
           console.warn('[QuickBite SOS] observer closed:', e?.code, e?.reason)
-          if (!finished && resumptionHandle && reconnects < MAX_RECONNECTS) {
+          // A quiet SOS (the exact scenario this feature exists for — someone hiding, not talking) can idle out on
+          // Gemini's Live API with a clean 1000 close before the server ever sends a sessionResumptionUpdate, so
+          // resumptionHandle can still be undefined here. Previously the reconnect only fired when a handle
+          // existed, so a silent SOS that idled out just died with no retry — confirmed on a real device test
+          // (mostly-quiet SOS, closed itself in the background, no reconnect logged). A fresh connection (even
+          // without resuming prior context) is far better than a dead observer, so reconnect regardless of whether
+          // a handle is available.
+          if (!finished && reconnects < MAX_RECONNECTS) {
             reconnects += 1
             void openSession(resumptionHandle).then((s) => { session = s }).catch((err) => {
               console.error('[QuickBite SOS] reconnect failed:', err)
@@ -142,7 +152,7 @@ export async function startSilentObserver(
             return
           }
           if (!finished) {
-            console.warn('[QuickBite SOS] observer could not reconnect — no resumption handle or attempts exhausted; mic/frame sends now suppressed until the SOS ends.')
+            console.warn('[QuickBite SOS] observer could not reconnect — attempts exhausted; mic/frame sends now suppressed until the SOS ends.')
           }
         },
       },
