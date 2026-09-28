@@ -131,7 +131,7 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                         <a className="btn btn-sm" href={v.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
                       )
                     ) : (
-                      <span className="sub">{v.status === 'recording' ? 'Uploading…' : 'Upload failed'}</span>
+                      <span className="sub">{v.status === 'recording' ? 'Uploading…' : `Upload failed${v.failReason ? ` — ${v.failReason}` : ''}`}</span>
                     )}
                   </div>
                 ))}

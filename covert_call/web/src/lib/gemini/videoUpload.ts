@@ -49,7 +49,14 @@ export async function uploadCallVideo(
       base64,
     }),
   })
-  if (!res.ok) throw new Error(`Drive upload failed: ${res.status}`)
-  const data = (await res.json()) as { fileId: string; url: string }
+  if (!res.ok) throw new Error(`Drive upload failed: HTTP ${res.status}`)
+  const data = (await res.json()) as { fileId?: string; url?: string; error?: string }
+  // Apps Script's own doPost() catches its internal errors and still responds 200 with { error: "..." } — a
+  // request too large for its size limit, a Drive quota issue, a script timeout. Previously that response was
+  // treated as success and destructured into fileId: undefined, silently written as a driveFileId of null with no
+  // way to tell why (confirmed on real incidents: several calls' video entries were "status: uploaded" with both
+  // driveFileId and driveUrl null). Surface the actual reason instead of guessing.
+  if (data.error) throw new Error(`Drive upload rejected: ${data.error}`)
+  if (!data.fileId || !data.url) throw new Error('Drive upload returned no file — response missing fileId/url')
   return { driveFileId: data.fileId, driveUrl: data.url }
 }
