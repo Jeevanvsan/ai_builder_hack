@@ -5,6 +5,19 @@ Before starting any work in this repo, **read both status files**: `status/perso
 After completing any work, **update Jeevan's status file** (`status/person_b_jeevan.md`) with what was done, the date and time (IST), and any note Ameen needs.
 **Never edit `status/person_a_ameen.md`.** Ameen records and updates his own status. Notes or requests for Ameen go in the "Notes for Ameen" section of Jeevan's file instead.
 
+## MANDATORY: web/native parity (always apply)
+`covert_call/native/` is the React Native port of the QuickBite web app (`covert_call/web/`). Whenever a fix or
+feature changes behavior shared between them — persona/prompt logic, tools, geocoding, severity/routing, incident
+data shape, anything under `covert_call/shared/` — check whether native needs the same change before considering
+the work done. In practice today: `covert_call/shared/` (geocode, severity, nav, incidents/client, types) is used
+unchanged by both, so a fix there already applies to native automatically — do not duplicate it. The call/persona
+flow itself (`covert_call/web/src/lib/gemini/*`) is NOT yet ported to native — `covert_call/native/src/lib/nativeCall.ts`
+is a documented stub (`startNativeCall` throws) pending native audio/camera transport (Epic 12.2) — so a web-only
+change there has nothing to port into yet; note it in `status/person_b_jeevan.md` instead of inventing native
+code for a feature that doesn't exist there. Once native's transport lands and it starts importing/reusing the
+web's `liveSession.ts`/`persona.ts`/`tools.ts` (per that stub file's own plan), re-check this rule — parity work
+becomes real at that point, not before.
+
 ## What this project is
 Submission for **AI Builder Cup 2026 | Google Cloud JAPAC Hackathon**, theme "Sustainability & Social Impact." Solo/small-team hackathon repo — currently just planning docs in `docs/`, no code yet.
 
