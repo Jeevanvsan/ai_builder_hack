@@ -419,7 +419,10 @@ export async function startLiveCall(
   session.sendClientContent({ turns: 'The call has just connected. Greet the caller now, as instructed.' })
 
   tracker = startLiveTracking(db, incidentId, (note) => {
-    if (finished) return
+    // Nearby help existing (or a responder picking a station) is never a reason to start directing someone:
+    // only a caller who is on the road, chased or leaving gets turn-by-turn guidance. The route still shows on
+    // the dashboard for the responder either way.
+    if (finished || !movementReported) return
     session.sendClientContent({
       turns: `(System note, not the caller — live navigation: ${note} If you are guiding the caller to safety, relay the next instruction now, phrased for the situation per your GETTING TO SAFETY rules.)`,
     })
