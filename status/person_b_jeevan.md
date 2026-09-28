@@ -155,6 +155,48 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Raise a PR for `ep-5-dashboard-auth` → `main` (now includes auth, responder management, analytics, responder performance, and AI Insights — a bigger PR than usual, worth flagging to Ameen before he reviews).
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
+## 2026-09-28 (IST, 19:29) — native app built out on Ameen's side (Epic 12 + 12.2)
+
+Branch `native/epic-12-foundation-ui-parity`, two commits, **not pushed / no PR yet**. This closes the
+"native has none of it" note below. `covert_call/web/`, `covert_call/shared/` and `covert_call/dashboard/`
+are untouched — the parity work was done as native-side ports, by Ameen's explicit choice, rather than by
+refactoring shared code out of web.
+
+**What now exists on native**
+- Full disguise-UI parity with the web app: all 22 menu items with images, search, category chips, promo
+  banner, item sheet with the 500 ms coded-item reveal, bill details, and the Home/Cart/Checkout/OrderPlaced/
+  delivery-instructions screens rewritten to match.
+- The live Gemini call: persona conversation, all tool calls into `shared/incidents`, live transcript, the
+  silence watchdog, reconnection, post-call consolidation + leakage check + correlation, and a call recording
+  uploaded to the same Drive endpoint as web.
+- The silent SOS: immediate high-severity incident, silent observer, three-tap-anywhere exit, Android back
+  blocked, status bar hidden, brightness dropped and restored.
+- Delivery instructions now has the photo attach (Gemini vision) it was missing.
+
+**Three things that affect your side**
+
+1. **Native imports three files from `web/src` directly** — `lib/gemini/persona.ts`, `lib/gemini/tools.ts` and
+   `lib/nav/liveTracking.ts`. This is deliberate: the persona changes often on your side, and a copy would
+   silently drift. The consequence is that **moving, renaming or splitting any of those three now breaks the
+   native build**, so please shout if you plan to. Editing their contents is fine and needs nothing from us —
+   native picks it up automatically.
+
+2. **Dashboard, small fix needed in your area (I did not touch it):**
+   `dashboard/src/components/CallRecordingPlayer.tsx` maps the recording's mimeType to a download extension and
+   falls back to `webm`. Native records **`audio/wav`** (no audio encoder is available on React Native, so the
+   mic and Mia's replies are mixed in JS and written as WAV). Playback still works — the browser sniffs the data
+   URL — but the **download filename gets `.webm` for a WAV file**. One extra branch alongside the existing
+   `ogg`/`mp4` cases fixes it.
+
+3. **Native SOS is audio-only for now.** No camera feeds are published from the phone yet, so for a
+   native-raised SOS the dashboard's live-video tiles and camera-sourced observations simply won't appear
+   (sound observations, stress trend and caller estimate all do). Camera is the next phase and needs a native
+   frame source, because WebRTC holds the camera for the live feed and React Native has no canvas to sample it.
+
+**Status: unrun on a device.** It typechecks and Metro bundles it, and I verified the bundle contains the right
+Gemini build (the cross-platform one throws on `live.connect()`; the web one is what's bundled). But nothing
+here has been executed on a phone yet — no EAS build has been made since these changes.
+
 ## Notes for Ameen (Person A)
 - **2026-09-28: user wants full parity — native mobile app should have every feature the web app has, including the actual Gemini Live call.** Right now native has none of it: `covert_call/native/src/lib/nativeCall.ts` is a documented stub (`startNativeCall` throws immediately), and `CallScreen.tsx` is a timer-only placeholder with no audio/video wired up. This is your area (Gemini Live + persona wiring) — flagging it for you rather than starting it myself. Scoping notes from checking the repo:
   - **What's already shared and needs no porting:** everything under `covert_call/shared/` (geocode, severity, nav/routing, incidents client + types) — both apps import these unchanged, so every fix from this week's testing session already applies to native the moment the call feature exists.
