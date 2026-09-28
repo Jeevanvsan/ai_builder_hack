@@ -360,3 +360,7 @@ Confirmed working on a real test (INC-MUL29YGP): distress sounds, threat indicat
 - All deployed (web + dashboard) and pushed on `phase-3-epic-16-decision-support`.
 
 **Notes for Ameen:** `silentSession.ts`, `liveSession.ts`, `SosPage.tsx`, `CallPage.tsx`, `media.ts`, `audio.ts`, `videoRecorder.ts`, `videoUpload.ts` all changed (your area) — worth a review. Web-only; native call flow is still a stub, so nothing to port yet.
+
+## 2026-09-28 (IST, ~15:45) — "SOS voice recorder missing" wasn't actually missing
+
+User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camera," no audio row, despite full voice detection (transcript, stress 90) working. Checked: this is expected, not a bug — a silent SOS never gets a separate `audioRecording` (that's a call-only field, set by `CallPage.tsx`); the mic's audio track is muxed directly into each camera's `MediaStream` before recording (`SosPage.tsx`), so the voice is inside the "Back camera" file already. Just wasn't obvious from the panel. Added a one-line note in `SidePanel.tsx`'s Evidence recordings section for `silent-sos` incidents explaining the voice is inside the camera recording(s). Dashboard redeployed.
