@@ -7,8 +7,10 @@ import { useKeepAwake } from 'expo-keep-awake'
 import type { RootStackParamList } from '../../App'
 import { db } from '../lib/firebase'
 import { startIncident, endIncident, updateLiveFields } from '../../../shared/incidents/client'
+import { startVideoPublisher } from '../../../shared/video/publisher'
 import { startLiveCall, type CallStatus, type LiveCallHandle, type CallRecording } from '../lib/gemini/liveSession'
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
+import { acquireCallCamera, stopStream, type RtcStream } from '../lib/platform/camera'
 import { useAppearance } from '../lib/appearance'
 import { useCart } from '../state/cart'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
@@ -36,6 +38,10 @@ export function CallScreen() {
 
   const incidentIdRef = useRef<string | null>(null)
   const callRef = useRef<LiveCallHandle | null>(null)
+  // Back-camera feed to the dashboard (Epic 9). Optional throughout: no camera, or a refused permission, just
+  // means the call runs audio-only.
+  const cameraRef = useRef<RtcStream | null>(null)
+  const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
   // The cart as it was when this screen opened. Later changes must not retrigger setup.
   const cartHadItemsOnMount = useRef(cart.count > 0)
   const startedRef = useRef(false)
@@ -66,6 +72,18 @@ export function CallScreen() {
       } catch {
         setStatus('failed')
       }
+
+      // Live video for the responder, best-effort and never allowed to affect the call itself: a refused
+      // permission or a blocked peer connection just means no feed.
+      try {
+        const camera = await acquireCallCamera()
+        cameraRef.current = camera
+        if (camera) {
+          publisherStopRef.current = await startVideoPublisher(db, id, camera, { camera: 'back' })
+        }
+      } catch (e) {
+        console.error('[QuickBite call] live video publisher failed:', e)
+      }
     })()
   }, [nav])
 
@@ -92,6 +110,12 @@ export function CallScreen() {
     } catch {
       // Teardown is best-effort; the exit must happen regardless.
     }
+
+    // Stops the feed (which also marks the video ended on the incident) and releases the camera.
+    await publisherStopRef.current?.().catch(() => {})
+    stopStream(cameraRef.current)
+    cameraRef.current = null
+
     setStatus('ended')
 
     if (!id) {
