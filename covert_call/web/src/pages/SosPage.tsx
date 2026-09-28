@@ -85,19 +85,27 @@ export function SosPage() {
             micStream: media.mic,
             videoStreams: media.cameras.map((c) => c.stream),
           })
-        } catch {
-          // No AI observer (e.g. no key) — the live feed and recordings still run.
+        } catch (e) {
+          // This previously swallowed EVERY possible failure (bad/missing key, quota, malformed config, network)
+          // with zero logging anywhere — the single biggest reason repeated SOS tests showed "no transcript, no
+          // observations" with no way to tell why. Now surfaced loudly so the real cause is visible next time.
+          console.error('[QuickBite SOS] silent observer failed to start — no AI observation this session:', e)
         }
+      } else {
+        console.warn('[QuickBite SOS] no mic stream acquired — silent observer was never started')
       }
 
       // Live video to the dashboard: publish EVERY camera so a responder can switch between front and back (Epic
       // 11 / 14.2). Each camera signals independently under its own feed.
+      console.log(`[QuickBite SOS] cameras that passed the frame check and will be published: ${media.cameras.map((c) => c.facing).join(', ') || 'none'}`)
       for (const cam of media.cameras) {
         try {
           const stop = await startVideoPublisher(db, id, videoOnly(cam.stream), { camera: cam.facing })
           publisherStopsRef.current.push(stop)
-        } catch {
-          // Blocked WebRTC for one camera just means no live feed for it; the others still stream.
+        } catch (e) {
+          // Blocked WebRTC for one camera just means no live feed for it; the others still stream. Previously
+          // silent — now logged, since "which camera failed and why" was invisible in every prior test.
+          console.error(`[QuickBite SOS] live feed publisher failed for ${cam.facing} camera:`, e)
         }
       }
 
