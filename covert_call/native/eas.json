@@ -1,6 +1,5 @@
 {
   "cli": { "version": ">= 12.0.0", "appVersionSource": "remote" },
-  "//": "Cloud builds do NOT read native/.env.local. Push the same values once per environment before building: npx eas-cli env:push --environment preview --path .env.local",
   "build": {
     "development": {
       "developmentClient": true,
