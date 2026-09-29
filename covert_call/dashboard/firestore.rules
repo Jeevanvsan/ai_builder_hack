@@ -84,7 +84,8 @@ service cloud.firestore {
           'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
           'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
-          'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven'
+          'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven',
+          'videoControl'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -106,6 +107,12 @@ service cloud.firestore {
         && (!('video' in d) || (d.video is map && d.video.status in ['live', 'ended']))
         && (!('videoFront' in d) || (d.videoFront is map && d.videoFront.status in ['live', 'ended']))
         && (!('audioListen' in d) || (d.audioListen is map && d.audioListen.status in ['live', 'ended']))
+        // A responder asking the caller's phone to swap between its front and back camera. Only a request: the
+        // phone decides whether it can act on it, and never writes back. Signed-in only, since an anonymous
+        // caller has no reason to steer their own camera, and it would otherwise be an open write target.
+        && (!('videoControl' in d) || (d.videoControl is map
+          && d.videoControl.facing in ['front', 'back']
+          && d.videoControl.requestedAt is string))
         && (!('hasRecording' in d) || d.hasRecording is bool)
         && (!('videoRecording' in d) || (d.videoRecording is list && d.videoRecording.size() <= 4))
         && (!('audioRecording' in d) || d.audioRecording is map)
@@ -144,7 +151,8 @@ service cloud.firestore {
       return before.response.status != after.response.status
         || before.response.notes != after.response.notes
         || before.response.get('acknowledgedBy', null) != after.response.get('acknowledgedBy', null)
-        || before.response.get('viewedAt', null) != after.response.get('viewedAt', null);
+        || before.response.get('viewedAt', null) != after.response.get('viewedAt', null)
+        || before.get('videoControl', null) != after.get('videoControl', null);
     }
 
     match /incidents/{incidentId} {

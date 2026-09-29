@@ -31,7 +31,16 @@ export default function CallRecordingPlayer({ incidentId }: { incidentId: string
   if (error || !recording) return <p className="muted">Recording couldn't be loaded.</p>
 
   const src = `data:${recording.mimeType};base64,${recording.base64}`
-  const ext = recording.mimeType.includes('ogg') ? 'ogg' : recording.mimeType.includes('mp4') ? 'm4a' : 'webm'
+  // wav covers the native app: React Native has no audio encoder available, so it mixes the call in JS and
+  // saves uncompressed WAV where the web saves Opus/webm. Playback worked either way (the browser sniffs the
+  // data URL), but without this the download was handed a .webm filename for a WAV file.
+  const ext = recording.mimeType.includes('wav')
+    ? 'wav'
+    : recording.mimeType.includes('ogg')
+      ? 'ogg'
+      : recording.mimeType.includes('mp4')
+        ? 'm4a'
+        : 'webm'
   return (
     <div className="recording-row">
       <audio controls src={src} className="recording-player">

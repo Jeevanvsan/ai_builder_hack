@@ -56,3 +56,18 @@ export function useCart(): CartApi {
   if (!ctx) throw new Error('useCart must be used inside CartProvider')
   return ctx
 }
+
+// Bill maths, ported from web/src/state/cart.ts. Kept identical so the cart and checkout totals a caller sees on
+// the phone match the browser exactly — the disguise is weaker if the same order costs different amounts.
+export const FREE_DELIVERY_THRESHOLD = 199
+
+export function computeBill(subtotal: number) {
+  const deliveryFee = subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : 39
+  const platformFee = 5
+  const taxes = Math.round(subtotal * 0.05)
+  return { subtotal, deliveryFee, platformFee, taxes, total: subtotal + deliveryFee + platformFee + taxes }
+}
+
+export function formatRupees(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN')}`
+}
