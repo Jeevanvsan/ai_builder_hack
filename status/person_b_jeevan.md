@@ -476,3 +476,5 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
 **Update 2026-09-29 (IST):** Landing demo slide 1 now streams `call.mp4` from the shared Drive folder "QuickByte Demo Videos" through Drive's preview player. Slides with a video no longer auto-advance. Local MP4s are excluded from the deploy. For the other 3 videos: upload them to the same folder and add each file ID as `drive:` in `VIDEOS` (`landing/src/components/Sections.tsx`).
 
 **Update 2026-09-29 (IST):** Landing: fixed the squashed first column in the mobile feature grid (dots now count swipe positions, not cards). The build now embeds the list of existing screenshots/videos, so missing ones no longer 404 in the console. Redeployed.
+
+**Update 2026-09-29 (IST, ~12:55):** Pushed the local-only `extended-brainstorming` branch and opened PR #14 (docs: brainstorm + Phase 3 backlog Epics 15-19). Ameen is reviewer on both PR #13 and PR #14, and both are mergeable.
