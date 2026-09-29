@@ -1,98 +1,123 @@
-# QuickBite native app (Epic 12) — UNTESTED SCAFFOLD
+# QuickBite native app (Epic 12)
 
-React Native (Expo) port of the QuickBite disguise app. **This scaffold was written without an Expo toolchain or a
-device to build/run it, so treat it as a starting point, not a working build.** The pure-UI + incident-writing
-parts (Home, Cart, Checkout coded-order, Silent tap, Settings) are ported and use the shared incident client, which
-runs under the Firebase JS SDK on React Native. The audio/video pipeline is stubbed with clear pointers.
+React Native (Expo SDK 53) port of the QuickBite disguise app. It writes to the **same Firestore** as the web app,
+so the responder dashboard treats a phone-raised incident exactly like a browser-raised one.
 
-## What's wired
-- Navigation (React Navigation native-stack) and the disguise screens.
-- Home → the two forks (Call / Silent tap) + **heart double-tap → silent SOS** (Epic 11.1).
-- Checkout **coded order → decoded incident** via the shared `decodeOrder()` + incident client (Epic 8).
-- Silent tap report (Epic 1.3) writing through the shared client.
-- Silent SOS screen: black overlay, keep-awake, incident creation, secret three-tap exit (Epic 11).
-- **Disguise personalisation** (Epic 13): name + icon presets, persisted with AsyncStorage, loaded before first render.
+**Status: feature-complete except the camera, and not yet run on a device.** It typechecks and Metro bundles it,
+but no EAS build has been made since the port, so treat every "works" below as "built and verified as far as is
+possible without hardware".
 
-## What's NOT wired yet (needs native modules + a device)
-- **Gemini Live audio** (mic PCM capture + playback): see `src/lib/nativeCall.ts`. No Web Audio API on RN — use a
-  native PCM lib. All conversation logic already exists in the web `liveSession.ts` and should be reused.
-- **Camera frames to Gemini** and **live video** (Epics 9–11): `react-native-webrtc` (globals registered in
-  `index.ts`) drives `shared/video/publisher.ts`; grab ~1 fps frames with `react-native-vision-camera`.
-- **Drive recording** on native (`react-native-webrtc` has no MediaRecorder — spike a native recorder).
-- **Alternate home-screen icons** (Epic 13): wire `setIcon()` in `src/lib/appearance.tsx` to a config-plugin lib
-  (e.g. `expo-alternate-app-icons`) once icon assets exist; configure it in `app.json`.
+## What's built
+- **Disguise UI**, matching `../web` screen for screen: all 22 menu items with images, search, category chips,
+  promo banner, item sheet with the 500 ms coded-item reveal, bill details, cart, checkout (address, payment,
+  delivery speed), order-placed with live status mirroring.
+- **Hidden SOS trigger** — heart double-tap within 400 ms, no visual feedback.
+- **Live Gemini call** — persona conversation, tool calls straight into `shared/incidents`, live transcript,
+  silence watchdog, reconnection, post-call consolidation + privacy check + correlation, call recording uploaded
+  to Drive.
+- **Silent SOS** — immediate high-severity incident, silent observer (audio), three-tap-anywhere exit, Android
+  back blocked, status bar hidden, brightness dropped and restored.
+- **Delivery instructions** — press-and-hold reveal, multi-select urgency, address, note, photo attach analysed
+  by Gemini.
+- **Coded order** — decoded into an incident at checkout, with the order-placed screen mirroring responder
+  progress as delivery milestones.
+- **Disguise personalisation** — in-app name + icon presets, persisted (the OS-level icon swap is still a stub).
 
-## Test it on your phone by scanning a QR code
+## What's NOT built
+- **Cameras.** No live video to the dashboard, no ~1 fps frames to Gemini, no video recording. WebRTC holds the
+  camera for the live feed and React Native has no canvas to sample it from, so this needs a small native frame
+  source. Until then the SOS is audio-only.
+- **Listen-in audio** (the responder listening to the caller's raw mic) is written but disabled in `src/lib/config.ts`
+  until it's confirmed that Android allows a second concurrent capture of the same mic without starving the
+  Gemini feed.
+- **OS home-screen icon switching** (`src/lib/appearance.tsx`).
 
-First, in every case:
+## How the code is organised
+- `src/lib/gemini/` — ported from `../web/src/lib/gemini/`. Each file names the web file it mirrors in its header.
+  **If you change one of these on the web, change it here too** (the root `CLAUDE.md` parity rule).
+- **Imported from the web unchanged, not copied:** `web/src/lib/gemini/persona.ts`, `web/src/lib/gemini/tools.ts`,
+  `web/src/lib/nav/liveTracking.ts`. The persona changes often; a copy would drift. Moving or renaming any of
+  those three breaks this build.
+- `src/lib/platform/` — the things with no browser equivalent: microphone/playback and a `navigator.geolocation`
+  shim backed by `expo-location`.
+- `../shared/` — incidents, codes, routing, geocoding. Used unchanged by web, native and the dashboard.
+
+## Two switches worth knowing about
+Both live in `src/lib/config.ts` and are JS-only, so flipping either needs a reload, not a new build.
+
+- `AUDIO_BACKEND` — `'audio-api'` (default) keeps background sounds audible to Gemini as evidence, matching the
+  web's deliberate choice to turn noise suppression off, but does **not** engage the phone's echo canceller.
+  `'two-way'` engages it but forces noise suppression on with it. **Switch to `'two-way'` if Mia interrupts
+  herself on a real phone** — the give-away is her own words appearing in the transcript as the caller.
+- `LISTEN_IN_ENABLED` — off, see above.
+
+## Recording format
+The web records compact Opus via MediaRecorder. React Native has no encoder available, so the caller's mic and
+Mia's replies are mixed in JS and written as **WAV** (`src/lib/gemini/recorder.ts`) — roughly **1.9 MB/min**.
+Fine for Drive; it overruns the ~1 MB Firestore fallback after about 30 seconds, so that fallback realistically
+only covers very short calls. It fails loudly and writes the reason to the incident rather than truncating.
+
+## Setup
+
 ```bash
-cd covert_call && npm install          # native is a workspace member
-cd native && npx expo install --fix    # reconcile module versions to the SDK
+cd covert_call && npm install     # native is a workspace member
 ```
-Create `native/.env` (Expo uses the `EXPO_PUBLIC_` prefix, **not** `VITE_`):
+
+Create `native/.env.local` with the **same values as the web app's** `VITE_*`:
+
 ```
-EXPO_PUBLIC_FIREBASE_API_KEY=...        # copy the web app's Firebase values
+EXPO_PUBLIC_FIREBASE_API_KEY=...
 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
 EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
 EXPO_PUBLIC_FIREBASE_APP_ID=...
-# EXPO_PUBLIC_DRIVE_UPLOAD_URL — only once native recording exists; nothing reads it yet
+EXPO_PUBLIC_GEMINI_LIVE_API_KEY=...
+EXPO_PUBLIC_DRIVE_UPLOAD_URL=...
+# EXPO_PUBLIC_ENABLE_GROUNDED_CONTEXT=true   # optional, off by default
 ```
 
-### Option A — Expo Go (fastest, no install, scan-and-run)
-Install **Expo Go** from the Play Store / App Store on your phone, then:
-```bash
-npm run start:go        # prints a QR code
-```
-Scan the QR with Expo Go (Android) or the Camera app (iOS). The disguise UI and the incident flows work — open the
-live dashboard alongside and watch them land:
-- **Coded order** (add a coded item → Checkout → Place order), **Silent tap**, **Silent SOS** (double-tap heart).
+Cloud builds do **not** read that file — push the values to EAS once per environment:
 
-WebRTC is guarded out in Expo Go, so **live video and the Gemini call/observer don't run here** — those need a real
-build (Option B). This is the quickest way to check the app and the dashboard wiring.
-
-### Option B — Installable app via EAS (QR → download + install an APK)
-This produces a real, installable app with the native modules. It builds on Expo's servers and needs a free Expo
-account.
 ```bash
-# use npx (no global install / PATH needed)
 npx eas-cli login
-npx expo install @config-plugins/react-native-webrtc   # the WebRTC config plugin app.json needs
-npx eas-cli init                                                # links/creates the Expo project (first time)
-# Cloud builds don't read native/.env — provide the Firebase values as EAS env vars once:
-npx eas-cli env:create --environment preview --name EXPO_PUBLIC_FIREBASE_API_KEY --value "..."
-#   ...repeat for AUTH_DOMAIN, PROJECT_ID, APP_ID
-npm run build:preview                                   # = eas build -p android --profile preview
+npx eas-cli env:push --environment preview --path .env.local
+npx eas-cli env:push --environment development --path .env.local
 ```
-When the build finishes (~10–20 min) EAS prints a **QR code + URL**. Scan it on the phone to download and install
-the APK (allow "install from unknown sources"). This build runs the full app, WebRTC included.
 
-### Option C — local dev client (no Expo account, needs Android Studio)
+## Running it
+
+**Expo Go will not work** — WebRTC, native audio and the Gemini call all need a real build.
+
 ```bash
-npx expo install @config-plugins/react-native-webrtc
-npx expo run:android      # builds a dev client onto a connected device/emulator, then: npm start → scan QR
+# One-off: a dev client you install once, then iterate over Metro in seconds
+npx eas-cli build -p android --profile development
+npm run start          # scan the QR from the dev client app
+
+# A standalone APK to hand to a tester
+npm run build:preview  # = eas build -p android --profile preview
 ```
 
-### Fastest way to see it actually working
-The native app writes to the **same Firestore** as the web app, so open the live dashboard
-(https://quickbite-5cde0-dashboard.web.app) on the side and watch it react. These paths already work end-to-end
-(no native AV needed):
-- **Coded order:** add a coded item (e.g. Extra Pepperoni) → Checkout → Place order → a `click-order` incident
-  appears on the dashboard.
-- **Silent tap:** Home → Delivery instructions → pick options + address → Save → a `silent-tap` incident appears.
-- **Silent SOS:** double-tap the heart → black screen; a `silent-sos` / hostage incident appears; three taps
-  top-left exits.
+Both print a QR code when finished; scan it on the phone to install (allow "install from unknown sources").
+EAS Update is configured, so **JS-only fixes ship with `eas update` instead of another build** — only native
+module changes need a rebuild.
 
-### What will NOT work yet (stubbed)
-- The **live call** and the **SOS observer** create the incident and the UI, but there's **no Gemini audio/video**
-  — native PCM capture/playback + camera frames aren't implemented (see `src/lib/nativeCall.ts`). So no persona
-  conversation, no live video feed, no Drive recording on native.
-- **Alternate home-screen icon** switching (name changes work in-app; the OS icon swap is stubbed).
+## Checks to run before a build
+```bash
+npx tsc --noEmit                 # types
+npx expo-doctor                  # dependency/config sanity
+npx expo export -p android       # proves Metro resolves and bundles everything
+```
+That last one is worth the 30 seconds: it has already caught two problems that would otherwise have cost a
+~1 hour cloud build each.
 
-### Known setup gaps to expect (I couldn't build this here)
-- `app.json` references `@config-plugins/react-native-webrtc` — that's why step 2 installs it before `run:android`.
-- Firestore live listeners on RN sometimes need `experimentalForceLongPolling` (see `src/lib/firebase.ts`).
-- Versions in `package.json` are indicative; `npx expo install --fix` is what makes them coherent for your SDK.
+## Before demoing: grant permissions once
+The first time the app needs the mic, camera or location, Android shows its permission dialog — including on the
+SOS screen, where it appears over the black overlay and undercuts the "phone is off" illusion. This is
+unavoidable for any app, so **run one call and one SOS on the device before a demo or a judged run**, accept
+everything, and every later trigger is silent.
 
-## Shared code
-Imports `../shared/incidents/*`, `../shared/video/*` and `../shared/codes` directly — the same source of truth as
-the web app and dashboard. Do not fork these; fix them in `shared/`.
+## Fastest way to see it working
+Open the dashboard (https://quickbite-5cde0-dashboard.web.app) beside the phone and watch incidents land:
+- **Coded order** — add a coded item (e.g. Extra Pepperoni) → Checkout → Place order.
+- **Delivery instructions** — Home → Delivery instructions → pick options + address → Save.
+- **Silent SOS** — double-tap the heart → black screen; three taps anywhere exits.
+- **Live call** — Home → Call to order (cart must be empty).

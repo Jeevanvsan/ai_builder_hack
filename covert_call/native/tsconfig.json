@@ -6,5 +6,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
+  "//": "Do NOT add compilerOptions.paths here. Expo's Metro reads this file's paths as real runtime aliases, so a typecheck-only alias (e.g. pointing 'react' at @types/react to dedupe JSX types) resolves at bundle time too and breaks the build. The duplicate-React-types problem it was working around is instead solved by keeping @types/react on one version across the monorepo, so npm hoists a single copy.",
   "include": ["index.ts", "App.tsx", "src", "../shared"]
 }
