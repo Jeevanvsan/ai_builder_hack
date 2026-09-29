@@ -422,3 +422,5 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
 **Update 2026-09-29 (IST):** Rewrote the root `README.md` as a plain-language product overview: what it is, the four ways in, what responders see, privacy, the emergency note, team and license. There are no technical details and no hackathon mention. The technical readme stays at `covert_call/README.md`.
 
 **Update 2026-09-29 (IST, ~12:00):** Redeployed the dashboard from `feature/nl-incident-search` (`6cf1ee5`), because a deploy at 11:31 IST from code without the queue/history sort had removed the sort dropdown from the live site. **Note for Ameen:** the sort commit is not on `main` yet. Please don't deploy the dashboard from `main` until it's merged, or it disappears again.
+
+**Update 2026-09-29 (IST):** Landing demo slide 1 now streams `call.mp4` from the shared Drive folder "QuickByte Demo Videos" through Drive's preview player. Slides with a video no longer auto-advance. Local MP4s are excluded from the deploy. For the other 3 videos: upload them to the same folder and add each file ID as `drive:` in `VIDEOS` (`landing/src/components/Sections.tsx`).
