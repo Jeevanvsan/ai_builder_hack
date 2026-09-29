@@ -112,6 +112,10 @@ export async function startLiveCall(
   // watchdog nudges it to re-ask after a quiet gap, and hangs up itself if the model doesn't after 3 tries.
   const SILENCE_MS = 12_000
   const SPEAKING_LEVEL = 0.02
+  // Minimum mic level treated as a real interruption while Mia is speaking (see the echo guard below). Tuned
+  // blind — if a caller finds they cannot cut in mid-sentence, lower it; if Mia's voice still reaches the
+  // transcript as the caller, raise it.
+  const BARGE_IN_LEVEL = 0.08
   let lastActivityAt = Date.now()
   let silentNudges = 0
   // True once anything dangerous has been reported. Silence after that is a reason to stay connected, not the
@@ -404,9 +408,21 @@ export async function startLiveCall(
     recorder.addMic(pcm)
     // The caller is speaking (transcripts arrive late, after they finish): don't treat a long answer as silence.
     if (level > SPEAKING_LEVEL && !player.isPlaying()) lastActivityAt = Date.now()
+
+    // Echo guard. The phone's own canceller does the real work; this is the backstop for what leaks past it.
+    // Whatever gets through arrives while Mia is speaking and is much quieter than a person talking into the
+    // handset — so while playback is active, only audio loud enough to be a genuine interruption is forwarded.
+    // Without this, her greeting came back through the mic and Gemini transcribed it as the CALLER, which then
+    // read as the caller interrupting and made her restart the sentence.
+    //
+    // Deliberately a level gate rather than muting outright: someone who needs to cut in mid-sentence is
+    // exactly the person this call exists for, and silencing them for the whole of Mia's turn is the worse
+    // failure. BARGE_IN_LEVEL sits well above room tone and leaked playback, below normal speech.
+    const echoLikely = player.isPlaying() && level < BARGE_IN_LEVEL
+
     // Checks the socket is actually alive, not just that nobody ended the call — otherwise, once a connection
     // drops for good, every mic frame keeps hitting a dead socket for the rest of the session.
-    if (!muted && canSend()) {
+    if (!muted && !echoLikely && canSend()) {
       session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
     }
   })

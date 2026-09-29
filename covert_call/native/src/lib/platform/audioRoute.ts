@@ -33,36 +33,25 @@ function load(): NativeRouting | null {
   return native
 }
 
-// Applied more than once on purpose. The audio engine re-asserts its own choice whenever Android reports an
-// audio device change, and those callbacks land asynchronously after startup — a single call at the wrong
-// moment is silently undone, which is exactly how this failed the first time.
-const REAPPLY_DELAYS_MS = [0, 400, 1500]
-
-let timers: ReturnType<typeof setTimeout>[] = []
-
+// Applied exactly once, and deliberately so. An earlier version re-applied at 0/400/1500 ms to outlast the audio
+// engine's own device callbacks — but switching the output device repeatedly while the echo canceller is still
+// converging defeated the canceller entirely, and Mia's greeting came back through the mic and into the
+// transcript as the caller. The canceller calibrates against the device that is live when recording starts, so
+// the fix is to settle routing before that point (see startMicTwoWay) and then leave it alone.
 export function routeCallToEarpiece(): void {
   const mod = load()
   if (!mod) return
-
-  cancelPending()
-  for (const delay of REAPPLY_DELAYS_MS) {
-    timers.push(
-      setTimeout(() => {
-        try {
-          const result = mod.routeToEarpiece()
-          // Logged every time: if a device still comes out of the loudspeaker, this line says whether the
-          // request was refused, had nothing to route to, or was applied and then overridden again.
-          console.log(`[QuickBite] audio routing -> ${result}`)
-        } catch (e) {
-          console.warn('[QuickBite] audio routing failed:', e)
-        }
-      }, delay),
-    )
+  try {
+    const result = mod.routeToEarpiece()
+    // Worth logging every call: "still on speaker" has several causes, and this distinguishes a refusal from a
+    // device with no earpiece from a module that never loaded.
+    console.log(`[QuickBite] audio routing -> ${result}`)
+  } catch (e) {
+    console.warn('[QuickBite] audio routing failed:', e)
   }
 }
 
 export function releaseCallAudio(): void {
-  cancelPending()
   const mod = load()
   if (!mod) return
   try {
@@ -70,9 +59,4 @@ export function releaseCallAudio(): void {
   } catch {
     // Nothing to release.
   }
-}
-
-function cancelPending() {
-  for (const t of timers) clearTimeout(t)
-  timers = []
 }

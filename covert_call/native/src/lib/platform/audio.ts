@@ -1,6 +1,7 @@
 import { AudioContext, AudioRecorder, AudioManager } from 'react-native-audio-api'
 import * as TwoWay from '@speechmatics/expo-two-way-audio'
 import { AUDIO_BACKEND } from '../config'
+import { routeCallToEarpiece } from './audioRoute'
 
 // Native port of web/src/lib/gemini/audio.ts — keep the two in sync.
 //
@@ -181,6 +182,12 @@ async function startMicTwoWay(onChunk: MicChunk): Promise<MicHandle> {
   if (!permission.granted) throw new Error('Microphone permission denied')
 
   await ensureTwoWayInitialized()
+
+  // Routing is settled here — after the engine has started, but before recording begins. The echo canceller is
+  // created with the recorder and calibrates against whatever output device is live at that moment, so changing
+  // the device afterwards leaves it cancelling against the wrong path. Doing it later is what put Mia's own
+  // greeting into the transcript as the caller.
+  routeCallToEarpiece()
 
   let stopped = false
   // This backend already delivers exactly what Gemini wants: 16 kHz mono PCM16, captured through the phone's

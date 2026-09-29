@@ -12,7 +12,7 @@ import { startLiveCall, type CallStatus, type LiveCallHandle, type CallRecording
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
 import { acquireCallCamera, stopStream, type RtcStream } from '../lib/platform/camera'
 import { ensureCapturePermissions } from '../lib/platform/permissions'
-import { routeCallToEarpiece, releaseCallAudio } from '../lib/platform/audioRoute'
+import { releaseCallAudio } from '../lib/platform/audioRoute'
 import { watchCameraSwitchRequests, type CameraSwitchWatcher } from '../lib/platform/cameraControl'
 import { startFrameTap, type FrameSource } from '../../modules/qb-frames'
 import { useAppearance } from '../lib/appearance'
@@ -99,12 +99,6 @@ export function CallScreen() {
       } catch {
         setStatus('failed')
       }
-
-      // Applied only now. The echo-cancelling audio engine starts up inside startLiveCall and grabs the
-      // loudspeaker as it does, so routing requested any earlier is simply overwritten (which is exactly what
-      // happened on the first device test). routeCallToEarpiece re-applies a few times to outlast the engine's
-      // own asynchronous device callbacks.
-      routeCallToEarpiece()
 
       // Live feed for the responder. Separate from the stills above and equally best-effort — a blocked peer
       // connection costs the video tile, never the call.
