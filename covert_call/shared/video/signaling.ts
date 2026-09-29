@@ -4,7 +4,27 @@ import { INCIDENTS } from '../incidents/client.ts'
 // Free peer-to-peer video: WebRTC media goes phone -> dashboard directly, Firestore only carries the handshake
 // (offer/answer + ICE candidates). Google's public STUN servers handle NAT discovery; there is no TURN relay
 // (that costs money), so a few very strict networks may fail to connect.
-export const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
+// STUN alone only tells each side its own public address; it cannot carry traffic. That is enough when the phone
+// and the dashboard can reach each other directly — same Wi-Fi, or a permissive network — and it failed exactly
+// as you would expect the first time the two were on different networks: "couldn't connect to the back camera
+// feed", after the viewer's 20s timeout. Mobile data is the common case here, since carrier-grade NAT is
+// symmetric and essentially never traversable without a relay.
+//
+// The TURN entries below are a fallback, not the default: ICE still prefers a direct path and only relays when
+// nothing else connects. TURN relays the encrypted SRTP stream, so the relay operator cannot see the video —
+// only that a stream exists, and the addresses involved.
+//
+// This is a free, shared, public relay with no uptime guarantee — fine for a prototype demo, and the reason the
+// port-443 TCP entry is included is that it is the one most likely to survive a restrictive corporate firewall.
+// Anything beyond demo use should point at a relay this project controls.
+const OPEN_RELAY = { username: 'openrelayproject', credential: 'openrelayproject' }
+
+export const ICE_SERVERS: RTCIceServer[] = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'turn:openrelay.metered.ca:80', ...OPEN_RELAY },
+  { urls: 'turn:openrelay.metered.ca:443', ...OPEN_RELAY },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', ...OPEN_RELAY },
+]
 
 // A single incident can carry several live feeds at once (Epic 11: front + back cameras; a live listen-in
 // audio channel), so each gets its own signaling collection and its own status field on the incident. 'back'
