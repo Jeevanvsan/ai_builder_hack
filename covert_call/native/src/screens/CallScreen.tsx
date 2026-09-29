@@ -12,6 +12,8 @@ import { startLiveCall, type CallStatus, type LiveCallHandle, type CallRecording
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
 import { acquireCallCamera, stopStream, type RtcStream } from '../lib/platform/camera'
 import { ensureCapturePermissions } from '../lib/platform/permissions'
+import { routeCallToEarpiece, releaseCallAudio } from '../lib/platform/audioRoute'
+import { watchCameraSwitchRequests, type CameraSwitchWatcher } from '../lib/platform/cameraControl'
 import { useAppearance } from '../lib/appearance'
 import { useCart } from '../state/cart'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
@@ -43,6 +45,7 @@ export function CallScreen() {
   // means the call runs audio-only.
   const cameraRef = useRef<RtcStream | null>(null)
   const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
+  const cameraWatcherRef = useRef<CameraSwitchWatcher | null>(null)
   // The cart as it was when this screen opened. Later changes must not retrigger setup.
   const cartHadItemsOnMount = useRef(cart.count > 0)
   const startedRef = useRef(false)
@@ -65,6 +68,10 @@ export function CallScreen() {
       // dialog on its own, so the first real call failed silently until the permissions were set by hand.
       const permissions = await ensureCapturePermissions()
 
+      // Before the session opens, so Mia's greeting already comes out of the earpiece rather than announcing
+      // itself to the room.
+      routeCallToEarpiece()
+
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
 
@@ -86,6 +93,7 @@ export function CallScreen() {
         cameraRef.current = camera
         if (camera) {
           publisherStopRef.current = await startVideoPublisher(db, id, camera, { camera: 'back' })
+          cameraWatcherRef.current = watchCameraSwitchRequests(db, id, () => cameraRef.current)
         }
       } catch (e) {
         console.error('[QuickBite call] live video publisher failed:', e)
@@ -118,9 +126,11 @@ export function CallScreen() {
     }
 
     // Stops the feed (which also marks the video ended on the incident) and releases the camera.
+    cameraWatcherRef.current?.stop()
     await publisherStopRef.current?.().catch(() => {})
     stopStream(cameraRef.current)
     cameraRef.current = null
+    releaseCallAudio()
 
     setStatus('ended')
 

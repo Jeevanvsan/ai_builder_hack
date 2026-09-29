@@ -12,6 +12,7 @@ import { startSilentObserver, type SilentObserverHandle } from '../lib/gemini/si
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
 import { acquireSosCameras, stopStream, type RtcStream } from '../lib/platform/camera'
 import { ensureCapturePermissions } from '../lib/platform/permissions'
+import { watchCameraSwitchRequests, type CameraSwitchWatcher } from '../lib/platform/cameraControl'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
 
@@ -45,6 +46,7 @@ export function SosScreen() {
   // Every camera the phone will give us, each published as its own feed so a responder can switch between them.
   const streamsRef = useRef<RtcStream[]>([])
   const publisherStopsRef = useRef<(() => Promise<void>)[]>([])
+  const cameraWatcherRef = useRef<CameraSwitchWatcher | null>(null)
 
   // Secret exit: three taps anywhere on the screen within 1.5s.
   const tapCountRef = useRef(0)
@@ -92,6 +94,11 @@ export function SosScreen() {
             console.error(`[QuickBite SOS] live feed publisher failed for the ${cam.facing} camera:`, e)
           }
         }
+        // Only one feed can be flipped, so the watcher follows the first camera published. On a phone that
+        // managed both, the responder already has two tiles and doesn't need this.
+        if (streamsRef.current.length === 1) {
+          cameraWatcherRef.current = watchCameraSwitchRequests(db, id, () => streamsRef.current[0] ?? null)
+        }
       } catch (e) {
         console.error('[QuickBite SOS] camera acquisition failed — continuing audio-only:', e)
       }
@@ -113,6 +120,7 @@ export function SosScreen() {
     const id = incidentIdRef.current
     const transcript = observerRef.current?.getTranscript() ?? ''
     const recording = await withTimeout(observerRef.current?.end() ?? Promise.resolve(null), null)
+    cameraWatcherRef.current?.stop()
     await withTimeout(Promise.all(publisherStopsRef.current.map((stop) => stop().catch(() => {}))), [])
     streamsRef.current.forEach(stopStream)
     streamsRef.current = []
