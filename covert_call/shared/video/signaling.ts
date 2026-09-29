@@ -5,26 +5,45 @@ import { INCIDENTS } from '../incidents/client.ts'
 // (offer/answer + ICE candidates). Google's public STUN servers handle NAT discovery; there is no TURN relay
 // (that costs money), so a few very strict networks may fail to connect.
 // STUN alone only tells each side its own public address; it cannot carry traffic. That is enough when the phone
-// and the dashboard can reach each other directly — same Wi-Fi, or a permissive network — and it failed exactly
-// as you would expect the first time the two were on different networks: "couldn't connect to the back camera
-// feed", after the viewer's 20s timeout. Mobile data is the common case here, since carrier-grade NAT is
-// symmetric and essentially never traversable without a relay.
+// and the dashboard can reach each other directly — same Wi-Fi, or a permissive network — and it fails exactly
+// as you would expect once they are on different networks: "couldn't connect to the back camera feed", after
+// the viewer's 20s timeout. Mobile data makes it near-certain, since carrier-grade NAT is symmetric and
+// essentially never traversable without a relay.
 //
-// The TURN entries below are a fallback, not the default: ICE still prefers a direct path and only relays when
-// nothing else connects. TURN relays the encrypted SRTP stream, so the relay operator cannot see the video —
-// only that a stream exists, and the addresses involved.
+// Relaying needs TURN, and TURN needs credentials. They are injected by each app from its own environment
+// rather than written here, because this repository is public and committed credentials would be scraped and
+// the quota drained. Without them the app still runs — it just can't relay, which is the behaviour above.
 //
-// This is a free, shared, public relay with no uptime guarantee — fine for a prototype demo, and the reason the
-// port-443 TCP entry is included is that it is the one most likely to survive a restrictive corporate firewall.
-// Anything beyond demo use should point at a relay this project controls.
-const OPEN_RELAY = { username: 'openrelayproject', credential: 'openrelayproject' }
+// A relay only ever carries encrypted SRTP, so the operator cannot see the video: only that a stream exists and
+// the addresses involved. ICE still prefers a direct path and falls back to the relay solely when nothing else
+// connects, so adding TURN costs nothing on networks that never need it.
+const STUN_ONLY: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
 
-export const ICE_SERVERS: RTCIceServer[] = [
-  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-  { urls: 'turn:openrelay.metered.ca:80', ...OPEN_RELAY },
-  { urls: 'turn:openrelay.metered.ca:443', ...OPEN_RELAY },
-  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', ...OPEN_RELAY },
-]
+let iceServers: RTCIceServer[] = STUN_ONLY
+
+/**
+ * Called once at startup by each app (web, native, dashboard) with credentials from its own environment.
+ * Passing nothing, or a blank url, leaves the app on STUN only rather than failing — a missing relay should
+ * degrade the video feed, never stop a call or an SOS from running.
+ *
+ * Both UDP and TCP/443 entries are registered for the same host: port 443 over TCP is the variant most likely
+ * to survive a restrictive corporate firewall, which is the case this exists for.
+ */
+export function configureTurn(turn?: { url?: string; username?: string; credential?: string }): void {
+  const url = turn?.url?.trim()
+  if (!url || !turn?.username || !turn?.credential) {
+    iceServers = STUN_ONLY
+    return
+  }
+
+  const auth = { username: turn.username, credential: turn.credential }
+  const tcp = url.includes('?transport=') ? [] : [{ urls: `${url}?transport=tcp`, ...auth }]
+  iceServers = [...STUN_ONLY, { urls: url, ...auth }, ...tcp]
+}
+
+export function getIceServers(): RTCIceServer[] {
+  return iceServers
+}
 
 // A single incident can carry several live feeds at once (Epic 11: front + back cameras; a live listen-in
 // audio channel), so each gets its own signaling collection and its own status field on the incident. 'back'

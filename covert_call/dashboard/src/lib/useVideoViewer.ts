@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { addDoc, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import {
   HEARTBEAT_STALE_MS,
-  ICE_SERVERS,
+  getIceServers,
   publisherCandidates,
   toPlain,
   viewerCandidates,
@@ -40,7 +40,7 @@ export function useVideoViewer(
 
   useEffect(() => {
     if (!live) return
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const pc = new RTCPeerConnection({ iceServers: getIceServers() })
     pc.addTransceiver(camera === 'mic' ? 'audio' : 'video', { direction: 'recvonly' })
     const viewerRef = doc(viewersCollection(db, incidentId, camera))
     const pending: RTCIceCandidateInit[] = []

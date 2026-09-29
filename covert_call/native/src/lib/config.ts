@@ -15,6 +15,15 @@ export const driveConfigured = Boolean(DRIVE_UPLOAD_URL)
 // shared free-tier text-model quota.
 export const GROUNDED_CONTEXT_ENABLED = process.env.EXPO_PUBLIC_ENABLE_GROUNDED_CONTEXT === 'true'
 
+// Relay used only when the phone and the dashboard cannot reach each other directly — a different network, or
+// mobile data, where carrier-grade NAT makes a direct path essentially impossible. Left unset, live video still
+// works on a shared network; it simply cannot relay. Credentials stay out of the repo, which is public.
+export const TURN = {
+  url: process.env.EXPO_PUBLIC_TURN_URL,
+  username: process.env.EXPO_PUBLIC_TURN_USERNAME,
+  credential: process.env.EXPO_PUBLIC_TURN_CREDENTIAL,
+}
+
 export const FIREBASE_CONFIG = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
