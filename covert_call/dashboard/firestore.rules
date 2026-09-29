@@ -80,9 +80,12 @@ service cloud.firestore {
       return d.keys().hasAll(['sessionStartedAt', 'channel', 'callState', 'location', 'extractedFieldsLive', 'severity', 'response'])
         && d.keys().hasOnly([
           'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
-          'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'transcriptSummary',
-          'voiceStressScore', 'voiceStressTrend', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
-          'hasRecording', 'videoRecording', 'sceneObservations', 'adviceGiven'
+          'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
+          'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
+          'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
+          'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
+          'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven',
+          'videoControl'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -92,18 +95,39 @@ service cloud.firestore {
         && d.callState in ['active', 'ended']
         && d.severity in ['low', 'medium', 'high']
         && d.location is map
+        && (!('track' in d.location) || (d.location.track is list && d.location.track.size() <= 2000))
+        && (!('safeRoute' in d) || d.safeRoute is map)
         && d.extractedFieldsLive is map
         && d.response is map
         && d.response.status in ['new', 'acknowledged', 'in_progress', 'resolved']
         && d.response.notes is list && d.response.notes.size() <= 200
         && (!('voiceStressTrend' in d) || (d.voiceStressTrend is list && d.voiceStressTrend.size() <= 2000))
         && (!('voiceStressScore' in d) || d.voiceStressScore == null || (d.voiceStressScore is number && d.voiceStressScore >= 0 && d.voiceStressScore <= 100))
+        && (!('callerEstimate' in d) || d.callerEstimate is map)
         && (!('video' in d) || (d.video is map && d.video.status in ['live', 'ended']))
         && (!('videoFront' in d) || (d.videoFront is map && d.videoFront.status in ['live', 'ended']))
+        && (!('audioListen' in d) || (d.audioListen is map && d.audioListen.status in ['live', 'ended']))
+        // A responder asking the caller's phone to swap between its front and back camera. Only a request: the
+        // phone decides whether it can act on it, and never writes back. Signed-in only, since an anonymous
+        // caller has no reason to steer their own camera, and it would otherwise be an open write target.
+        && (!('videoControl' in d) || (d.videoControl is map
+          && d.videoControl.facing in ['front', 'back']
+          && d.videoControl.requestedAt is string))
         && (!('hasRecording' in d) || d.hasRecording is bool)
         && (!('videoRecording' in d) || (d.videoRecording is list && d.videoRecording.size() <= 4))
+        && (!('audioRecording' in d) || d.audioRecording is map)
         && (!('sceneObservations' in d) || (d.sceneObservations is list && d.sceneObservations.size() <= 2000))
         && (!('adviceGiven' in d) || (d.adviceGiven is list && d.adviceGiven.size() <= 500))
+        && (!('fieldConfidenceLive' in d) || d.fieldConfidenceLive is map)
+        && (!('reasoningTrace' in d) || (d.reasoningTrace is list && d.reasoningTrace.size() <= 500))
+        && (!('transcriptLines' in d) || (d.transcriptLines is list && d.transcriptLines.size() <= 3000))
+        && (!('fieldHistory' in d) || (d.fieldHistory is list && d.fieldHistory.size() <= 500))
+        && (!('bulletin' in d) || d.bulletin is map)
+        && (!('consolidationFailed' in d) || d.consolidationFailed is bool)
+        && optionalString(d, 'recordingFailed', 300)
+        && (!('correlatedIncidentIds' in d) || (d.correlatedIncidentIds is list && d.correlatedIncidentIds.size() <= 20))
+        && optionalString(d, 'recommendation', 200)
+        && optionalString(d, 'groundedContext', 300)
         && optionalString(d, 'consolidatedSummary', 5000)
         && optionalString(d, 'transcriptSummary', 5000);
     }
@@ -116,7 +140,9 @@ service cloud.firestore {
         && after.sessionStartedAt == before.sessionStartedAt
         && after.channel == before.channel
         && after.response.notes.size() >= before.response.notes.size()
-        && (!('voiceStressTrend' in before) || after.voiceStressTrend.size() >= before.voiceStressTrend.size());
+        && (!('voiceStressTrend' in before) || after.voiceStressTrend.size() >= before.voiceStressTrend.size())
+        && (!('reasoningTrace' in before) || after.reasoningTrace.size() >= before.reasoningTrace.size())
+        && (!('transcriptLines' in before) || after.transcriptLines.size() >= before.transcriptLines.size());
     }
 
     // A responder action touches status, who acknowledged/viewed it, or adds a note — only a signed-in
@@ -125,7 +151,8 @@ service cloud.firestore {
       return before.response.status != after.response.status
         || before.response.notes != after.response.notes
         || before.response.get('acknowledgedBy', null) != after.response.get('acknowledgedBy', null)
-        || before.response.get('viewedAt', null) != after.response.get('viewedAt', null);
+        || before.response.get('viewedAt', null) != after.response.get('viewedAt', null)
+        || before.get('videoControl', null) != after.get('videoControl', null);
     }
 
     match /incidents/{incidentId} {
@@ -172,6 +199,25 @@ service cloud.firestore {
 
       // Second live feed's handshake — the front camera of a dual-camera SOS (Epic 11). Same rules as videoViewers.
       match /videoViewersFront/{viewerId} {
+        allow read: if true;
+        allow create: if request.resource.data.keys().hasOnly(['offer', 'createdAt', 'viewerName'])
+          && request.resource.data.offer is map
+          && request.resource.data.createdAt is string;
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answer'])
+          && request.resource.data.answer is map;
+        allow delete: if true;
+
+        match /{side}/{candidateId} {
+          allow read: if true;
+          allow create: if side in ['viewerCandidates', 'publisherCandidates']
+            && request.resource.data.keys().hasOnly(['candidate', 'sdpMid', 'sdpMLineIndex', 'usernameFragment']);
+          allow update: if false;
+          allow delete: if true;
+        }
+      }
+
+      // Third live feed's handshake — the caller-mic listen-in audio channel (Epic 16). Same rules as videoViewers.
+      match /audioViewers/{viewerId} {
         allow read: if true;
         allow create: if request.resource.data.keys().hasOnly(['offer', 'createdAt', 'viewerName'])
           && request.resource.data.offer is map

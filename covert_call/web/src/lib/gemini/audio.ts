@@ -27,7 +27,9 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export const MIC_CONSTRAINTS: MediaTrackConstraints = {
   channelCount: 1,
   echoCancellation: true,
-  noiseSuppression: true,
+  // Off on purpose: background sounds (voices, bangs, sirens) are evidence Gemini should hear. Echo cancellation
+  // stays on so Mia does not hear herself.
+  noiseSuppression: false,
   autoGainControl: true,
 }
 
@@ -36,7 +38,7 @@ export const MIC_CONSTRAINTS: MediaTrackConstraints = {
 // If `providedStream` is passed (e.g. the caller already opened the mic alongside the camera), its audio track is
 // reused and its tracks are left for the caller to stop; otherwise the mic is opened and owned here.
 export async function startMicCapture(
-  onChunk: (base64Pcm: string) => void,
+  onChunk: (base64Pcm: string, level: number) => void,
   providedStream?: MediaStream,
 ): Promise<{ stop: () => void; stream: MediaStream }> {
   const ownsStream = !providedStream
@@ -52,17 +54,26 @@ export async function startMicCapture(
   const silentSink = context.createGain()
   silentSink.gain.value = 0
 
+  // disconnect() below takes effect asynchronously relative to already-queued audio callback invocations — a few
+  // frames already scheduled can still fire onaudioprocess right after stop() is called. Checking this flag
+  // INSIDE the callback (not just relying on disconnect() timing) closes that gap: without it, those straggler
+  // frames still called onChunk(), which downstream (silentSession.ts / liveSession.ts) can mean a handful of
+  // sendRealtimeInput calls onto an already-closed Gemini Live socket even after stop() has returned.
+  let stopped = false
   processor.onaudioprocess = (e) => {
+    if (stopped) return
     const input = e.inputBuffer.getChannelData(0)
+    // RMS level of this frame, so the call can tell the caller is talking before any transcript arrives.
+    let sum = 0
+    for (let i = 0; i < input.length; i++) sum += input[i] * input[i]
     const resampled = resampleTo16k(input, context.sampleRate)
-    onChunk(arrayBufferToBase64(floatTo16BitPCM(resampled)))
+    onChunk(arrayBufferToBase64(floatTo16BitPCM(resampled)), Math.sqrt(sum / input.length))
   }
 
   source.connect(processor)
   processor.connect(silentSink)
   silentSink.connect(context.destination)
 
-  let stopped = false
   return {
     stream,
     stop: () => {

@@ -1,28 +1,20 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import CallRecordingPlayer from '../../components/CallRecordingPlayer'
 import Chip from '../../components/Chip'
 import DataState from '../../components/DataState'
-import IncidentMap from '../../components/IncidentMap'
-import LiveValue from '../../components/LiveValue'
-import LiveVideo from '../../components/LiveVideo'
-import NoteForm from '../../components/NoteForm'
 import ResponseActions from '../../components/ResponseActions'
-import StressMeter from '../../components/StressMeter'
-import StressSparkline from '../../components/StressSparkline'
+import CaseBoard from '../../components/board/CaseBoard'
+import DecodeText from '../../components/board/DecodeText'
+import SidePanel from '../../components/board/SidePanel'
+import TimelineRail from '../../components/board/TimelineRail'
+import { playEscalationCue } from '../../lib/alertOutputs'
 import { channelLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
 import { useAuth } from '../../lib/authContext'
 import { responderLabel } from '../../lib/auth'
 import { markViewed } from '../../lib/responseActions'
-import { buildTimeline } from '../../lib/timeline'
-import type { FieldConfidence } from '../../../../shared/incidents/types'
+import { useChangesSinceLastView } from '../../lib/useChangesSinceLastView'
 import { useNow } from '../../lib/useNow'
-
-function Confidence({ level }: { level: FieldConfidence | undefined }) {
-  if (!level) return null
-  return <span className={`confidence confidence-${level}`}>{level}</span>
-}
 
 export default function IncidentDetailPage() {
   const { id } = useParams()
@@ -38,224 +30,70 @@ export default function IncidentDetailPage() {
     if (incidentId && viewedAt === null) void markViewed(incidentId, name)
   }, [incidentId, viewedAt, name])
 
-  if (loading || error) {
+  // Epic 16.8: what changed since this browser last opened this incident.
+  const changesSinceLastView = useChangesSinceLastView(incident)
+
+  // Epic 16.7: a distinct cue the instant severity rises on the incident already open in front of this responder.
+  const severity = incident?.severity
+  const lastSeenSeverity = useRef<typeof severity>(undefined)
+  useEffect(() => {
+    if (severity === undefined) return
+    if (lastSeenSeverity.current !== undefined && severity !== lastSeenSeverity.current) {
+      const rank = { low: 0, medium: 1, high: 2 } as const
+      if (rank[severity] > rank[lastSeenSeverity.current]) playEscalationCue()
+    }
+    lastSeenSeverity.current = severity
+  }, [severity])
+
+  if (loading || error || !incident) {
     return (
       <section>
         <Link to="/" className="back-link">← Back to live queue</Link>
-        <DataState loading={loading} error={error} />
+        {loading || error ? <DataState loading={loading} error={error} /> : <p className="muted">No incident with this ID ({id}).</p>}
       </section>
     )
   }
 
-  if (!incident) {
-    return (
-      <section>
-        <Link to="/" className="back-link">← Back to live queue</Link>
-        <div className="page-head">
-          <h1>Incident {id}</h1>
-          <p className="muted">No incident with this ID.</p>
-        </div>
-      </section>
-    )
-  }
-
-  const f = incident.extractedFieldsLive
   // A resolved case is never shown as a live call, even if the caller's session never reported ending.
   const live = incident.callState === 'active' && incident.response.status !== 'resolved'
-  const conf = incident.fieldConfidence
-  const back = incident.response.status === 'resolved'
-    ? { to: '/history', label: 'Back to case history' }
-    : { to: '/', label: 'Back to live queue' }
-  const { rough, confirmed } = incident.location
+  const back = incident.response.status === 'resolved' ? { to: '/history', label: 'Case history' } : { to: '/', label: 'Live queue' }
+  const timer = live
+    ? formatElapsed(incident.sessionStartedAt, now)
+    : incident.sessionEndedAt ? formatElapsed(incident.sessionStartedAt, Date.parse(incident.sessionEndedAt)) : '—'
 
   return (
-    <section className={live ? 'detail detail-live' : 'detail detail-ended'}>
-      <Link to={back.to} className="back-link">← {back.label}</Link>
-
-      <div className="page-head detail-head">
-        <div>
-          <h1>
-            <span className="mono">{incident.id}</span>
-            <LiveValue value={incident.severity}>
-              <Chip tone={incident.severity} filled>{incident.severity}</Chip>
-            </LiveValue>
-            <LiveValue value={incident.response.status}>
-              <Chip tone={incident.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(incident.response.status)}</Chip>
-            </LiveValue>
-          </h1>
-          <p className="muted">
-            {incident.incidentType === 'sos' && (
-              <span className="sos-badge">SOS{incident.scenario ? ` · ${incident.scenario}` : ''}</span>
-            )}
+    <section className={`case-page ${live ? 'is-live' : 'is-ended'}`}>
+      <header className="case-status">
+        <Link to={back.to} className="case-back" aria-label={`Back to ${back.label}`}>←</Link>
+        <div className="case-title">
+          <div className="case-title-row">
+            <span className="mono case-id">{incident.id}</span>
+            <Chip tone={incident.severity} filled>{incident.severity}</Chip>
+            <Chip tone={incident.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(incident.response.status)}</Chip>
+            {incident.incidentType === 'sos' && <span className="sos-badge">SOS{incident.scenario ? ` · ${incident.scenario}` : ''}</span>}
+          </div>
+          <span className="sub">
             {channelLabel(incident.channel)} · started {formatTime(incident.sessionStartedAt)}
-            {incident.cameraMode && ` · cameras: ${incident.cameraMode}`}
             {incident.response.acknowledgedBy && ` · handled by ${incident.response.acknowledgedBy}`}
-          </p>
+          </span>
         </div>
-        <div className="head-side">
-          <ResponseActions incident={incident} />
-          {live ? (
-            <div className="call-banner call-live">
-              <span className="live"><span className="live-dot" />Call in progress</span>
-              <span className="mono call-timer">{formatElapsed(incident.sessionStartedAt, now)}</span>
-            </div>
-          ) : (
-            <div className="call-banner call-ended">
-              <span>Case record</span>
-              <span className="sub">
-              Call lasted {incident.sessionEndedAt ? formatElapsed(incident.sessionStartedAt, Date.parse(incident.sessionEndedAt)) : '—'}
-            </span>
-            </div>
-          )}
-        </div>
+        {incident.recommendation && (
+          <div className={`case-recommendation rec-${incident.severity}`}>
+            <span className="case-rec-label">AI recommends</span>
+            <DecodeText text={incident.recommendation} className="case-rec-text" />
+          </div>
+        )}
+        <div className="case-actions"><ResponseActions incident={incident} /></div>
+      </header>
+
+      {changesSinceLastView && <div className="diff-banner">Since you last checked: {changesSinceLastView.join(', ')}</div>}
+
+      <div className="case-main">
+        <CaseBoard incident={incident} live={live} now={now} timer={timer} />
+        <SidePanel incident={incident} live={live} now={now} />
       </div>
 
-      <div className={incident.video || incident.videoFront ? 'detail-grid has-video' : 'detail-grid'}>
-        {(incident.video || incident.videoFront) && (
-          <div className="card video-card">
-            <div className="video-card-head">
-              <h2>Live video</h2>
-              <Link to={`/incident/${incident.id}/video`} className="btn btn-sm">Full screen</Link>
-            </div>
-            <LiveVideo incident={incident} />
-          </div>
-        )}
-        <div className="card map-card">
-          <h2>Location</h2>
-          <IncidentMap location={incident.location} />
-          <div className="location-lines">
-            <div>
-              <span className="legend legend-confirmed" />
-              {confirmed ? (
-                <LiveValue value={confirmed.address}>
-                  <strong>{confirmed.address}</strong> <Confidence level={confirmed.confidence} />
-                </LiveValue>
-              ) : (
-                <span className="muted-inline">Address not yet confirmed{live ? ', waiting on the caller' : ''}</span>
-              )}
-            </div>
-            <div className="sub">
-              <span className="legend legend-rough" />
-              {rough
-                ? `Approximate: ${rough.lat.toFixed(4)}, ${rough.lng.toFixed(4)} (${rough.source === 'gps' ? 'GPS' : 'IP fallback'})`
-                : 'Approximate location: capturing…'}
-            </div>
-          </div>
-        </div>
-
-        <div className="card fields-card">
-          <h2>Extracted fields</h2>
-          <dl className="fields fields-lg">
-            <dt>People present</dt>
-            <dd><LiveValue value={f.peopleCount}>{f.peopleCount ?? <span className="pending">{live ? 'Listening…' : 'Not reported'}</span>}</LiveValue> <Confidence level={conf.peopleCount} /></dd>
-            <dt>Danger indicators</dt>
-            <dd>
-              <LiveValue value={f.dangerIndicators}>
-                {f.dangerIndicators.length
-                  ? f.dangerIndicators.map((d) => <Chip key={d} tone="danger">{d}</Chip>)
-                  : <span className="pending">{live ? 'Listening…' : 'None reported'}</span>}
-              </LiveValue>
-              <Confidence level={conf.dangerIndicators} />
-            </dd>
-            <dt>Urgency</dt>
-            <dd><LiveValue value={f.urgency}>{f.urgency ?? <span className="pending">{live ? 'Listening…' : 'Not reported'}</span>}</LiveValue> <Confidence level={conf.urgency} /></dd>
-            <dt>Notes</dt>
-            <dd><LiveValue value={f.notes}>{f.notes ?? <span className="pending">—</span>}</LiveValue></dd>
-          </dl>
-        </div>
-
-        {incident.sceneObservations && incident.sceneObservations.length > 0 && (
-          <div className="card scene-card">
-            <h2>Seen &amp; heard</h2>
-            <p className="sub">What the AI observed on camera or in the background — separate from what the caller said.</p>
-            <ul className="scene-list">
-              {incident.sceneObservations.map((o, idx) => (
-                <li key={`${o.at}-${idx}`}>
-                  <span className={`scene-tag scene-${o.source}`}>{o.source === 'sound' ? 'Heard' : 'Seen'}</span>
-                  <span className="scene-kind">{o.kind}</span>
-                  {o.detail && <span className="scene-detail">{o.detail}</span>}
-                  <span className="scene-time mono">
-                    {new Date(o.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="card stress-card">
-          <h2>Voice stress</h2>
-          <LiveValue value={incident.voiceStressScore}>
-            <StressMeter score={incident.voiceStressScore} />
-          </LiveValue>
-          <StressSparkline trend={incident.voiceStressTrend} live={live} />
-        </div>
-
-        <div className="card timeline-card">
-          <h2>Timeline</h2>
-          <ol className="timeline">
-            {buildTimeline(incident).map((e) => (
-              <li key={`${e.at}-${e.label}`} className={e.tone ? `tl-${e.tone}` : undefined}>
-                <span className="tl-time mono">{new Date(e.at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                <span>{e.label}</span>
-              </li>
-            ))}
-          </ol>
-          <NoteForm incidentId={incident.id} />
-        </div>
-
-        {incident.hasRecording && (
-          <div className="card recording-card">
-            <h2>Call recording</h2>
-            <CallRecordingPlayer incidentId={incident.id} />
-            <p className="sub">Full call audio (mic + AI voice), for evidence and verification. Playable anytime.</p>
-          </div>
-        )}
-
-        {incident.videoRecording && incident.videoRecording.length > 0 && (
-          <div className="card recording-card">
-            <h2>Call video</h2>
-            <ul className="drive-videos">
-              {incident.videoRecording.map((v) => (
-                <li key={v.camera}>
-                  <span className="drive-cam">{v.camera === 'front' ? 'Front camera' : 'Back camera'}</span>
-                  {v.status === 'uploaded' && v.driveUrl ? (
-                    <a className="btn btn-sm" href={v.driveUrl} target="_blank" rel="noreferrer">Open in Drive</a>
-                  ) : v.status === 'recording' ? (
-                    <span className="sub">Uploading…</span>
-                  ) : (
-                    <span className="sub">Upload failed</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <p className="sub">Saved to the team's Google Drive for later review.</p>
-          </div>
-        )}
-
-        <div className="card summary-card">
-          <h2>Consolidated summary</h2>
-          {incident.consolidatedSummary ? (
-            <>
-              <LiveValue value={incident.consolidatedSummary}>
-                <p className="summary">{incident.consolidatedSummary}</p>
-              </LiveValue>
-              {incident.leakageCheckStatus.reviewed && (
-                <p className="sub">
-                  Third-party check:{' '}
-                  {incident.leakageCheckStatus.redactions.length
-                    ? `redacted ${incident.leakageCheckStatus.redactions.join(', ')}`
-                    : 'no redactions needed'}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="pending">
-              {live ? 'Written by Gemini once the call ends. Fields above update live until then.' : 'Consolidating the call…'}
-            </p>
-          )}
-        </div>
-      </div>
+      <TimelineRail incident={incident} live={live} now={now} />
     </section>
   )
 }

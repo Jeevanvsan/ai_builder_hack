@@ -1,7 +1,7 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-25 17:05 IST — Two pieces of work this session:
+**Last updated:** 2026-09-29 05:00 IST — Landing page built and deployed (see bottom section). Earlier: Two pieces of work this session:
 1. Branch `ep-5-dashboard-auth` (Jeevan's own scope): Firebase Auth sign-in, a Responder Management page, a full incident Analytics page + Responder Performance page (ECharts), and a Gemini-powered AI Insights tab, auto-refreshed daily. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone.
 2. **Branch `epic-1-2-3-gemini-live` (Ameen's Epic 1/2 scope, picked up on his behalf since he's currently busy and asked for it to be continued)** — see the dedicated section below. Committed locally (`c5ed12a`), not yet pushed/PR'd, pending Ameen's go-ahead since this is normally his ownership area.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
@@ -155,7 +155,77 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Raise a PR for `ep-5-dashboard-auth` → `main` (now includes auth, responder management, analytics, responder performance, and AI Insights — a bigger PR than usual, worth flagging to Ameen before he reviews).
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
 
+## 2026-09-28 (IST, 19:29) — native app built out on Ameen's side (Epic 12 + 12.2)
+
+Branch `native/epic-12-foundation-ui-parity`, two commits, **not pushed / no PR yet**. This closes the
+"native has none of it" note below. `covert_call/web/`, `covert_call/shared/` and `covert_call/dashboard/`
+are untouched — the parity work was done as native-side ports, by Ameen's explicit choice, rather than by
+refactoring shared code out of web.
+
+**What now exists on native**
+- Full disguise-UI parity with the web app: all 22 menu items with images, search, category chips, promo
+  banner, item sheet with the 500 ms coded-item reveal, bill details, and the Home/Cart/Checkout/OrderPlaced/
+  delivery-instructions screens rewritten to match.
+- The live Gemini call: persona conversation, all tool calls into `shared/incidents`, live transcript, the
+  silence watchdog, reconnection, post-call consolidation + leakage check + correlation, and a call recording
+  uploaded to the same Drive endpoint as web.
+- The silent SOS: immediate high-severity incident, silent observer, three-tap-anywhere exit, Android back
+  blocked, status bar hidden, brightness dropped and restored.
+- Delivery instructions now has the photo attach (Gemini vision) it was missing.
+
+**Three things that affect your side**
+
+1. **Native imports three files from `web/src` directly** — `lib/gemini/persona.ts`, `lib/gemini/tools.ts` and
+   `lib/nav/liveTracking.ts`. This is deliberate: the persona changes often on your side, and a copy would
+   silently drift. The consequence is that **moving, renaming or splitting any of those three now breaks the
+   native build**, so please shout if you plan to. Editing their contents is fine and needs nothing from us —
+   native picks it up automatically.
+
+2. **Dashboard — one line changed in your area, with Ameen's go-ahead (commit `df48d74`).**
+   `dashboard/src/components/CallRecordingPlayer.tsx` mapped an unrecognised mimeType to a `.webm` download
+   name. Native records **`audio/wav`** (React Native has no audio encoder available, so the mic and Mia's
+   replies are mixed in JS and written as WAV), so its recordings downloaded mislabelled. Playback was always
+   fine. Added a `wav` branch beside the existing `ogg`/`mp4` ones — nothing else in the dashboard was touched.
+   Heads-up in case you have that file open.
+
+3. **Live video from the phone now works — your viewer needs no changes.** The call publishes the back
+   camera and the SOS publishes every camera it can open (falling back to back-only and reporting the same
+   `cameraMode` you already handle). The streams come from `react-native-webrtc`, which is exactly what
+   `shared/video/publisher.ts` expects, so that file and the dashboard side are used completely unchanged.
+   Two caveats worth knowing when you see a native case:
+   - **No camera-sourced scene observations yet.** Gemini can hear but not see on native: sampling ~1 fps JPEGs
+     out of a WebRTC track needs a native frame source React Native doesn't provide. Sound observations, the
+     stress trend and the caller estimate all work.
+   - **No frozen-camera check.** The web compares two canvas samples to drop a camera that opened but produces
+     no frames; there's no canvas on RN, so a native SOS could show a stalled second tile rather than dropping
+     it. Worth knowing before you chase it as a dashboard bug.
+   - **No video recordings to Drive from native yet** — audio only. Same missing native piece.
+
+**Status: unrun on a device.** It typechecks and Metro bundles it, and I verified the bundle contains the right
+Gemini build (the cross-platform one throws on `live.connect()`; the web one is what's bundled). But nothing
+here has been executed on a phone yet — no EAS build has been made since these changes.
+
 ## Notes for Ameen (Person A)
+- **2026-09-28: user wants full parity — native mobile app should have every feature the web app has, including the actual Gemini Live call.** Right now native has none of it: `covert_call/native/src/lib/nativeCall.ts` is a documented stub (`startNativeCall` throws immediately), and `CallScreen.tsx` is a timer-only placeholder with no audio/video wired up. This is your area (Gemini Live + persona wiring) — flagging it for you rather than starting it myself. Scoping notes from checking the repo:
+  - **What's already shared and needs no porting:** everything under `covert_call/shared/` (geocode, severity, nav/routing, incidents client + types) — both apps import these unchanged, so every fix from this week's testing session already applies to native the moment the call feature exists.
+  - **What's missing, per `nativeCall.ts`'s own plan:**
+    1. Mic capture as raw 16kHz PCM16 — no Web Audio API on RN; needs a native audio module (the file suggests `@dr.pogodin/react-native-audio-api` or a LiveAudioStream-style lib). Not in `package.json` yet.
+    2. Playback of the model's 24kHz PCM16 response — same library, output side.
+    3. ~1fps camera frames via `react-native-vision-camera` (not installed yet) for the scene-observation feature.
+    4. Live video/WebRTC — `react-native-webrtc` is already installed and `registerGlobals()` is already called, so `shared/video/publisher.ts` should work with no changes.
+    5. Drive recording upload — same Apps Script endpoint as web, just needs `EXPO_PUBLIC_DRIVE_UPLOAD_URL` instead of `VITE_DRIVE_UPLOAD_URL`.
+  - **The Gemini Live session itself (`@google/genai`), the persona, the tools, and every `shared/incidents` write in `web/src/lib/gemini/liveSession.ts` are meant to be reused as-is** — worth confirming early that `@google/genai`'s SDK actually works under React Native's JS runtime (it likely assumes browser `WebSocket`/`fetch` globals, which Hermes/RN mostly but not always provides identically) before wiring the rest around it.
+  - Needs a dev-client rebuild (`expo prebuild` + new native modules), not just a JS/Metro change — can't be tested in Expo Go.
+  - I added a mandatory rule to root `CLAUDE.md` ("web/native parity") so this gets checked on every future change to the call/persona logic once you've built it.
+- **2026-09-26 ~21:30 IST: live-call testing fixes, all deployed (web + dashboard + Firestore rules), branch `phase-3-epic-16-decision-support`, not pushed yet.** Web/persona changes need your review:
+  - **Persona (`persona.ts`):** call `confirm_address` the moment the caller mentions any place, and again for every new landmark; call `get_route_guidance` with each reported landmark; answer the question the caller actually asked (e.g. "any shop nearby?") instead of repeating the standing instruction; say a warm goodbye before `end_call`.
+  - **`liveSession.ts`:** `end_call` now waits for the goodbye audio to finish playing (it used to cut off after a fixed 4 s); `<no speech>` / `{pause}` transcription tokens are stripped out of the transcript.
+  - **`liveTracking.ts` / `nearbyServices.ts`:** landmarks are searched even when the phone has GPS (the landmark overrides GPS if they're more than 800 m apart); an uncertain match tells Mia to confirm it with the caller.
+  - **Geocoding (`geocode.ts`):** district-level hits are rejected (bare "Alappuzha" landed tens of km away); if one part of an address is misheard, the other parts are retried without it ("St. George Auditorium, Vaisheri, Alappuzha" → found).
+  - **Severity (`severity.ts`):** tags like "No weapon involved" / "No injury" no longer count as a weapon or injury (this used to trigger "weapon reported").
+  - **Firestore rules:** added the missing `audioViewers` match, which had broken live audio listen-in entirely.
+  - **Dashboard:** the map, Route tile and Location tile now follow the caller live (distance counts down, next turn advances); caller age/gender shows on the dispatch bulletin; the Scene tab was removed.
+  - Still open: the responder "take over the call" 2-way voice feature is not built; Drive upload failures still need the Apps Script execution log to diagnose.
 - **2026-09-25 21:11 IST: Phase 2 DEPLOYED to Firebase (from the `phase-2` branch, before merge).**
   - Firestore rules deployed (compiled clean), dashboard + web app both rebuilt and deployed; both return 200.
   - Live: web https://quickbite-5cde0.web.app · dashboard https://quickbite-5cde0-dashboard.web.app.
@@ -254,3 +324,155 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - **Please put the web app code in `covert_call/web/`** and add `"web"` to `workspaces` in `covert_call/package.json`; run `npm install` from `covert_call/`.
 - Data model changes go through `covert_call/shared/incidents/types.ts` — tell Jeevan before changing it (the dashboard reads every field).
 - Billing on `quickbite-5cde0` unblocks 3.4 (summary), Google Maps, and closed-tab notifications — worth deciding together with the project owner.
+
+## 2026-09-26 (IST, evening) — route/map polish, fact sheet, case linking
+- Dashboard: linked cases now include rule-based matches (within 300 m, last 7 days) alongside the AI matches.
+- Map: only the base tiles are greyed out now. The route, the moving track (dots, newest in bold), a pulsing live position and the markers show at full colour.
+- Case file: when there's no AI summary, it shows a fact sheet (urgency, people, danger, location, movement, route).
+- **Notes for Ameen (please review, web/persona):** `web/src/lib/gemini/persona.ts` GETTING TO SAFETY now makes Mia ask the caller to confirm they've reached safety before she ends the call, and keep guiding if they don't confirm. Web app redeployed.
+- 2026-09-26 (IST, ~18:15): **Notes for Ameen (persona, please review):** after a test chase call, Mia kept doing the order flow and never gave directions, and read Step 4 options without their meanings. Added: a rule that Step 4 always says each option's meaning in the same sentence and uses the list matching Step 3 (garlic bread always offered for "myself"); a new "ON THE MOVE / BEING CHASED" section that overrides the call flow (report, then get_route_guidance and the first direction right away, skip name/spelling/pin/read-back, stay on until the caller confirms they're safe); Step 7 skipped when the caller is on the move. Web app redeployed.
+- 2026-09-26 (IST, ~18:40): **Notes for Ameen (persona, please review):** Mia now works out the situation first instead of following a fixed order script. New section "THINK LIKE A DISPATCHER": after every answer she checks the danger right now, whether someone may be listening, where the caller is and whether they're moving, and what she already knows. She follows a priority order (safety, then location, then what/who, then details, then name) and picks an approach: listened-to (full cover), can talk openly (plain dispatcher questions), chased/moving, injured, hazard, hiding/trapped, can't speak, calm report, child caller. Her tone matches the caller's state. Rule 2 applies only while the cover is on. The call steps are now a toolkit. "Never end early" is now based on the situation, not on steps. Web app redeployed.
+- 2026-09-26 (IST, ~19:00): **Notes for Ameen (persona):** in a test call with background talk (Spanish, a slogan, Malayalam), Mia replied "I'm just a language model and can't help with that". Added a "NEVER BREAK CHARACTER" section: she never says she's an AI and never refuses; unclear or off-topic speech is treated as a noisy line; background voices are logged as sound evidence, not answered (a remark about the place is a location clue); unrelated requests get a light in-character deflection. Web app redeployed.
+- 2026-09-26 (IST, ~19:10): **Notes for Ameen (persona):** strengthened the LANGUAGE section. Mia switches as soon as the caller speaks another language (including mixes like Manglish/Hinglish) and keeps the whole call in it: options, meanings, directions, read-back, goodbye. She speaks it naturally, with local words for directions. Background voices don't change the language. Tool reports stay in English for responders.
+- 2026-09-26 (IST, ~19:25): **Notes for Ameen (web audio):** turned off `noiseSuppression` in `web/src/lib/gemini/audio.ts` MIC_CONSTRAINTS so Gemini hears background sounds (voices, bangs, sirens) as evidence for the Seen & heard card. Echo cancellation and auto gain stay on. Watch for Mia picking up background talk as the caller in noisy rooms. Web app redeployed.
+- 2026-09-26 (IST, ~19:50): Route guidance now names a landmark at each turn: new `landmarkNear()` in `shared/nav/nearbyServices.ts` (OpenStreetMap, within 60 m; prefers petrol pumps, temples, banks, signals, bus stops), cached per turn. Checked: Vazhicherry gives "Pichu Iyer Junction (bus stop)". The guidance tool also says what is near the caller now. **Notes for Ameen (persona + web/nav, please review):** Mia gives direction + distance + landmark, never a bare "turn right". If the caller asks "where/what's there" she re-checks and describes it instead of repeating herself. She says English system notes in the caller's language and never invents a direction before the tool answers. New "CALM THEM THE WHOLE WAY" rule: slow warm voice, a reassuring line after each direction, the remaining distance given often, breathing with a panicking caller. Web app redeployed.
+- 2026-09-26 (IST, ~20:05): **Notes for Ameen (persona, please review):** added a TWO MODES section and a full OPEN MODE. When the caller can talk freely (says so, describes the emergency plainly, or picks "menu" in Step 2, which now explains that "menu" means they can talk freely), Mia drops the food cover completely. She introduces herself plainly, asks direct dispatcher questions, and gives practical first aid and immediate steps right away: bleeding, recovery position, CPR, choking, burns, fractures/accidents, chest pain, seizure, snake bite, fire, gas, being followed, violence at home, flood. She also suggests dialling 112, keeps reporting with the tools, and switches back to covert if the caller whispers or someone comes near. Web app redeployed.
+- 2026-09-26 (IST, ~20:20): **Notes for Ameen (persona + nav):** in the Malayalam test the route to "Police Station, Alappuzha South, 548 m" was known, but Mia only said "In 40 metres, turn right". The turn note now starts with the destination and remaining distance and asks her to relay everything. Persona: every direction must include where the caller is going and how far is left, plus the road/landmark ("the rider/pickup point" in covert mode, plainly in open mode). Web app redeployed.
+- 2026-09-26 (IST, ~20:40): **Notes for Ameen (web call + persona, please review):**
+  - The silence watchdog kept firing while the caller was mid-answer (it only reset on the transcript, which arrives late), so Mia repeated questions. `audio.ts` now passes a mic RMS level, and `liveSession.ts` counts speech above 0.02 as activity. `SILENCE_MS` went from 8 s to 12 s, and the nudge says to ignore it if the caller just answered.
+  - Persona: one question per turn, then wait, never chained; accept several answers at once; never re-ask answered things. "Menu" switches to open mode from the very next sentence. "The usual"/calm reports skip the danger drill-down and stay short.
+  - Web app redeployed.
+- 2026-09-26 (IST, ~21:00): **Notes for Ameen (web call + persona, please review):**
+  - `liveSession.ts` sets `realtimeInputConfig.automaticActivityDetection`: start and end sensitivity LOW, `silenceDurationMs` 1200, `prefixPaddingMs` 200. This gives callers time to pause without Mia jumping in, and stops her own voice from the speaker counting as a barge-in (she was restarting sentences).
+  - Persona: the greeting now asks straight away "can you talk freely, or shall we keep it like a normal food order? say 'talk' or 'order'" (the old "quick order or menu" step is merged into it). New rules: speak slowly and calmly, never repeat a question just asked (only after a silence note), wait for fragments to finish, and act at once on plain words ("I'm being chased") even mid-order.
+  - Web app redeployed.
+- 2026-09-26 (IST, ~21:30): **Notes for Ameen (Live model + persona + nav, please review):**
+  - Voice calls now use `gemini-3.8-live-extended-thinking` with `thinkingLevel: LOW`. `?model=live` in the URL falls back to `gemini-3.8-live`. Probed with our key: it connects and replies with audio. The silent observer is unchanged.
+  - Fixed the landmark loop: with no GPS fix, route guidance fell back to "ask for a landmark" every time. It now uses the incident's rough or confirmed location, and if even that is missing it tells Mia not to re-ask a landmark already given.
+  - Persona: tools are silent (never speak `<function_call>`/`end_call`); "ask once, remember forever"; never tell a chased caller to "stay where you are".
+  - An occasional male voice was reported; the voice is fixed to Kore in config, so the cause is unknown. Please listen for it.
+  - Web app redeployed.
+- 2026-09-26 (IST, ~21:45): Replies felt slow. Measured time to first audio: `gemini-3.8-live` 1.0–2.2 s; extended-thinking LOW 1.0–1.1 s with an occasional 3.8 s; MINIMAL isn't supported. Most of the delay came from voice detection, so I dropped the low end-sensitivity and cut `silenceDurationMs` from 1200 to 700; start sensitivity stays LOW. The extended-thinking model stays; `?model=live` is the fallback. Web app redeployed.
+- 2026-09-26 (IST, ~22:00): **Notes for Ameen (Live model + nav, please review):**
+  - Wrong-city route: with no GPS, guidance fell back to the IP-based rough location. That put a Muhamma caller in Kochi and routed them to Palluruthy police station, 30 km away, off the map. Routing without GPS now uses only a confirmed address and re-routes when the address is confirmed or corrected.
+  - Dashboard map zooms out to fit a route that isn't fully in view (once per route).
+  - Default model reverted to `gemini-3.8-live`: with extended thinking, the caller's transcript was missing and English was misheard. `?model=extended` opts in.
+  - Web app and dashboard redeployed.
+- 2026-09-26 (IST, ~22:30):
+  - Dashboard: new web check. `dashboard/src/lib/webIntel.ts` uses `gemini-3.5-flash` + Google Search to look up recent public reports of similar incidents near the confirmed place, using only the place and incident type (never names). Results and source links go in the Linked cases card, stored in `incident.webIntel` (type and rules updated, rules deployed). **Blocked by quota:** both our keys return 429 for Google Search grounding, while plain generate works. The card shows "no recent reports" until quota is available.
+  - Dashboard: the replay now shows after every ended call (it used to need the AI summary, which also fails on quota). The call recording has a Download button.
+  - **Notes for Ameen (persona):** new "LOCATION FIRST, THEN THE RIGHT DESTINATION" section. Mia gets the real location before any route; a place the caller mentions (petrol pump) is where they are, not the destination, so she still guides to the police station/hospital. She may suggest a manned petrol pump only as a temporary safe spot if the station is over ~2 km away and danger is immediate.
+  - Web app and dashboard redeployed.
+- 2026-09-26 (IST, ~23:00): **Notes for Ameen (web call + persona, please review):**
+  - Transcript bug: the 5 s periodic flush marked the open line as finished, so the rest of the caller's sentence was never written (lines cut off like "I feel lik"). `liveSession.ts` now tracks how much of each line has been written and completes it when the speaker switches. The dashboard shows only the newest version of a growing line (no more "That's g" / "That's good…" pairs).
+  - `confirm_address` now rejects vague places ("petrol pump", "green sign post", "near the market"): the tool answer tells Mia to ask for area/road and town. Before, "petrol pump" was geocoded to a pump in Mattancherry, Kochi. A saved address now tells her to call `get_route_guidance` if the caller is followed or chased.
+  - Persona: mandatory sequence — exact location (area/road + town), then confirm_address, then route to the police station. A petrol pump is never the destination.
+  - Web app and dashboard redeployed.
+- 2026-09-26 (IST, ~23:20): **Notes for Ameen (web call + nav + persona, please review):**
+  - Routing uses GPS only when it's precise (accuracy ≤ 100 m, i.e. phone GPS). A laptop's Wi-Fi fix put an Alappuzha caller near Kothamangalam, so Mia routed 7.7 km without asking where they were. With no precise fix or confirmed address, `get_route_guidance` now tells Mia she MUST ask the exact location (road/area + town), read it back and confirm it before giving any directions.
+  - Caller transcription hints: `inputAudioTranscription.languageCodes` (en-IN, ml-IN, hi-IN, ta-IN) plus `customVocabulary` (local places, code words). Probed first: `gemini-3.8-live` accepts them.
+  - Persona "NEVER ASSUME — CHECK": ask walking or vehicle before "keep driving"; a tool's landmark is "you should see X nearby", not something the caller said; read back the street and get the town; one reply per turn.
+  - Web app redeployed.
+- 2026-09-26 (IST, ~23:45): **Notes for Ameen (nav + persona, please review):** without precise GPS the caller's position used to stay at the confirmed address while they moved. New `locateLandmark()` in `shared/nav/nearbyServices.ts` places a named landmark on OpenStreetMap within 3 km of the last known position (Overpass, falling back to Nominatim). Checked: "St. George Auditorium, Vazhichery" and "Convent Square junction" both resolve; "bridge junction" is too generic and returns nothing. `get_route_guidance(landmark)` now moves the position there, adds a track point (plus the start point the first time, so the dashboard map follows) and re-routes. Persona: every new place the caller names triggers `get_route_guidance` before answering. The 429 errors in the console are `gemini-3.5-flash` quota (post-call summary / web check), not the live call. Web app redeployed.
+- 2026-09-27 (IST, ~00:15): Two more fixes, both free/no-billing per your "use max free, open sources" instruction:
+  - **Web-intel switched off Gemini Search grounding entirely** (it's billing-gated even on tiny usage) **to Google News' free RSS search** (`dashboard/src/lib/webIntel.ts`) — no key, no quota, tested working (returns real headlines+links for a place+topic query). Card label now says "Google News" not "Google Search".
+  - **Case summary was failing 100% silently.** `CallPage.tsx` wrapped `consolidateCall`+`runLeakageCheck` in a bare `try{}catch{}` — any failure (429, network blip, anything) permanently lost the summary with zero trace. Now retries once, and on a second failure sets `incident.consolidationFailed` (new field, types + rules updated) so the dashboard shows *why* it's missing instead of "Gemini writes the case summary when the call ends" forever — and shows the FactSheet either way (also now shown live, not just after the call).
+  - Your own Gemini API Usage dashboard screenshot confirms real 429/400/404 spikes on `gemini-3.5-flash-lite` right in the Sep 24-26 window — this was a real, not phantom, quota issue for that model.
+  - Web app + dashboard + Firestore rules redeployed.
+- 2026-09-27 (IST, ~01:10): **Notes for Ameen (nav/persona/Gemini calls, please review):**
+  - **Location-bug root cause found and fixed at the type level.** A "confirmed" address that fails to geocode now stores `lat: null, lng: null` (types + client.ts) instead of silently falling back to the device's rough/GPS fix — every map/route/nearby-cases consumer (`IncidentMap`, `OsmIncidentMap`, `CaseBoard`, `evidence.ts`, `analytics.ts`, `liveTracking.ts`) now checks for real coordinates before treating it as a pin, verified with a full `tsc -b` pass across both apps. On investigating the wrong-map-pin report closely: that specific case was a genuine GPS/spoken-address mismatch during testing (device really was near Muvattupuzha), not a fix for the code to make — left as-is per your call, but the underlying "don't fabricate a pin" bug this exposed is real and now fixed for all future calls.
+  - **Landmark searches now anchor to the confirmed address, not GPS**, per your request that follow-up landmarks stay near where the caller said they were. If a landmark can't be placed nearby, Mia is told to ask for a different one rather than silently guessing.
+  - **Call audio now uploads to Google Drive** (same Apps Script uploader as video, already configured — `VITE_DRIVE_UPLOAD_URL` is set), with the ~1MB Firestore doc as a fallback only if Drive isn't configured or fails. New `audioRecording` field (types + client.ts `setAudioRecording` + rules), dashboard shows an "Open in Drive" link.
+  - **LLM calls per ended call cut from up to 4 down to 1 required + 1 conditional**: `consolidateCall` now also returns the leakage/privacy-check redactions in the same request (was a separate `runLeakageCheck` call on the identical transcript — file deleted, both `CallPage.tsx` and `SosPage.tsx` updated). The weather/road grounding check is now off by default (`VITE_ENABLE_GROUNDED_CONTEXT=true` to opt in) since it was the least essential of the three and added a 3rd request to every call. `findCorrelatedIncidents` (cross-case matching) is left as its own call — different, larger input, already skips itself cheaply when there's nothing to match.
+  - Web app + dashboard + Firestore rules redeployed.
+- 2026-09-27 (IST, ~00:40):
+  - **Web-intel dropped** (user's call): the free Google News RSS path is CORS-blocked from the browser (tested and confirmed with the actual console error), and every free CORS proxy tried was down or unreliable. Removed `dashboard/src/lib/webIntel.ts`, the `webIntel` field/type, its rule, and the "On the web" section from the Linked cases tile entirely rather than ship something fragile. If this comes back, it needs a small server-side fetch (e.g. a Cloud Function) since the browser can't call Google News directly.
+  - **Renamed visible "Gemini" labels to "AI"** in the dashboard (the AI-insights badge and the case-summary placeholder line) — user asked not to name the vendor in UI copy. Left code comments/error messages alone (not user-visible) and did NOT touch the actual Gemini usage or the hackathon's mandatory-tech requirement, only display text.
+  - **Recording save failures were silently swallowed**, same bug class as the earlier consolidation one: `saveCallRecording` failing (most likely Firestore's ~1MB doc cap on a longer call) never surfaced anywhere. Spot-checked 5 recent real incidents: 3 had `hasRecording: true`, 2 didn't — confirms it's a real, occasional failure, not total breakage. Now sets `incident.recordingFailed` (new field, types + rules updated) with the reason, and the Case file shows "No audio recording — saving it failed (...)" instead of the section just not appearing.
+  - **Live queue rows now show the actual reported time** (date+time), not just "X min ago" — it was already computed for a tooltip, now also shown as text.
+  - Web app + dashboard + Firestore rules redeployed.
+
+## 2026-09-28 (IST, afternoon ~15:30) — Silent SOS observer finally working end to end, Drive folders, routing fix
+
+Confirmed working on a real test (INC-MUL29YGP): distress sounds, threat indicators, headcount, voice stress, caller estimate and case summary all populate live.
+
+- **Root cause of "SOS detects nothing" (every prior test):** `gemini-3.8-live` rejects `responseModalities: [TEXT]` (close 1007). Silent observer now uses AUDIO like the call, and simply never plays the model's audio back. Also added `outputAudioTranscription` for parity.
+- **Quiet SOS died on its first idle close (1000):** reconnect required a resumption handle, which a quiet session may never receive. Now reconnects regardless, and the attempt counter resets on each successful reopen (long quiet SOS survives repeated idle closes). Same change in `liveSession.ts`.
+- **SOS heard speech but never wrote it:** transcript only lived in memory for the final summary. Now written live via `appendTranscriptLine` (grouped per utterance). `report_caller_estimate` was offered to the SOS but never handled — now saved.
+- **SOS had no listen-in audio feed** on the dashboard (call had one, SOS didn't) — now publishes the mic-only feed.
+- **SOS exit hang:** consolidation had no timeout and blocked `zeroTraceExit`. Capped at 8s in both SosPage and CallPage; every teardown step has its own timeout; `videoRecorder.stop()` has a 2s fallback.
+- **Connection-health gating:** sends now require a live socket (`connected && !finished`) — fixed the "WebSocket already CLOSING/CLOSED" console flood. Double-close guards on `end()`. Silent catch blocks now log.
+- **Camera:** same physical camera opened twice on single-camera devices is deduped; cameras that open but produce no frames are dropped with a console warning. Mic is never dropped for silence (hiding is the use case).
+- **Drive:** base64 upload corruption fixed (`indexOf(',')` hit the comma inside `codecs=vp8,opus`). Uploads now go into one subfolder per incident — Jeevan redeployed the Apps Script (see `covert_call/docs/setup/drive-uploader.md`) and updated `VITE_DRIVE_UPLOAD_URL`. **Confirmed working**: Drive now shows a separate folder per incident (INC-MUL21YS7, INC-MUL22FNJ, INC-MUL29YGP, etc.) under "QuickBite Call Videos", verified directly in Drive.
+- **Routing:** `drivingRoute()` had no try/catch, so one failed OSRM request killed `bestSafeRoute` for all candidates. Fixed (shared, applies to native too).
+- **Dashboard:** Case History search now matches channel ("sos"); critical-mode banner + popup; SceneSketch removed; negated danger tags ("no weapon") no longer escalate severity.
+- **Docs:** new `covert_call/docs/e2e-test-cases.md` — full manual test script for web app + dashboard.
+- All deployed (web + dashboard) and pushed on `phase-3-epic-16-decision-support`.
+
+**Notes for Ameen:** `silentSession.ts`, `liveSession.ts`, `SosPage.tsx`, `CallPage.tsx`, `media.ts`, `audio.ts`, `videoRecorder.ts`, `videoUpload.ts` all changed (your area) — worth a review. Web-only; native call flow is still a stub, so nothing to port yet.
+
+## 2026-09-28 (IST, ~15:45) — "SOS voice recorder missing" wasn't actually missing
+
+User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camera," no audio row, despite full voice detection (transcript, stress 90) working. Checked: this is expected, not a bug — a silent SOS never gets a separate `audioRecording` (that's a call-only field, set by `CallPage.tsx`); the mic's audio track is muxed directly into each camera's `MediaStream` before recording (`SosPage.tsx`), so the voice is inside the "Back camera" file already. Just wasn't obvious from the panel. Added a one-line note in `SidePanel.tsx`'s Evidence recordings section for `silent-sos` incidents explaining the voice is inside the camera recording(s). Dashboard redeployed.
+- 2026-09-28 (IST, ~16:00): Checked on INC-MUL2NRUT: the downloaded `back.webm` plays with audio, so the SOS recording has sound. Drive's own preview can't handle browser-recorded webm (it shows a clapperboard icon), so download the file to play it.
+- 2026-09-28 (IST, ~16:10): Updated `covert_call/docs/backlog.md` Epic 11:
+  - 11.2: exit gesture is now three taps anywhere
+  - 11.3: switched to AUDIO modality; added reconnect, live transcript, caller estimate, listen-in feed, Drive subfolders and the audio-in-video check. Real iPhone test is still open.
+  - Committed the SidePanel SOS recording note (it was deployed earlier but hadn't been committed).
+- 2026-09-28 (IST, ~16:40), branch `feature/nl-incident-search` (created from `phase-3-epic-16-decision-support`): **plain-language incident search** in the Live queue and Case history.
+  - Typing filters instantly with no AI call. It matches summary, danger tags, what was seen/heard, transcript, bulletin, address and caller estimate, and uses synonyms ("woman hit with a hammer" finds "female" + "weapon: hammer"). A case needs to match at least half the words.
+  - Enter or **Ask AI** sends short case digests to `gemini-3.5-flash-lite`, which returns matching cases ranked, each with a one-line reason shown on the row. If the AI fails (e.g. quota), the keyword results stay.
+  - Queue stats still count the whole queue. The query is kept in the URL.
+  - Files: `dashboard/src/lib/nlSearch.ts`, `dashboard/src/components/SmartSearch.tsx`, `QueuePage.tsx`, `HistoryPage.tsx`, `index.css`. Dashboard redeployed. Dashboard-only, nothing to port.
+- 2026-09-28 (IST, ~17:15): Added `covert_call/docs/demo_video_scripts.md`, the demo video scripts: covert call (attacker in the room), chase call (followed on foot), optional silent SOS clip, opening and ending shots, ChatGPT caller setup prompts and a pre-take checklist. **Note for Ameen:** the caller's lines use the real code words from `shared/codes.ts`; Mia's lines are expected wording only.
+- 2026-09-28 (IST, ~17:45): Split the demo scripts into `covert_call/docs/demo/`: README (overview, opening, ending, checklist), `scene_a_covert_call.md` (locked in, door broken, gunshot) and `scene_b_chase_call.md` (car chase, shots, tyre blown, run to the police station). Each has a full ChatGPT role-play prompt and sound-effect cues. The effects are played into the room so the Seen & heard detection shows on camera.
+
+## 2026-09-29 (IST, ~05:00) — Public landing page (branch `ep-landing-page`)
+- New app `covert_call/landing/` (React + Vite + TS + Motion), added to the `covert_call` npm workspace (`npm run landing`, `npm run deploy:landing`). Same colour tokens as the dashboard.
+- **Live: https://quickbite-5cde0-landing.web.app**. It's a third hosting site (`quickbite-5cde0-landing`, target `landing`) in project `quickbite-5cde0`. Its `firebase.json` is hosting-only, so it can't touch Firestore rules.
+- The page is branded **"Covert Call"**, not QuickBite, so the disguise app isn't publicly advertised as an SOS app. QuickBite appears only as "the disguise".
+- Sections: animated hero (phone morphs from the QuickBite menu into the Mia call while dashboard fields stream in), problem stats (WHO / UNODC figures, cited), disguise phone fan, a pinned 4-step "How it works" scroll, 4 USP deep-dives (Mia persona, coded questions, live extraction, voice stress), an 8-card bento grid with screenshot lightbox, a comparison table, a demo video slider, a caller-vs-responder drag split view, a tech marquee, download (the APK is a placeholder modal) and the footer.
+- **Screenshots/videos are placeholders.** Drop PNGs into `landing/public/shots/` and MP4s into `landing/public/videos/`, using the names listed in `shots/README.md`. Any missing file falls back to a styled mock.
+- Not committed yet.
+
+**Note for Ameen:** the coded-question examples on the page ("extra spicy" = hurt, etc.) are illustrative. Tell me the real code phrases and I'll swap them in. The page also needs the APK link once the native build exists.
+
+**Update 2026-09-29 (IST, later):** Rewrote the landing page against `covert_call/docs/backlog.md` and the real web code:
+- "How it works" is now "Four ways in", with the four separate entry paths from Home: Call to order (Gemini Live), Click & order (coded cart), Delivery instructions (silent tap) and Heart double-tap SOS.
+- The code examples now come from the real `menu.ts` codes (garlic bread = followed, etc.), and the page explains same-breath coding.
+- New deep-dives for Click & order and the SOS. The bento grid now also covers Seen & heard, the leakage check, Drive recording and disguise personalisation.
+- All public links to the responder dashboard have been removed, because normal visitors can't sign in.
+- Redeployed.
+
+**Update 2026-09-29 (IST):** Added 4 real dashboard screenshots to `landing/public/shots/`: the incident detail (used as responder, extraction and map), the live queue, analytics, and a new "Responder performance" bento card. Redeployed.
+
+**Update 2026-09-29 (IST):** On the landing page, replaced the drag split view with a synced "live mirror": the caller phone and the responder card side by side, an animated decode pulse between them, and replayable steps. Fixed the mock screens so "Call to order" is on Home, not checkout. Removed every mention of the hackathon from the page (hero eyebrow, footer copy and links). Redeployed.
+
+**Update 2026-09-29 (IST):** Landing polish, redeployed:
+- The feature pop-ups had washed-out text inside the dark section. Fixed, and added proper per-feature mock screens (`landing/src/components/Mocks.tsx`) until real screenshots arrive.
+- Rebuilt the voice-stress mock as a real chart: gauge, "words vs voice" severity rows, and an area chart with call moments marked on it.
+
+**Update 2026-09-29 (IST):** Fixed a landing lightbox bug. Opening a card with no screenshot left later cards (e.g. Analytics) stuck on the placeholder even though their screenshot existed. Redeployed.
+
+**Update 2026-09-29 (IST):** The landing demo slider now has 4 slots: `covert-call.mp4`, `chased-call.mp4`, `sos.mp4` and `click-order.mp4` in `landing/public/videos/`. Redeployed.
+
+**Update 2026-09-29 (IST):** Landing page:
+- **Responsive pass:** checked in headless Chrome at 360, 390, 768, 1024 (portrait + landscape) and 1440 px. No horizontal overflow. Fixed the hero overlap, the disguise fan overlapping its text, the comparison table (Covert Call column now first so it fits on phones), the nav button, the footer and the pop-ups.
+- **New `/privacy` Privacy Policy page:** covers mic, camera, location, photos, Gemini processing, Firestore (asia-south1), Drive recordings, responder-only access, the leakage-check redaction, retention and contact. Linked from the footer.
+- **Demo slide 2:** now describes the persona's open mode (the caller says "talk" and Mia drops the food cover).
+
+**Update 2026-09-29 (IST):** Landing page:
+- **Stale screenshots fixed:** screenshots added after a visit could stay stuck on the placeholder, because the site-wide rewrite answered a missing `/shots/*.png` with HTML and the browser cached that for 1 h. The rewrite is now only `/privacy`, so missing files return 404. `/shots` and `/videos` are cached for 5 min, and image and video URLs carry a per-build `?v=` parameter.
+- **Leakage check card removed** at Jeevan's request, since it isn't visible anywhere in the dashboard UI.
+
+**Update 2026-09-29 (IST):** Mobile landing made shorter: the stats, the four ways in, the 6 deep-dives and the feature grid are now horizontal swipe rows. Caller and responder now sit side by side. Fixed the cropped deep-dive visuals and the icon overlapping the card title. Demo slide 1 now uses `videos/call.mp4` (112 MB, should be compressed to about 20 MB). Redeployed.
+
+**Update 2026-09-29 (IST):** Mobile swipe rows now show they swipe: the next card peeks in (fixed a reveal animation that kept half-visible cards hidden), an animated "Swipe →" hint, and tappable dot indicators under each row. Demo videos now show the whole frame (no crop) inline and in fullscreen. Redeployed.
+
+**Update 2026-09-29 (IST):** Rewrote the root `README.md` as a plain-language product overview: what it is, the four ways in, what responders see, privacy, the emergency note, team and license. There are no technical details and no hackathon mention. The technical readme stays at `covert_call/README.md`.
+
+**Update 2026-09-29 (IST, ~12:00):** Redeployed the dashboard from `feature/nl-incident-search` (`6cf1ee5`), because a deploy at 11:31 IST from code without the queue/history sort had removed the sort dropdown from the live site. **Note for Ameen:** the sort commit is not on `main` yet. Please don't deploy the dashboard from `main` until it's merged, or it disappears again.
+
+**Update 2026-09-29 (IST):** Landing demo slide 1 now streams `call.mp4` from the shared Drive folder "QuickByte Demo Videos" through Drive's preview player. Slides with a video no longer auto-advance. Local MP4s are excluded from the deploy. For the other 3 videos: upload them to the same folder and add each file ID as `drive:` in `VIDEOS` (`landing/src/components/Sections.tsx`).
+
+**Update 2026-09-29 (IST):** Landing: fixed the squashed first column in the mobile feature grid (dots now count swipe positions, not cards). The build now embeds the list of existing screenshots/videos, so missing ones no longer 404 in the console. Redeployed.
