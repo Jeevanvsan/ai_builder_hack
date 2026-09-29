@@ -36,9 +36,12 @@ export const FIREBASE_CONFIG = {
 //   'two-way'    — @speechmatics/expo-two-way-audio. Records through the phone's VOICE_COMMUNICATION path with
 //                  the hardware echo canceller on, which fixes leakage — but it forces noise suppression on at
 //                  the same time (no separate switch), so quiet background evidence is partly lost.
-// Start on 'audio-api' to preserve background-sound evidence; switch to 'two-way' if Mia audibly interrupts
-// herself on a real phone (the give-away: her own words appear in the transcript as the caller).
-export const AUDIO_BACKEND: 'audio-api' | 'two-way' = 'audio-api'
+// Set to 'two-way' after the first real device test. On 'audio-api' the loudspeaker fed straight back into the
+// mic: Mia's own greeting was transcribed as the CALLER, Gemini treated it as her being interrupted, and she
+// restarted the greeting again and again — which also made her speech sound broken up, because it was being cut
+// off mid-sentence each time. Losing some background-sound evidence to noise suppression is a far smaller price
+// than a call that can't hold a sentence. Revisit only if a device shows the opposite problem.
+export const AUDIO_BACKEND: 'audio-api' | 'two-way' = 'two-way'
 
 // Publishes the caller's raw mic to the dashboard so a responder can listen in live, as the web does. Off until
 // checked on a device: Android may refuse a second concurrent capture of the same mic, and if it does, the loser
