@@ -4,7 +4,8 @@
   "workspaces": [
     "dashboard",
     "web",
-    "native"
+    "native",
+    "landing"
   ],
   "scripts": {
     "dashboard": "npm run dev -w dashboard",
@@ -13,6 +14,8 @@
     "simulate-call": "npm run simulate-call -w dashboard",
     "seed": "npm run seed -w dashboard --",
     "deploy:dashboard": "npm run deploy -w dashboard",
-    "deploy:web": "npm run deploy -w web"
+    "deploy:web": "npm run deploy -w web",
+    "landing": "npm run dev -w landing",
+    "deploy:landing": "npm run deploy -w landing"
   }
 }
