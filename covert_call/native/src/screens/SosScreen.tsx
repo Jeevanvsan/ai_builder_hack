@@ -13,6 +13,7 @@ import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession
 import { acquireSosCameras, stopStream, type RtcStream } from '../lib/platform/camera'
 import { ensureCapturePermissions } from '../lib/platform/permissions'
 import { watchCameraSwitchRequests, type CameraSwitchWatcher } from '../lib/platform/cameraControl'
+import { startFrameTap, type FrameSource } from '../../modules/qb-frames'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
 
@@ -81,6 +82,7 @@ export function SosScreen() {
 
       // Live video to the dashboard. Started before the observer so a responder can see the scene as early as
       // possible; each camera signals independently, so one failing doesn't stop the others.
+      let frames: FrameSource | null = null
       try {
         if (!permissions.camera) throw new Error('camera permission not granted')
         const { cameras, mode } = await acquireSosCameras()
@@ -94,6 +96,11 @@ export function SosScreen() {
             console.error(`[QuickBite SOS] live feed publisher failed for the ${cam.facing} camera:`, e)
           }
         }
+        // Stills come from the back camera where there is one — it faces the scene, not the person holding
+        // the phone — so the observer describes what is happening rather than who is hiding.
+        const forStills = cameras.find((c) => c.facing === 'back') ?? cameras[0]
+        if (forStills) frames = startFrameTap(forStills.stream)
+
         // Only one feed can be flipped, so the watcher follows the first camera published. On a phone that
         // managed both, the responder already has two tiles and doesn't need this.
         if (streamsRef.current.length === 1) {
@@ -104,7 +111,7 @@ export function SosScreen() {
       }
 
       try {
-        observerRef.current = await startSilentObserver(db, id)
+        observerRef.current = await startSilentObserver(db, id, { frames })
       } catch (e) {
         // Previously this swallowed every failure (bad key, quota, network) with no logging, which was the main
         // reason repeated SOS tests showed "no transcript, no observations" with no way to tell why.

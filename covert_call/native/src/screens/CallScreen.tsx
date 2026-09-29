@@ -14,6 +14,7 @@ import { acquireCallCamera, stopStream, type RtcStream } from '../lib/platform/c
 import { ensureCapturePermissions } from '../lib/platform/permissions'
 import { routeCallToEarpiece, releaseCallAudio } from '../lib/platform/audioRoute'
 import { watchCameraSwitchRequests, type CameraSwitchWatcher } from '../lib/platform/cameraControl'
+import { startFrameTap, type FrameSource } from '../../modules/qb-frames'
 import { useAppearance } from '../lib/appearance'
 import { useCart } from '../state/cart'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
@@ -75,28 +76,43 @@ export function CallScreen() {
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
 
+      // The camera is opened before the session so Gemini can see from the first turn rather than joining late.
+      // Entirely optional: a refused permission or a device without a camera just means an audio-only call.
+      let frames: FrameSource | null = null
       try {
-        callRef.current = await startLiveCall(db, id, {
-          onStatusChange: setStatus,
-          onCallEnd: () => finishCallRef.current(),
-          onCallDropped: () => finishCallRef.current({ dropped: true }),
-        })
+        if (permissions.camera) {
+          const camera = await acquireCallCamera()
+          cameraRef.current = camera
+          if (camera) frames = startFrameTap(camera)
+        }
+      } catch (e) {
+        console.error('[QuickBite call] camera unavailable — continuing audio-only:', e)
+      }
+
+      try {
+        callRef.current = await startLiveCall(
+          db,
+          id,
+          {
+            onStatusChange: setStatus,
+            onCallEnd: () => finishCallRef.current(),
+            onCallDropped: () => finishCallRef.current({ dropped: true }),
+          },
+          { frames },
+        )
       } catch {
         setStatus('failed')
       }
 
-      // Live video for the responder, best-effort and never allowed to affect the call itself: a refused
-      // permission or a blocked peer connection just means no feed.
-      try {
-        if (!permissions.camera) throw new Error('camera permission not granted')
-        const camera = await acquireCallCamera()
-        cameraRef.current = camera
-        if (camera) {
-          publisherStopRef.current = await startVideoPublisher(db, id, camera, { camera: 'back' })
+      // Live feed for the responder. Separate from the stills above and equally best-effort — a blocked peer
+      // connection costs the video tile, never the call.
+      if (cameraRef.current) {
+        try {
+          publisherStopRef.current = await startVideoPublisher(db, id, cameraRef.current, { camera: 'back' })
           cameraWatcherRef.current = watchCameraSwitchRequests(db, id, () => cameraRef.current)
+        } catch (e) {
+          console.error('[QuickBite call] live video publisher failed:', e)
         }
-      } catch (e) {
-        console.error('[QuickBite call] live video publisher failed:', e)
       }
     })()
   }, [nav])

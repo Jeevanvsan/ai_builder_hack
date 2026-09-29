@@ -11,6 +11,7 @@ import { SILENT_OBSERVER_INSTRUCTION } from '../../../../web/src/lib/gemini/pers
 import { REPORT_SCENE_OBSERVATION_TOOLS } from '../../../../web/src/lib/gemini/tools'
 import { startMicCapture, type MicHandle } from '../platform/audio'
 import { startCallRecording, type CallRecorder } from './recorder'
+import type { FrameSource } from '../../../modules/qb-frames'
 import { GEMINI_API_KEY } from '../config'
 
 // Native port of web/src/lib/gemini/silentSession.ts — keep the two in sync.
@@ -31,7 +32,11 @@ export type SilentObserverHandle = {
   getTranscript: () => string
 }
 
-export async function startSilentObserver(db: Firestore, incidentId: string): Promise<SilentObserverHandle> {
+export async function startSilentObserver(
+  db: Firestore,
+  incidentId: string,
+  opts: { frames?: FrameSource | null } = {},
+): Promise<SilentObserverHandle> {
   if (!GEMINI_API_KEY) throw new Error('Gemini Live is not configured')
 
   const client = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
@@ -201,6 +206,16 @@ export async function startSilentObserver(db: Firestore, incidentId: string): Pr
     if (canSend()) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
   })
 
+  // Camera stills, same cadence as the call. This is what turns "heard a scream" into "saw two people and a
+  // weapon on the table" in the responder's evidence list.
+  const frameTimer = opts.frames
+    ? setInterval(() => {
+        if (finished) return
+        const jpeg = opts.frames?.grab()
+        if (jpeg && canSend()) session.sendRealtimeInput({ video: { data: jpeg, mimeType: 'image/jpeg' } })
+      }, 1_000)
+    : null
+
   if (canSend()) {
     session.sendClientContent({ turns: 'A silent SOS has started. Begin observing and reporting through tools now.' })
   }
@@ -214,6 +229,8 @@ export async function startSilentObserver(db: Firestore, incidentId: string): Pr
       ended = true
       finished = true
       flushHeard()
+      if (frameTimer) clearInterval(frameTimer)
+      opts.frames?.stop()
       mic.stop()
       const recording = recorder.stop()
       session.close()
