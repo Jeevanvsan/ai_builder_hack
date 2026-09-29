@@ -160,11 +160,27 @@ async function startMicAudioApi(onChunk: MicChunk): Promise<MicHandle> {
   }
 }
 
+// The two-way engine drives BOTH capture and playback, so whichever side starts first has to initialise it.
+// Playback usually wins the race: the call creates its player up front, and Mia's greeting can arrive before the
+// microphone is opened. Without this, that greeting was handed to an uninitialised engine and silently dropped.
+let twoWayInit: Promise<void> | null = null
+function ensureTwoWayInitialized(): Promise<void> {
+  if (!twoWayInit) {
+    twoWayInit = TwoWay.initialize()
+      .then(() => {})
+      .catch((e) => {
+        twoWayInit = null // let a later attempt retry rather than staying permanently broken
+        throw e
+      })
+  }
+  return twoWayInit
+}
+
 async function startMicTwoWay(onChunk: MicChunk): Promise<MicHandle> {
   const permission = await TwoWay.requestMicrophonePermissionsAsync()
   if (!permission.granted) throw new Error('Microphone permission denied')
 
-  await TwoWay.initialize()
+  await ensureTwoWayInitialized()
 
   let stopped = false
   // This backend already delivers exactly what Gemini wants: 16 kHz mono PCM16, captured through the phone's
@@ -277,6 +293,15 @@ function createTwoWayPlayer(): Player {
   // It exposes no scheduling clock, so "still playing" is tracked from how much audio has been handed over.
   let playingUntil = 0
   let pcmListener: ((pcm: Float32Array, sampleRate: number) => void) | null = null
+  // Anything that arrives before the engine is ready waits here rather than being thrown away.
+  let ready = false
+  const queued: Uint8Array[] = []
+  void ensureTwoWayInitialized()
+    .then(() => {
+      ready = true
+      if (!closed) for (const chunk of queued.splice(0)) TwoWay.playPCMData(chunk)
+    })
+    .catch((e) => console.error('[QuickBite] two-way audio failed to initialise:', e))
 
   return {
     play(base64Pcm) {
@@ -286,7 +311,9 @@ function createTwoWayPlayer(): Player {
       pcmListener?.(float32, OUTPUT_SAMPLE_RATE)
 
       const downsampled = resample(float32, OUTPUT_SAMPLE_RATE, PLAYBACK_RATE)
-      TwoWay.playPCMData(floatTo16BitPCM(downsampled))
+      const bytes = floatTo16BitPCM(downsampled)
+      if (ready) TwoWay.playPCMData(bytes)
+      else queued.push(bytes)
 
       const now = Date.now()
       const durationMs = (downsampled.length / PLAYBACK_RATE) * 1000
@@ -294,8 +321,10 @@ function createTwoWayPlayer(): Player {
     },
 
     clearQueue() {
-      // No queue-drop API is exposed, so a barge-in can't cut audio already handed to the engine. Reset the
-      // clock so the call's silence watchdog doesn't keep treating the session as busy speaking.
+      // No queue-drop API is exposed, so a barge-in can't cut audio already handed to the engine — but anything
+      // still waiting on initialisation can and should be dropped. Reset the clock too, so the call's silence
+      // watchdog doesn't keep treating the session as busy speaking.
+      queued.length = 0
       playingUntil = 0
     },
 
@@ -303,6 +332,7 @@ function createTwoWayPlayer(): Player {
       if (closed) return
       closed = true
       playingUntil = 0
+      queued.length = 0
       try {
         TwoWay.tearDown()
       } catch {

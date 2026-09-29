@@ -11,6 +11,7 @@ import { startVideoPublisher } from '../../../shared/video/publisher'
 import { startLiveCall, type CallStatus, type LiveCallHandle, type CallRecording } from '../lib/gemini/liveSession'
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
 import { acquireCallCamera, stopStream, type RtcStream } from '../lib/platform/camera'
+import { ensureCapturePermissions } from '../lib/platform/permissions'
 import { useAppearance } from '../lib/appearance'
 import { useCart } from '../state/cart'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
@@ -60,6 +61,10 @@ export function CallScreen() {
     startedRef.current = true
 
     void (async () => {
+      // Asked before anything tries to capture: neither the audio library nor the camera raised Android's
+      // dialog on its own, so the first real call failed silently until the permissions were set by hand.
+      const permissions = await ensureCapturePermissions()
+
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
 
@@ -76,6 +81,7 @@ export function CallScreen() {
       // Live video for the responder, best-effort and never allowed to affect the call itself: a refused
       // permission or a blocked peer connection just means no feed.
       try {
+        if (!permissions.camera) throw new Error('camera permission not granted')
         const camera = await acquireCallCamera()
         cameraRef.current = camera
         if (camera) {

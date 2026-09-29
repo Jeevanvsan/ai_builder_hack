@@ -11,6 +11,7 @@ import { startVideoPublisher } from '../../../shared/video/publisher'
 import { startSilentObserver, type SilentObserverHandle } from '../lib/gemini/silentSession'
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
 import { acquireSosCameras, stopStream, type RtcStream } from '../lib/platform/camera'
+import { ensureCapturePermissions } from '../lib/platform/permissions'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
 
@@ -54,6 +55,10 @@ export function SosScreen() {
     startedRef.current = true
 
     void (async () => {
+      // Normally already answered during an ordinary call, so no dialog interrupts the black screen. If they
+      // haven't been, asking here still beats capturing nothing at all.
+      const permissions = await ensureCapturePermissions()
+
       // An SOS starts at high severity immediately, before anything is known.
       const { id } = await startIncident(db, {
         channel: 'silent-sos',
@@ -75,6 +80,7 @@ export function SosScreen() {
       // Live video to the dashboard. Started before the observer so a responder can see the scene as early as
       // possible; each camera signals independently, so one failing doesn't stop the others.
       try {
+        if (!permissions.camera) throw new Error('camera permission not granted')
         const { cameras, mode } = await acquireSosCameras()
         streamsRef.current = cameras.map((c) => c.stream)
         void setCameraMode(db, id, mode)
