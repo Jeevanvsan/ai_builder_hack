@@ -38,11 +38,13 @@ export default function LiveVideo({ incident, large = false }: { incident: Incid
   const liveNow = state === 'live' || state === 'connecting'
   const [asking, setAsking] = useState(false)
   const [asked, setAsked] = useState<'back' | 'front'>(hasFront && !hasBack ? 'front' : 'back')
+  const [flipError, setFlipError] = useState<string | null>(null)
 
   const requestFlip = async () => {
     if (asking) return
     const next = asked === 'back' ? 'front' : 'back'
     setAsking(true)
+    setFlipError(null)
     try {
       // requestedAt is what the phone watches: a fresh timestamp is what tells it this is a new request rather
       // than the value it has already acted on.
@@ -50,8 +52,11 @@ export default function LiveVideo({ incident, large = false }: { incident: Incid
         videoControl: { facing: next, requestedAt: new Date().toISOString() },
       })
       setAsked(next)
-    } catch {
-      // Nothing to undo — the picture either changes or it doesn't.
+    } catch (e) {
+      // This was silently swallowed at first, which made a rejected write look exactly like a phone that had
+      // ignored the request — the field wasn't permitted by the security rules and nothing said so. Surface it.
+      console.error('[dashboard] camera flip request failed:', e)
+      setFlipError("Couldn't send the request")
     } finally {
       setAsking(false)
     }
@@ -76,6 +81,7 @@ export default function LiveVideo({ incident, large = false }: { incident: Incid
           >
             {asking ? 'Asking…' : `Flip to ${asked === 'back' ? 'front' : 'back'}`}
           </button>
+          {flipError && <span className="sub">{flipError}</span>}
         </div>
       )}
       {/* Muted + playsInline so browsers allow autoplay; the feed carries no audio anyway. */}
