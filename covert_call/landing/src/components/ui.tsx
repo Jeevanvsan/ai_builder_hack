@@ -55,7 +55,7 @@ export function Modal({ open, onClose, wide, children }: { open: boolean; onClos
 export function Shot({ name, alt, fallback }: { name: string; alt: string; fallback: ReactNode }) {
   // Remember which image failed, so reusing this component for another shot (e.g. in the lightbox) retries.
   const [failed, setFailed] = useState<string | null>(null)
-  if (failed === name) return <>{fallback}</>
+  if (failed === name || !__SHOTS__.includes(name)) return <>{fallback}</>
   return <img key={name} className="shot-img" src={`/shots/${name}.png?v=${__BUILD_ID__}`} alt={alt} onError={() => setFailed(name)} />
 }
 
@@ -129,7 +129,8 @@ export function SwipeDots({ target, dark }: { target: string; dark?: boolean }) 
     if (!el) return
     elRef.current = el
     const update = () => {
-      const kids = [...el.children] as HTMLElement[]
+      // One dot per swipe position: cards stacked in the same column (the 2-row grid) share a dot.
+      const kids = ([...el.children] as HTMLElement[]).filter((k, i, all) => all.findIndex((o) => o.offsetLeft === k.offsetLeft) === i)
       setCount(kids.length)
       const mid = el.scrollLeft + el.clientWidth / 2
       let best = 0, bestD = Infinity
@@ -142,7 +143,8 @@ export function SwipeDots({ target, dark }: { target: string; dark?: boolean }) 
     return () => { el.removeEventListener('scroll', update); window.removeEventListener('resize', update) }
   }, [target])
   const go = (i: number) => {
-    const el = elRef.current; const k = el?.children[i] as HTMLElement | undefined
+    const el = elRef.current
+    const k = el && ([...el.children] as HTMLElement[]).filter((c, n, all) => all.findIndex((o) => o.offsetLeft === c.offsetLeft) === n)[i]
     if (el && k) el.scrollTo({ left: k.offsetLeft - (el.clientWidth - k.offsetWidth) / 2, behavior: 'smooth' })
   }
   if (count < 2) return null
