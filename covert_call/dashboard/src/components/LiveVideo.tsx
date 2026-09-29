@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { doc, updateDoc } from 'firebase/firestore'
 import type { Incident } from '../../../shared/incidents/types'
 import type { Camera } from '../../../shared/video/signaling'
+import { INCIDENTS } from '../../../shared/incidents/client'
+import { db } from '../lib/firebase'
 import { formatTime } from '../lib/format'
 import { useAuth } from '../lib/authContext'
 import { responderLabel } from '../lib/auth'
@@ -27,12 +30,52 @@ export default function LiveVideo({ incident, large = false }: { incident: Incid
 
   const label = camera === 'front' ? 'front camera' : 'back camera'
 
+  // Most phones refuse to run both cameras at once, so a session usually carries a single feed and the toggle
+  // above has nothing to switch between. In that case the caller's device can be asked to flip the camera it is
+  // already streaming. It's a request, not a command: the phone does the switching, and an older app build (or a
+  // device that can't flip) simply carries on unchanged, so don't present this as a guarantee.
+  const oneFeedOnly = (hasBack || hasFront) && !(hasBack && hasFront)
+  const liveNow = state === 'live' || state === 'connecting'
+  const [asking, setAsking] = useState(false)
+  const [asked, setAsked] = useState<'back' | 'front'>(hasFront && !hasBack ? 'front' : 'back')
+
+  const requestFlip = async () => {
+    if (asking) return
+    const next = asked === 'back' ? 'front' : 'back'
+    setAsking(true)
+    try {
+      // requestedAt is what the phone watches: a fresh timestamp is what tells it this is a new request rather
+      // than the value it has already acted on.
+      await updateDoc(doc(db, INCIDENTS, incident.id), {
+        videoControl: { facing: next, requestedAt: new Date().toISOString() },
+      })
+      setAsked(next)
+    } catch {
+      // Nothing to undo — the picture either changes or it doesn't.
+    } finally {
+      setAsking(false)
+    }
+  }
+
   return (
     <div className={`video-frame${large ? ' video-frame-large' : ''}`}>
       {hasBack && hasFront && (
         <div className="video-cam-toggle">
           <button type="button" className={`btn btn-sm${camera === 'back' ? ' active' : ''}`} onClick={() => setPicked('back')}>Back</button>
           <button type="button" className={`btn btn-sm${camera === 'front' ? ' active' : ''}`} onClick={() => setPicked('front')}>Front</button>
+        </div>
+      )}
+      {oneFeedOnly && liveNow && (
+        <div className="video-cam-toggle">
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => void requestFlip()}
+            disabled={asking}
+            title="Asks the caller's phone to switch between its front and back camera"
+          >
+            {asking ? 'Asking…' : `Flip to ${asked === 'back' ? 'front' : 'back'}`}
+          </button>
         </div>
       )}
       {/* Muted + playsInline so browsers allow autoplay; the feed carries no audio anyway. */}

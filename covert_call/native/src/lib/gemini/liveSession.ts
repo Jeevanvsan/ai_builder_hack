@@ -24,6 +24,7 @@ import { LIVE_CALL_TOOLS } from '../../../../web/src/lib/gemini/tools'
 import { startLiveTracking, type LiveTracker } from '../../../../web/src/lib/nav/liveTracking'
 import { startMicCapture, createAudioPlayer, type MicHandle, type Player } from '../platform/audio'
 import { startCallRecording, type CallRecorder } from './recorder'
+import type { FrameSource } from '../../../modules/qb-frames'
 import { GEMINI_API_KEY } from '../config'
 
 // Native port of web/src/lib/gemini/liveSession.ts — keep the two in sync.
@@ -60,6 +61,9 @@ export async function startLiveCall(
   db: Firestore,
   incidentId: string,
   callbacks: LiveCallCallbacks,
+  // Optional camera stills. With them the model can describe what it sees; without, the call is audio-only and
+  // everything else behaves the same.
+  opts: { frames?: FrameSource | null } = {},
 ): Promise<LiveCallHandle> {
   if (!GEMINI_API_KEY) throw new Error('Gemini Live is not configured')
 
@@ -407,6 +411,17 @@ export async function startLiveCall(
     }
   })
 
+  // Gemini Live takes video as periodic stills, not a stream, so a still a second is exactly its own cadence.
+  // A session carrying video hits a shorter cap than an audio-only one; the reconnect path above already covers
+  // that, and its counter resets on every successful reopen, so a long call still survives.
+  const frameTimer = opts.frames
+    ? setInterval(() => {
+        if (finished) return
+        const jpeg = opts.frames?.grab()
+        if (jpeg && canSend()) session.sendRealtimeInput({ video: { data: jpeg, mimeType: 'image/jpeg' } })
+      }, 1_000)
+    : null
+
   // A speaker switch already flushes the previous line, but one speaker talking for a long stretch would
   // otherwise wait indefinitely to appear in the live feed.
   const transcriptFlushTimer = setInterval(() => {
@@ -491,6 +506,8 @@ export async function startLiveCall(
       clearInterval(silenceTimer)
       clearInterval(estimateTimer)
       clearInterval(transcriptFlushTimer)
+      if (frameTimer) clearInterval(frameTimer)
+      opts.frames?.stop()
       tracker?.stop()
       mic?.stop()
       const recording = recorder.stop()
