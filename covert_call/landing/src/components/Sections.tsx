@@ -216,8 +216,10 @@ export function Compare() {
   )
 }
 
-const VIDEOS = [
-  { file: 'call', title: 'Covert Call', d: 'The whole idea: a food-delivery app that hides a call for help.' },
+// Paste a Google Drive share link's file ID into `drive` (file shared as "Anyone with the link")
+// to stream that slide from Drive; otherwise /videos/<file>.mp4 is used.
+const VIDEOS: { file: string; drive?: string; title: string; d: string }[] = [
+  { file: 'call', drive: '1QZ6hgnZhDg_2ww4j_66B_1M9pS8kDXY5', title: 'Covert Call', d: 'The whole idea: a food-delivery app that hides a call for help.' },
   { file: 'chased-call', title: 'Someone chasing, free to speak', d: 'Open mode: the caller says "talk", Mia drops the food cover and acts as a calm dispatcher, guiding them to safety while responders track them live.' },
   { file: 'sos', title: 'Heart double-tap SOS', d: 'The screen goes black, both cameras stream, and the AI observes silently.' },
   { file: 'click-order', title: 'Tap and order', d: 'A coded cart is placed and arrives as a decoded incident.' },
@@ -231,6 +233,15 @@ function VideoSlide({ v, active }: { v: (typeof VIDEOS)[number]; active: boolean
     if (active) ref.current.play().catch(() => {})
     else ref.current.pause()
   }, [active])
+  if (v.drive) {
+    return (
+      <div className="slide-media">
+        {active
+          ? <iframe src={`https://drive.google.com/file/d/${v.drive}/preview`} title={v.title} allow="autoplay; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
+          : <div className="slide-placeholder"><div><div className="play">▶</div><b style={{ color: '#fff' }}>{v.title}</b></div></div>}
+      </div>
+    )
+  }
   return (
     <div className="slide-media">
       {!missing && <video ref={ref} src={`/videos/${v.file}.mp4?v=${__BUILD_ID__}`} muted loop playsInline controls={active} onError={() => setMissing(true)} />}
@@ -258,7 +269,8 @@ export function DemoSlider() {
     return () => window.removeEventListener('resize', measure)
   }, [])
   useEffect(() => {
-    if (paused) return
+    // Never auto-advance away from a slide that has a real video to watch.
+    if (paused || VIDEOS[i].drive) return
     const t = setTimeout(() => setI((n) => (n + 1) % VIDEOS.length), 7000)
     return () => clearTimeout(t)
   }, [i, paused])
