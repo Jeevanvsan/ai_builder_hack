@@ -1,6 +1,6 @@
 import { addDoc, doc, onSnapshot, updateDoc, type Firestore, type Unsubscribe } from 'firebase/firestore'
 import { INCIDENTS } from '../incidents/client.ts'
-import { HEARTBEAT_MS, ICE_SERVERS, publisherCandidates, toPlain, videoField, viewerCandidates, viewerDoc, viewersCollection, type Camera } from './signaling.ts'
+import { HEARTBEAT_MS, getIceServers, publisherCandidates, toPlain, videoField, viewerCandidates, viewerDoc, viewersCollection, type Camera } from './signaling.ts'
 
 // Called by the QuickBite app with a camera stream. `camera` defaults to 'back' (the call, Epic 9) and can be
 // 'front' for the SOS's second feed (Epic 11) — each camera streams and signals independently, so a dashboard can
@@ -33,7 +33,7 @@ export async function startVideoPublisher(
   }
 
   const answerViewer = async (viewerId: string, offer: RTCSessionDescriptionInit) => {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const pc = new RTCPeerConnection({ iceServers: getIceServers() })
     stream.getTracks().forEach((track) => pc.addTrack(track, stream))
     pc.onicecandidate = (e) => {
       if (e.candidate) void addDoc(publisherCandidates(db, incidentId, viewerId, camera), e.candidate.toJSON())
