@@ -492,3 +492,5 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
 **Update 2026-09-29 (IST):** Landing: fixed the squashed first column in the mobile feature grid (dots now count swipe positions, not cards). The build now embeds the list of existing screenshots/videos, so missing ones no longer 404 in the console. Redeployed.
 
 **Update 2026-09-29 (IST):** Opened PR #13 (`feature/nl-incident-search` → `main`) for the queue/history sort and 4 call/routing fixes that missed PR #10. Merged `main` into it to resolve a status-file conflict.
+
+**Update 2026-09-29 (IST, ~12:55):** Pushed the local-only `extended-brainstorming` branch and opened PR #14 (docs: brainstorm + Phase 3 backlog Epics 15-19). Ameen is reviewer on both PR #13 and PR #14, and both are mergeable.
