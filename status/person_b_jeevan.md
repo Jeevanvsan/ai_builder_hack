@@ -1,7 +1,7 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-25 17:05 IST — Two pieces of work this session:
+**Last updated:** 2026-09-29 05:00 IST — Landing page built and deployed (see bottom section). Earlier: Two pieces of work this session:
 1. Branch `ep-5-dashboard-auth` (Jeevan's own scope): Firebase Auth sign-in, a Responder Management page, a full incident Analytics page + Responder Performance page (ECharts), and a Gemini-powered AI Insights tab, auto-refreshed daily. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone.
 2. **Branch `epic-1-2-3-gemini-live` (Ameen's Epic 1/2 scope, picked up on his behalf since he's currently busy and asked for it to be continued)** — see the dedicated section below. Committed locally (`c5ed12a`), not yet pushed/PR'd, pending Ameen's go-ahead since this is normally his ownership area.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
@@ -376,3 +376,49 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
   - Files: `dashboard/src/lib/nlSearch.ts`, `dashboard/src/components/SmartSearch.tsx`, `QueuePage.tsx`, `HistoryPage.tsx`, `index.css`. Dashboard redeployed. Dashboard-only, nothing to port.
 - 2026-09-28 (IST, ~17:15): Added `covert_call/docs/demo_video_scripts.md`, the demo video scripts: covert call (attacker in the room), chase call (followed on foot), optional silent SOS clip, opening and ending shots, ChatGPT caller setup prompts and a pre-take checklist. **Note for Ameen:** the caller's lines use the real code words from `shared/codes.ts`; Mia's lines are expected wording only.
 - 2026-09-28 (IST, ~17:45): Split the demo scripts into `covert_call/docs/demo/`: README (overview, opening, ending, checklist), `scene_a_covert_call.md` (locked in, door broken, gunshot) and `scene_b_chase_call.md` (car chase, shots, tyre blown, run to the police station). Each has a full ChatGPT role-play prompt and sound-effect cues. The effects are played into the room so the Seen & heard detection shows on camera.
+
+## 2026-09-29 (IST, ~05:00) — Public landing page (branch `ep-landing-page`)
+- New app `covert_call/landing/` (React + Vite + TS + Motion), added to the `covert_call` npm workspace (`npm run landing`, `npm run deploy:landing`). Same colour tokens as the dashboard.
+- **Live: https://quickbite-5cde0-landing.web.app**. It's a third hosting site (`quickbite-5cde0-landing`, target `landing`) in project `quickbite-5cde0`. Its `firebase.json` is hosting-only, so it can't touch Firestore rules.
+- The page is branded **"Covert Call"**, not QuickBite, so the disguise app isn't publicly advertised as an SOS app. QuickBite appears only as "the disguise".
+- Sections: animated hero (phone morphs from the QuickBite menu into the Mia call while dashboard fields stream in), problem stats (WHO / UNODC figures, cited), disguise phone fan, a pinned 4-step "How it works" scroll, 4 USP deep-dives (Mia persona, coded questions, live extraction, voice stress), an 8-card bento grid with screenshot lightbox, a comparison table, a demo video slider, a caller-vs-responder drag split view, a tech marquee, download (the APK is a placeholder modal) and the footer.
+- **Screenshots/videos are placeholders.** Drop PNGs into `landing/public/shots/` and MP4s into `landing/public/videos/`, using the names listed in `shots/README.md`. Any missing file falls back to a styled mock.
+- Not committed yet.
+
+**Note for Ameen:** the coded-question examples on the page ("extra spicy" = hurt, etc.) are illustrative. Tell me the real code phrases and I'll swap them in. The page also needs the APK link once the native build exists.
+
+**Update 2026-09-29 (IST, later):** Rewrote the landing page against `covert_call/docs/backlog.md` and the real web code:
+- "How it works" is now "Four ways in", with the four separate entry paths from Home: Call to order (Gemini Live), Click & order (coded cart), Delivery instructions (silent tap) and Heart double-tap SOS.
+- The code examples now come from the real `menu.ts` codes (garlic bread = followed, etc.), and the page explains same-breath coding.
+- New deep-dives for Click & order and the SOS. The bento grid now also covers Seen & heard, the leakage check, Drive recording and disguise personalisation.
+- All public links to the responder dashboard have been removed, because normal visitors can't sign in.
+- Redeployed.
+
+**Update 2026-09-29 (IST):** Added 4 real dashboard screenshots to `landing/public/shots/`: the incident detail (used as responder, extraction and map), the live queue, analytics, and a new "Responder performance" bento card. Redeployed.
+
+**Update 2026-09-29 (IST):** On the landing page, replaced the drag split view with a synced "live mirror": the caller phone and the responder card side by side, an animated decode pulse between them, and replayable steps. Fixed the mock screens so "Call to order" is on Home, not checkout. Removed every mention of the hackathon from the page (hero eyebrow, footer copy and links). Redeployed.
+
+**Update 2026-09-29 (IST):** Landing polish, redeployed:
+- The feature pop-ups had washed-out text inside the dark section. Fixed, and added proper per-feature mock screens (`landing/src/components/Mocks.tsx`) until real screenshots arrive.
+- Rebuilt the voice-stress mock as a real chart: gauge, "words vs voice" severity rows, and an area chart with call moments marked on it.
+
+**Update 2026-09-29 (IST):** Fixed a landing lightbox bug. Opening a card with no screenshot left later cards (e.g. Analytics) stuck on the placeholder even though their screenshot existed. Redeployed.
+
+**Update 2026-09-29 (IST):** The landing demo slider now has 4 slots: `covert-call.mp4`, `chased-call.mp4`, `sos.mp4` and `click-order.mp4` in `landing/public/videos/`. Redeployed.
+
+**Update 2026-09-29 (IST):** Landing page:
+- **Responsive pass:** checked in headless Chrome at 360, 390, 768, 1024 (portrait + landscape) and 1440 px. No horizontal overflow. Fixed the hero overlap, the disguise fan overlapping its text, the comparison table (Covert Call column now first so it fits on phones), the nav button, the footer and the pop-ups.
+- **New `/privacy` Privacy Policy page:** covers mic, camera, location, photos, Gemini processing, Firestore (asia-south1), Drive recordings, responder-only access, the leakage-check redaction, retention and contact. Linked from the footer.
+- **Demo slide 2:** now describes the persona's open mode (the caller says "talk" and Mia drops the food cover).
+
+**Update 2026-09-29 (IST):** Landing page:
+- **Stale screenshots fixed:** screenshots added after a visit could stay stuck on the placeholder, because the site-wide rewrite answered a missing `/shots/*.png` with HTML and the browser cached that for 1 h. The rewrite is now only `/privacy`, so missing files return 404. `/shots` and `/videos` are cached for 5 min, and image and video URLs carry a per-build `?v=` parameter.
+- **Leakage check card removed** at Jeevan's request, since it isn't visible anywhere in the dashboard UI.
+
+**Update 2026-09-29 (IST):** Mobile landing made shorter: the stats, the four ways in, the 6 deep-dives and the feature grid are now horizontal swipe rows. Caller and responder now sit side by side. Fixed the cropped deep-dive visuals and the icon overlapping the card title. Demo slide 1 now uses `videos/call.mp4` (112 MB, should be compressed to about 20 MB). Redeployed.
+
+**Update 2026-09-29 (IST):** Mobile swipe rows now show they swipe: the next card peeks in (fixed a reveal animation that kept half-visible cards hidden), an animated "Swipe →" hint, and tappable dot indicators under each row. Demo videos now show the whole frame (no crop) inline and in fullscreen. Redeployed.
+
+**Update 2026-09-29 (IST):** Rewrote the root `README.md` as a plain-language product overview: what it is, the four ways in, what responders see, privacy, the emergency note, team and license. There are no technical details and no hackathon mention. The technical readme stays at `covert_call/README.md`.
+
+**Update 2026-09-29 (IST, ~12:00):** Redeployed the dashboard from `feature/nl-incident-search` (`6cf1ee5`), because a deploy at 11:31 IST from code without the queue/history sort had removed the sort dropdown from the live site. **Note for Ameen:** the sort commit is not on `main` yet. Please don't deploy the dashboard from `main` until it's merged, or it disappears again.
