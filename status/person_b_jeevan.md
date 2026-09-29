@@ -1,7 +1,7 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-25 17:05 IST — Two pieces of work this session:
+**Last updated:** 2026-09-29 05:00 IST — Landing page built and deployed (see bottom section). Earlier: Two pieces of work this session:
 1. Branch `ep-5-dashboard-auth` (Jeevan's own scope): Firebase Auth sign-in, a Responder Management page, a full incident Analytics page + Responder Performance page (ECharts), and a Gemini-powered AI Insights tab, auto-refreshed daily. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone.
 2. **Branch `epic-1-2-3-gemini-live` (Ameen's Epic 1/2 scope, picked up on his behalf since he's currently busy and asked for it to be continued)** — see the dedicated section below. Committed locally (`c5ed12a`), not yet pushed/PR'd, pending Ameen's go-ahead since this is normally his ownership area.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
@@ -154,6 +154,56 @@ at all. Now built and **verified working end-to-end with a real spoken test call
 - Follow up with Ameen on the `epic-1-2-3-gemini-live` PR review.
 - Raise a PR for `ep-5-dashboard-auth` → `main` (now includes auth, responder management, analytics, responder performance, and AI Insights — a bigger PR than usual, worth flagging to Ameen before he reviews).
 - Epic 5 with Ameen: demo script around the split-screen live-update moment, deck, theme-fit answer (25% of score, still undecided).
+
+## 2026-09-28 (IST, 19:29) — native app built out on Ameen's side (Epic 12 + 12.2)
+
+Branch `native/epic-12-foundation-ui-parity`, two commits, **not pushed / no PR yet**. This closes the
+"native has none of it" note below. `covert_call/web/`, `covert_call/shared/` and `covert_call/dashboard/`
+are untouched — the parity work was done as native-side ports, by Ameen's explicit choice, rather than by
+refactoring shared code out of web.
+
+**What now exists on native**
+- Full disguise-UI parity with the web app: all 22 menu items with images, search, category chips, promo
+  banner, item sheet with the 500 ms coded-item reveal, bill details, and the Home/Cart/Checkout/OrderPlaced/
+  delivery-instructions screens rewritten to match.
+- The live Gemini call: persona conversation, all tool calls into `shared/incidents`, live transcript, the
+  silence watchdog, reconnection, post-call consolidation + leakage check + correlation, and a call recording
+  uploaded to the same Drive endpoint as web.
+- The silent SOS: immediate high-severity incident, silent observer, three-tap-anywhere exit, Android back
+  blocked, status bar hidden, brightness dropped and restored.
+- Delivery instructions now has the photo attach (Gemini vision) it was missing.
+
+**Three things that affect your side**
+
+1. **Native imports three files from `web/src` directly** — `lib/gemini/persona.ts`, `lib/gemini/tools.ts` and
+   `lib/nav/liveTracking.ts`. This is deliberate: the persona changes often on your side, and a copy would
+   silently drift. The consequence is that **moving, renaming or splitting any of those three now breaks the
+   native build**, so please shout if you plan to. Editing their contents is fine and needs nothing from us —
+   native picks it up automatically.
+
+2. **Dashboard — one line changed in your area, with Ameen's go-ahead (commit `df48d74`).**
+   `dashboard/src/components/CallRecordingPlayer.tsx` mapped an unrecognised mimeType to a `.webm` download
+   name. Native records **`audio/wav`** (React Native has no audio encoder available, so the mic and Mia's
+   replies are mixed in JS and written as WAV), so its recordings downloaded mislabelled. Playback was always
+   fine. Added a `wav` branch beside the existing `ogg`/`mp4` ones — nothing else in the dashboard was touched.
+   Heads-up in case you have that file open.
+
+3. **Live video from the phone now works — your viewer needs no changes.** The call publishes the back
+   camera and the SOS publishes every camera it can open (falling back to back-only and reporting the same
+   `cameraMode` you already handle). The streams come from `react-native-webrtc`, which is exactly what
+   `shared/video/publisher.ts` expects, so that file and the dashboard side are used completely unchanged.
+   Two caveats worth knowing when you see a native case:
+   - **No camera-sourced scene observations yet.** Gemini can hear but not see on native: sampling ~1 fps JPEGs
+     out of a WebRTC track needs a native frame source React Native doesn't provide. Sound observations, the
+     stress trend and the caller estimate all work.
+   - **No frozen-camera check.** The web compares two canvas samples to drop a camera that opened but produces
+     no frames; there's no canvas on RN, so a native SOS could show a stalled second tile rather than dropping
+     it. Worth knowing before you chase it as a dashboard bug.
+   - **No video recordings to Drive from native yet** — audio only. Same missing native piece.
+
+**Status: unrun on a device.** It typechecks and Metro bundles it, and I verified the bundle contains the right
+Gemini build (the cross-platform one throws on `live.connect()`; the web one is what's bundled). But nothing
+here has been executed on a phone yet — no EAS build has been made since these changes.
 
 ## Notes for Ameen (Person A)
 - **2026-09-28: user wants full parity — native mobile app should have every feature the web app has, including the actual Gemini Live call.** Right now native has none of it: `covert_call/native/src/lib/nativeCall.ts` is a documented stub (`startNativeCall` throws immediately), and `CallScreen.tsx` is a timer-only placeholder with no audio/video wired up. This is your area (Gemini Live + persona wiring) — flagging it for you rather than starting it myself. Scoping notes from checking the repo:
@@ -390,3 +440,55 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
   - (~18:35) A route the responder picks on the dashboard (or a re-route) no longer gets passed to Mia unless the caller is moving (on the road, chased or leaving). It still shows on the dashboard. Web redeployed.
   - (~18:45) The caller transcript misheard code answers (for example 'Kola' for 'cola') while Mia's detection was right. The live transcript comes from a separate, weaker speech-to-text step than the model that actually understands the audio. It now gets every code phrase from shared/codes.ts plus the answers to Mia's follow-up questions as vocabulary hints. Checked that the Live API accepts 75 entries. Web redeployed.
   - (~18:55) Dashboard: a new 'Sort by' dropdown in the Live queue and Case history: highest risk (severity, then number of danger signs, then voice stress), newest, oldest, highest voice stress. Each page keeps its own default order (priority ranking / most recently resolved) when no sort is picked. The sort is kept in the URL and works together with the plain-language search. File: dashboard/src/lib/sortIncidents.ts. Dashboard redeployed.
+
+## 2026-09-29 (IST, ~05:00) — Public landing page (branch `ep-landing-page`)
+- New app `covert_call/landing/` (React + Vite + TS + Motion), added to the `covert_call` npm workspace (`npm run landing`, `npm run deploy:landing`). Same colour tokens as the dashboard.
+- **Live: https://quickbite-5cde0-landing.web.app**. It's a third hosting site (`quickbite-5cde0-landing`, target `landing`) in project `quickbite-5cde0`. Its `firebase.json` is hosting-only, so it can't touch Firestore rules.
+- The page is branded **"Covert Call"**, not QuickBite, so the disguise app isn't publicly advertised as an SOS app. QuickBite appears only as "the disguise".
+- Sections: animated hero (phone morphs from the QuickBite menu into the Mia call while dashboard fields stream in), problem stats (WHO / UNODC figures, cited), disguise phone fan, a pinned 4-step "How it works" scroll, 4 USP deep-dives (Mia persona, coded questions, live extraction, voice stress), an 8-card bento grid with screenshot lightbox, a comparison table, a demo video slider, a caller-vs-responder drag split view, a tech marquee, download (the APK is a placeholder modal) and the footer.
+- **Screenshots/videos are placeholders.** Drop PNGs into `landing/public/shots/` and MP4s into `landing/public/videos/`, using the names listed in `shots/README.md`. Any missing file falls back to a styled mock.
+- Not committed yet.
+
+**Note for Ameen:** the coded-question examples on the page ("extra spicy" = hurt, etc.) are illustrative. Tell me the real code phrases and I'll swap them in. The page also needs the APK link once the native build exists.
+
+**Update 2026-09-29 (IST, later):** Rewrote the landing page against `covert_call/docs/backlog.md` and the real web code:
+- "How it works" is now "Four ways in", with the four separate entry paths from Home: Call to order (Gemini Live), Click & order (coded cart), Delivery instructions (silent tap) and Heart double-tap SOS.
+- The code examples now come from the real `menu.ts` codes (garlic bread = followed, etc.), and the page explains same-breath coding.
+- New deep-dives for Click & order and the SOS. The bento grid now also covers Seen & heard, the leakage check, Drive recording and disguise personalisation.
+- All public links to the responder dashboard have been removed, because normal visitors can't sign in.
+- Redeployed.
+
+**Update 2026-09-29 (IST):** Added 4 real dashboard screenshots to `landing/public/shots/`: the incident detail (used as responder, extraction and map), the live queue, analytics, and a new "Responder performance" bento card. Redeployed.
+
+**Update 2026-09-29 (IST):** On the landing page, replaced the drag split view with a synced "live mirror": the caller phone and the responder card side by side, an animated decode pulse between them, and replayable steps. Fixed the mock screens so "Call to order" is on Home, not checkout. Removed every mention of the hackathon from the page (hero eyebrow, footer copy and links). Redeployed.
+
+**Update 2026-09-29 (IST):** Landing polish, redeployed:
+- The feature pop-ups had washed-out text inside the dark section. Fixed, and added proper per-feature mock screens (`landing/src/components/Mocks.tsx`) until real screenshots arrive.
+- Rebuilt the voice-stress mock as a real chart: gauge, "words vs voice" severity rows, and an area chart with call moments marked on it.
+
+**Update 2026-09-29 (IST):** Fixed a landing lightbox bug. Opening a card with no screenshot left later cards (e.g. Analytics) stuck on the placeholder even though their screenshot existed. Redeployed.
+
+**Update 2026-09-29 (IST):** The landing demo slider now has 4 slots: `covert-call.mp4`, `chased-call.mp4`, `sos.mp4` and `click-order.mp4` in `landing/public/videos/`. Redeployed.
+
+**Update 2026-09-29 (IST):** Landing page:
+- **Responsive pass:** checked in headless Chrome at 360, 390, 768, 1024 (portrait + landscape) and 1440 px. No horizontal overflow. Fixed the hero overlap, the disguise fan overlapping its text, the comparison table (Covert Call column now first so it fits on phones), the nav button, the footer and the pop-ups.
+- **New `/privacy` Privacy Policy page:** covers mic, camera, location, photos, Gemini processing, Firestore (asia-south1), Drive recordings, responder-only access, the leakage-check redaction, retention and contact. Linked from the footer.
+- **Demo slide 2:** now describes the persona's open mode (the caller says "talk" and Mia drops the food cover).
+
+**Update 2026-09-29 (IST):** Landing page:
+- **Stale screenshots fixed:** screenshots added after a visit could stay stuck on the placeholder, because the site-wide rewrite answered a missing `/shots/*.png` with HTML and the browser cached that for 1 h. The rewrite is now only `/privacy`, so missing files return 404. `/shots` and `/videos` are cached for 5 min, and image and video URLs carry a per-build `?v=` parameter.
+- **Leakage check card removed** at Jeevan's request, since it isn't visible anywhere in the dashboard UI.
+
+**Update 2026-09-29 (IST):** Mobile landing made shorter: the stats, the four ways in, the 6 deep-dives and the feature grid are now horizontal swipe rows. Caller and responder now sit side by side. Fixed the cropped deep-dive visuals and the icon overlapping the card title. Demo slide 1 now uses `videos/call.mp4` (112 MB, should be compressed to about 20 MB). Redeployed.
+
+**Update 2026-09-29 (IST):** Mobile swipe rows now show they swipe: the next card peeks in (fixed a reveal animation that kept half-visible cards hidden), an animated "Swipe →" hint, and tappable dot indicators under each row. Demo videos now show the whole frame (no crop) inline and in fullscreen. Redeployed.
+
+**Update 2026-09-29 (IST):** Rewrote the root `README.md` as a plain-language product overview: what it is, the four ways in, what responders see, privacy, the emergency note, team and license. There are no technical details and no hackathon mention. The technical readme stays at `covert_call/README.md`.
+
+**Update 2026-09-29 (IST, ~12:00):** Redeployed the dashboard from `feature/nl-incident-search` (`6cf1ee5`), because a deploy at 11:31 IST from code without the queue/history sort had removed the sort dropdown from the live site. **Note for Ameen:** the sort commit is not on `main` yet. Please don't deploy the dashboard from `main` until it's merged, or it disappears again.
+
+**Update 2026-09-29 (IST):** Landing demo slide 1 now streams `call.mp4` from the shared Drive folder "QuickByte Demo Videos" through Drive's preview player. Slides with a video no longer auto-advance. Local MP4s are excluded from the deploy. For the other 3 videos: upload them to the same folder and add each file ID as `drive:` in `VIDEOS` (`landing/src/components/Sections.tsx`).
+
+**Update 2026-09-29 (IST):** Landing: fixed the squashed first column in the mobile feature grid (dots now count swipe positions, not cards). The build now embeds the list of existing screenshots/videos, so missing ones no longer 404 in the console. Redeployed.
+
+**Update 2026-09-29 (IST):** Opened PR #13 (`feature/nl-incident-search` → `main`) for the queue/history sort and 4 call/routing fixes that missed PR #10. Merged `main` into it to resolve a status-file conflict.
