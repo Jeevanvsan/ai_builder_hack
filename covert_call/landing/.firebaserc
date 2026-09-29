@@ -1,0 +1,8 @@
+{
+  "projects": { "default": "quickbite-5cde0" },
+  "targets": {
+    "quickbite-5cde0": {
+      "hosting": { "landing": ["quickbite-5cde0-landing"] }
+    }
+  }
+}
