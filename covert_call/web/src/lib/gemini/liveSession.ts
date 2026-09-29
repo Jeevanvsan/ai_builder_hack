@@ -1,9 +1,10 @@
 import { GoogleGenAI, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
-import type { Firestore } from 'firebase/firestore'
-import { appendTranscriptLine, confirmAddress, recordAdvice, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { arrayRemove, doc, updateDoc, type Firestore } from 'firebase/firestore'
+import { INCIDENTS, appendTranscriptLine, confirmAddress, recordAdvice, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
+import { ALL_CODES } from '../../../../shared/codes.ts'
 import { startCallRecording, type CallRecorder } from './recorder.ts'
 import { LIVE_CALL_TOOLS } from './tools.ts'
 import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
@@ -90,7 +91,7 @@ export async function startLiveCall(
   // whole line happens to be only one, since consecutive fragments get merged into the same line before this
   // would otherwise be checked. Previously leaked straight into the responder-facing conversation view looking
   // like Mia or the caller had spoken gibberish.
-  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silence|inaudible|noise|breathing|laughs?|sighs?)\s*[>}\])]/gi
+  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]|-{2,}/gi
   const appendTranscript = (speaker: string, rawText: string) => {
     const text = rawText.replace(NON_SPEECH_TOKEN, '')
     if (!text) return
@@ -104,10 +105,17 @@ export async function startLiveCall(
 
   // Gemini Live only takes a turn after it hears the caller, so silence never makes it speak on its own.
   // This watchdog nudges it to re-ask after a quiet gap, and hangs up itself if the model doesn't after 3 tries.
-  const SILENCE_MS = 12_000
+  // 20 s: callers (and demo role-play voices) often take a while to answer after a long direction.
+  const SILENCE_MS = 20_000
   const SPEAKING_LEVEL = 0.02
   let lastActivityAt = Date.now()
   let silentNudges = 0
+  // Set only once the caller has said they're being followed/chased or are on the move. Route guidance is gated on
+  // it: a caller hiding at home who describes the ATTACKER's bike was being routed to a police station.
+  let movementReported = false
+  const SILENT_TAG = 'caller silent after danger - line kept open'
+  let silentTagged = false
+  const MOVEMENT = /(followed|chased|chasing|stalked|stalking|fleeing|escaping)|following (me|her|him|them|the caller)|on the move|moving around|abduct|taken somewhere|running away|in the road|leaving the (house|home|room|building)/i
   // True once anything dangerous has been reported this call (a weapon, a gunshot/scream heard, high urgency).
   // Silence after that point is a reason to stay connected, not the ordinary "no answer, end the call" case —
   // see the silence timer below and persona.ts's SILENCE section.
@@ -156,6 +164,8 @@ export async function startLiveCall(
         // Once real danger has been reported, going silent is a reason to STAY on the line, not hang up — see
         // the silence-timer guard below. Never reset back to false: danger doesn't un-happen mid-call.
         if (args.urgency === 'high' || (Array.isArray(args.dangerIndicators) && args.dangerIndicators.length)) dangerReported = true
+        // Danger tags only, never free-text notes ("follow-up" in a note matched and routed a caller hiding at home).
+        if (Array.isArray(args.dangerIndicators) && args.dangerIndicators.some((t) => typeof t === 'string' && MOVEMENT.test(t))) movementReported = true
         enqueueWrite(() => updateLiveFields(db, incidentId, patch))
         break
       }
@@ -166,7 +176,9 @@ export async function startLiveCall(
           return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
         }
         enqueueWrite(() => confirmAddress(db, incidentId, address))
-        return 'Saved. If they are being chased, followed or need to move, call get_route_guidance now and guide them to the police station/hospital it gives.'
+        return movementReported
+          ? 'Saved. They are on the move — call get_route_guidance now and guide them to the police station/hospital it gives.'
+          : 'Saved. Do NOT give directions — they have not said they are being followed or moving. Keep them safe where they are.'
       }
       case 'report_stress_level': {
         const score = args.score
@@ -244,6 +256,11 @@ export async function startLiveCall(
       appendTranscript('Caller', callerText)
       lastActivityAt = Date.now()
       silentNudges = 0
+      // They spoke again, so "silent after danger" is no longer true: take the tag off the dashboard.
+      if (silentTagged && callerText.replace(NON_SPEECH_TOKEN, '').trim()) {
+        silentTagged = false
+        enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { 'extractedFieldsLive.dangerIndicators': arrayRemove(SILENT_TAG) }))
+      }
     }
     const miaText = message.serverContent?.outputTranscription?.text
     if (miaText) appendTranscript('Mia', miaText)
@@ -276,6 +293,12 @@ export async function startLiveCall(
       // Route guidance needs a real answer (live GPS + routing), so it's answered once the tracker resolves.
       for (const call of routeCalls) {
         const args = (call.args ?? {}) as { situation?: string; landmark?: string }
+        // Mia's own situation text counts only if it says the CALLER is followed/chased/moving ("attacker on bike" doesn't).
+        if (args.situation && MOVEMENT.test(args.situation)) movementReported = true
+        if (!movementReported) {
+          void session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response: { output: 'NOT needed: the caller has not said they are being followed, chased or on the move. Do NOT give any directions or mention a route. A vehicle answer describes the ATTACKER, not the caller moving. If they are inside (home, a room), ask the CAN THEY GET OUT question first. Only if they can get out safely, or say they are being followed: report_situation with that (e.g. \"caller escaping - leaving the house\"), then call this again.' } }] })
+          continue
+        }
         void (tracker ? tracker.guidance(args.situation, args.landmark) : Promise.resolve('No GPS yet — ask for the nearest landmark.'))
           .catch(() => 'Routing is unavailable right now — ask for the nearest landmark and keep them moving somewhere busy and lit.')
           .then((output) => session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response: { output } }] }))
@@ -306,7 +329,13 @@ export async function startLiveCall(
         inputAudioTranscription: {
           languageCodes: ['en-IN', 'ml-IN', 'hi-IN', 'ta-IN'],
           customVocabulary: [
-            'QuickBite', 'Mia', 'talk', 'order', 'garlic bread', 'pepperoni', 'extra spicy', 'kids meal', 'family combo',
+            'QuickBite', 'Mia', 'talk', 'order',
+            // Every code phrase plus the answers to Mia's follow-ups, so a whispered "cola" isn't heard as "Kola".
+            ...ALL_CODES.map((c) => c.food),
+            'cola', 'lemon', 'orange', 'a few napkins', 'a whole pack', 'small', 'medium', 'large', 'one pizza', 'two pizzas',
+            'a few', 'hand it to me', 'leave it at the door', 'right now', 'pre-order', 'as soon as possible', 'within the hour',
+            'whenever', 'pick up', 'bike', 'car', 'barbecue', 'mayo', 'ketchup', 'regular crust', 'large crust', 'the usual',
+            'collect it outside', 'bring it in', 'for myself', 'for someone else', 'one address', 'moving around',
             'Alappuzha', 'Alleppey', 'Vazhicherry', 'Muhamma', 'Mullakkal', 'Kalavoor', 'Cherthala', 'Kochi', 'Ernakulam',
             'Kottayam', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Bengaluru', 'HSR Layout', 'Koramangala',
             'petrol pump', 'junction', 'police station',
@@ -397,7 +426,10 @@ export async function startLiveCall(
   session.sendClientContent({ turns: 'The call has just connected. Greet the caller now, as instructed.' })
 
   tracker = startLiveTracking(db, incidentId, (note) => {
-    if (finished) return
+    // Nearby help existing (or a responder picking a station) is never a reason to start directing someone:
+    // only a caller who is on the road, chased or leaving gets turn-by-turn guidance. The route still shows on
+    // the dashboard for the responder either way.
+    if (finished || !movementReported) return
     session.sendClientContent({
       turns: `(System note, not the caller — live navigation: ${note} If you are guiding the caller to safety, relay the next instruction now, phrased for the situation per your GETTING TO SAFETY rules.)`,
     })
@@ -458,8 +490,9 @@ export async function startLiveCall(
     // when the caller speaks, and the line stays open for the responder listening live.
     if (dangerReported) {
       if (silentNudges === 1) {
+        silentTagged = true
         enqueueWrite(() => updateLiveFields(db, incidentId, {
-          dangerIndicators: ['caller silent after danger - line kept open'],
+          dangerIndicators: [SILENT_TAG],
           urgency: 'high',
         }))
         session.sendClientContent({
