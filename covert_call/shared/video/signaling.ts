@@ -6,15 +6,18 @@ import { INCIDENTS } from '../incidents/client.ts'
 // (that costs money), so a few very strict networks may fail to connect.
 export const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
 
-// A single incident can carry two live feeds at once (Epic 11: front + back cameras), so each camera gets its own
-// signaling collection and its own status field on the incident. The back camera keeps the original names, so the
-// existing single-camera call path (Epic 9) is completely unchanged.
-export type Camera = 'back' | 'front'
+// A single incident can carry several live feeds at once (Epic 11: front + back cameras; a live listen-in
+// audio channel), so each gets its own signaling collection and its own status field on the incident. 'back'
+// keeps the original names, so the existing single-camera call path (Epic 9) is completely unchanged.
+// 'mic' is the caller's raw microphone audio, published one-way for a responder to listen in live (never sent
+// back to the caller — that's a separate two-way takeover channel, not this one).
+export type Camera = 'back' | 'front' | 'mic'
 
-// Which incident field holds a camera's live status.
-export const videoField = (camera: Camera = 'back'): 'video' | 'videoFront' => (camera === 'front' ? 'videoFront' : 'video')
+// Which incident field holds a channel's live status.
+export const videoField = (camera: Camera = 'back'): 'video' | 'videoFront' | 'audioListen' =>
+  camera === 'front' ? 'videoFront' : camera === 'mic' ? 'audioListen' : 'video'
 
-const viewersName = (camera: Camera): string => (camera === 'front' ? 'videoViewersFront' : 'videoViewers')
+const viewersName = (camera: Camera): string => (camera === 'front' ? 'videoViewersFront' : camera === 'mic' ? 'audioViewers' : 'videoViewers')
 
 // incidents/{id}/{videoViewers|videoViewersFront}/{viewerId}                      { offer, answer?, createdAt, viewerName }
 // incidents/{id}/.../{viewerId}/viewerCandidates     ICE candidates from the dashboard

@@ -30,20 +30,70 @@ export interface Incident {
     rough: RoughLocation | null
     confirmed: {
       address: string
-      lat: number
-      lng: number
+      // Null when the spoken address couldn't be geocoded at all — the text is still worth showing a responder,
+      // but there is no reliable pin to route to or move the caller's map position from (see confirmAddress()).
+      lat: number | null
+      lng: number | null
       confidence: FieldConfidence
       confirmedAt: string
     } | null
+    // Live GPS trail while the call is open (route-to-safety): lets the dashboard follow a moving caller.
+    track?: { lat: number; lng: number; at: string; speed?: number | null }[]
   }
+  // Route to the best-fit station (police/hospital/fire), kept current as the caller moves. Set by the AI during the
+  // call or by a responder picking a station on the dashboard.
+  safeRoute?: import('../nav/route.ts').SafeRoute
   extractedFieldsLive: {
     peopleCount: number | null
     dangerIndicators: string[]
     urgency: Severity | null
     notes: string | null
   }
+  // Timestamped transcript lines written live during the call (Epic 17.1) — completed lines only (flushed on a
+  // speaker switch or a periodic safety timer), not every raw speech-to-text fragment. Shared by the annotated
+  // live transcript (17.2) and the post-call replay scrubber (17.3).
+  transcriptLines?: { speaker: 'Caller' | 'Mia'; text: string; at: string }[]
+  // A snapshot of extractedFieldsLive taken each time it changes (Epic 17.3) — lets the replay scrubber show only
+  // the fields known as of a given point in the call, not the final picture. Capped/pruned by the writer if a
+  // call runs unusually long; absent means no history was recorded (older incidents, or a very short call).
+  fieldHistory?: { fields: Incident['extractedFieldsLive']; at: string }[]
   consolidatedSummary: string | null
+  // Set only if the post-call consolidation pass (summary/bulletin) failed after retrying, so the dashboard can
+  // say why the summary is missing instead of showing an empty state forever (Epic 3.4 bug: it used to fail
+  // completely silently, with the incident stuck showing "Gemini writes the case summary..." forever).
+  consolidationFailed?: boolean
+  // Set only if saving the call's audio recording failed everywhere (Drive not configured/failed AND it was too
+  // big for the Firestore fallback below) — same "say why instead of just missing" fix as consolidationFailed.
+  recordingFailed?: string
   fieldConfidence: Record<string, FieldConfidence>
+  // Live confidence per field, updated as the call progresses (Epic 16.2) — distinct from `fieldConfidence`,
+  // which is only written once at consolidation. Lets the dashboard show a field sharpening from "uncertain" to
+  // "confirmed" during the call itself, not just after it ends.
+  fieldConfidenceLive?: Record<string, FieldConfidence>
+  // Short, plain-language lines explaining why severity/urgency changed, appended whenever they actually change
+  // (Epic 16.1) — not on every field write. Gives a responder a live "why", not just the resulting chip.
+  reasoningTrace?: { text: string; at: string }[]
+  // One derived, human-readable recommended action (Epic 16.3), computed alongside severity from the same
+  // inputs — deterministic and explainable, not a separate Gemini call.
+  recommendation?: string | null
+  // One short, non-personal factual line (Epic 16.10) sourced via Gemini Search grounding — e.g. weather/road
+  // conditions near the confirmed location. Best-effort context only; absent if grounding found nothing relevant
+  // or isn't configured.
+  groundedContext?: string | null
+  // Other incident IDs that appear to describe the same person/vehicle/location as this one (Epic 19.1), found
+  // by comparing our own recent reports — never an external identity lookup. Absent means no match was found or
+  // the check wasn't run.
+  correlatedIncidentIds?: string[]
+  // Rigid dispatch-bulletin-style breakdown (Epic 16.4), written once at consolidation alongside the prose
+  // `consolidatedSummary` — terse fragments formatted like a real dispatch broadcast, not sentences.
+  bulletin?: {
+    location: string
+    subjects: string
+    weapons: string
+    vehicle: string
+    status: string
+    recommendedAction: string
+  }
   // What the AI saw on the camera or heard in the background during the call (Epic 10) — kept separate from what
   // the caller actually said. `source` is 'camera' (a video frame) or 'sound' (a background noise like a gunshot
   // or other voices). Absent until the first observation.
@@ -53,6 +103,10 @@ export interface Incident {
   adviceGiven?: { text: string; at: string }[]
   voiceStressScore: number | null
   voiceStressTrend: { timestamp: string; score: number }[]
+  // The AI's rough, UNCONFIRMED guess of the caller's age group and gender from voice/camera (never something
+  // the caller stated) — shown to a responder clearly labelled as an estimate, mainly to flag a child or
+  // elderly caller. Absent until the model reports one; a call may not get one at all if it's short or unclear.
+  callerEstimate?: { ageGroup: 'child' | 'teen' | 'adult' | 'elderly' | 'unclear'; gender: 'male' | 'female' | 'unclear'; confidence?: number | null; at: string }
   leakageCheckStatus: { reviewed: boolean; redactions: string[] }
   severity: Severity
   // Present once the QuickBite app starts streaming the back camera (Epic 7.1). Absent means no video for this incident.
@@ -60,6 +114,10 @@ export interface Incident {
   // The front-camera live feed, only for a dual-camera SOS (Epic 11). Same shape as `video`; the dashboard shows a
   // Back/Front toggle when both are present.
   videoFront?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
+  // A one-way WebRTC feed of the caller's raw microphone audio (never the caller's device speaker output, and
+  // never anything sent back to them) — a responder can listen live via the dashboard's Listen button. Separate
+  // from the call's own recorded audio (hasRecording/audioRecording), which is only available after the call.
+  audioListen?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
   // One entry per camera whose footage is being saved to the team Google Drive (Epic 9.2; Epic 11 records two
   // cameras for the silent SOS). Absent means no Drive recording (e.g. no camera, or the Drive upload URL isn't
   // configured). driveUrl is filled once the upload finishes.
@@ -70,11 +128,24 @@ export interface Incident {
     driveUrl?: string | null
     startedAt: string
     endedAt?: string | null
+    // Why the upload failed (e.g. "Drive upload rejected: <Apps Script error>"), so a responder/Ameen can tell a
+    // real bug from Apps Script's own request-size limit instead of just seeing "failed" with no reason.
+    failReason?: string | null
   }[]
   // True once the full call recording (mic + AI voice) has been saved to the incidents/{id}/recording/audio
   // subcollection doc — kept off the main document since Firestore caps a document at 1MiB. Absent/false if
-  // recording wasn't supported in the caller's browser, or the call was too long to fit in one document.
+  // recording wasn't supported in the caller's browser, the call was too long to fit in one document, and Drive
+  // upload (below) isn't configured or also failed.
   hasRecording?: boolean
+  // The call's own audio saved to the team Google Drive (Epic 9.2's uploader, reused) — the preferred path when
+  // configured, since it has no ~1MB size cap unlike the Firestore fallback above. Same shape as videoRecording.
+  audioRecording?: {
+    status: 'recording' | 'uploaded' | 'failed'
+    driveFileId?: string | null
+    driveUrl?: string | null
+    startedAt: string
+    endedAt?: string | null
+  }
   response: {
     status: ResponseStatus
     acknowledgedBy: string | null

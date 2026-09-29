@@ -99,6 +99,31 @@ export function stopRinging(): void {
   }
 }
 
+// Epic 16.7: a distinct, one-shot cue for when severity escalates on an incident a responder already has open —
+// deliberately different from playAlertSound()'s siren wail (that one means "unopened incident"), so the two are
+// never confused. Two quick high beeps rather than a sweep.
+export function playEscalationCue(): void {
+  try {
+    const ctx = getAudio()
+    if (!ctx || ctx.state !== 'running') return
+    const t0 = ctx.currentTime + 0.02
+    for (const start of [0, 0.18]) {
+      const osc = ctx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.value = 1100
+      const gain = ctx.createGain()
+      gain.gain.setValueAtTime(0.0001, t0 + start)
+      gain.gain.exponentialRampToValueAtTime(0.28, t0 + start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + start + 0.14)
+      osc.connect(gain).connect(ctx.destination)
+      osc.start(t0 + start)
+      osc.stop(t0 + start + 0.16)
+    }
+  } catch {
+    // Audio blocked or unavailable.
+  }
+}
+
 export const notificationsSupported = () => typeof Notification !== 'undefined'
 
 // System notification for when the dashboard tab is in the background or another window has focus.

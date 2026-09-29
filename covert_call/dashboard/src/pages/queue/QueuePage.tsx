@@ -1,20 +1,36 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { motion } from 'motion/react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Chip from '../../components/Chip'
 import StressMeter from '../../components/StressMeter'
 import DataState from '../../components/DataState'
 import Pagination from '../../components/Pagination'
+import SmartSearchBar, { useSmartSearch } from '../../components/SmartSearch'
 import { useIncidents } from '../../lib/incidentsStore'
 import { isUnviewed, rankOpenIncidents } from '../../lib/ranking'
 import { usePagination } from '../../lib/usePagination'
 import { channelLabel, formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
 import { useNow } from '../../lib/useNow'
 
+// Epic: live queue as a card feed, not a table — severity/live/new state read visually (color, size, position)
+// at a glance, matching how a responder actually scans a live board rather than reading table cells row by row.
 export default function QueuePage() {
   const now = useNow()
   const navigate = useNavigate()
   const { data, loading, error } = useIncidents('open')
   const queue = rankOpenIncidents(data)
-  const pager = usePagination(queue)
+  // Plain-language search (kept in the URL like Case history). Stats above always count the whole queue.
+  const [params, setParams] = useSearchParams()
+  const q = params.get('q') ?? ''
+  const setQ = (v: string) => {
+    const next = new URLSearchParams(params)
+    if (v) next.set('q', v)
+    else next.delete('q')
+    next.delete('page')
+    setParams(next, { replace: true })
+  }
+  const search = useSmartSearch(queue, q)
+  const shown = search.results
+  const pager = usePagination(shown)
 
   const stats = [
     { label: 'Not yet opened', value: queue.filter(isUnviewed).length, tone: 'new' },
@@ -40,86 +56,73 @@ export default function QueuePage() {
         ))}
       </div>
 
+      <div className="filters">
+        <SmartSearchBar value={q} onChange={setQ} onAsk={() => void search.runAi()} aiStatus={search.aiStatus} />
+        {q && <button type="button" className="btn" onClick={() => setQ('')}>Clear</button>}
+      </div>
+      {q && !loading && <p className="result-count">{shown.length} of {queue.length} open incidents</p>}
+
       {loading || error ? (
         <DataState loading={loading} error={error} />
       ) : queue.length === 0 ? (
         <div className="card empty">No open incidents.</div>
+      ) : shown.length === 0 ? (
+        <div className="card empty">No open incidents match this description.</div>
       ) : (
         <>
-        <table className="table queue">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Severity</th>
-              <th>Incident</th>
-              <th>Status</th>
-              <th>Call</th>
-              <th>People</th>
-              <th>Danger indicators</th>
-              <th>Voice stress</th>
-              <th>Location</th>
-              <th>Elapsed</th>
-              <th>Started</th>
-            </tr>
-          </thead>
-          <tbody>
+          <div className="incident-feed">
             {pager.pageItems.map((i, index) => {
               const f = i.extractedFieldsLive
               const unviewed = isUnviewed(i)
               return (
-                <tr
+                <motion.div
                   key={i.id}
-                  className={`row-${i.severity}${unviewed ? ' row-new' : ''}`}
+                  layout
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 26, delay: Math.min(index, 5) * 0.03 }}
+                  className={`incident-card incident-card-${i.severity}${unviewed ? ' incident-card-new' : ''}`}
                   onClick={() => navigate(`/incident/${i.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/incident/${i.id}`)}
                 >
-                  <td className="rank">{pager.offset + index + 1}</td>
-                  <td><Chip tone={i.severity} filled>{i.severity}</Chip></td>
-                  <td className="mono">
-                    <Link to={`/incident/${i.id}`}>{i.id}</Link>
-                    {unviewed && <div><Chip tone="new" filled>New</Chip></div>}
-                  </td>
-                  <td>
-                    <Chip tone={i.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(i.response.status)}</Chip>
-                    {i.response.acknowledgedBy && <div className="sub">{i.response.acknowledgedBy}</div>}
-                  </td>
-                  <td>
-                    {i.callState === 'active' ? (
-                      <span className="live"><span className="live-dot" />Live</span>
-                    ) : (
-                      <span className="muted-inline">Ended</span>
-                    )}
-                    <div className="sub">{channelLabel(i.channel)}</div>
-                    {i.incidentType === 'sos' && (
-                      <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>
-                    )}
-                  </td>
-                  <td>{f.peopleCount ?? '—'}</td>
-                  <td>
-                    {f.dangerIndicators.length
-                      ? f.dangerIndicators.map((d) => <Chip key={d} tone="danger">{d}</Chip>)
+                  <div className="row-cell row-rank">
+                    <span className="incident-card-rank">#{pager.offset + index + 1}</span>
+                    <Chip tone={i.severity} filled>{i.severity}</Chip>
+                  </div>
+                  <div className="row-cell row-id">
+                    <Link to={`/incident/${i.id}`} className="incident-card-id mono" onClick={(e) => e.stopPropagation()}>{i.id}</Link>
+                    <span className="sub">
+                      {channelLabel(i.channel)}
+                      {i.incidentType === 'sos' && <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>}
+                    </span>
+                    {search.reasons.get(i.id) && <span className="search-reason">AI: {search.reasons.get(i.id)}</span>}
+                  </div>
+                  <div className="row-cell row-state">
+                    {i.callState === 'active' ? <span className="live"><span className="live-dot" />Live</span> : <span className="muted-inline">Ended</span>}
+                    <span>{unviewed ? <Chip tone="new" filled>New</Chip> : <Chip tone={i.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(i.response.status)}</Chip>}</span>
+                  </div>
+                  <div className="row-cell row-indicators">
+                    {f.dangerIndicators.length > 0
+                      ? <>{f.dangerIndicators.slice(0, 2).map((d) => <Chip key={d} tone="danger">{d}</Chip>)}{f.dangerIndicators.length > 2 && <span className="sub">+{f.dangerIndicators.length - 2}</span>}</>
                       : <span className="muted-inline">None reported</span>}
-                  </td>
-                  <td><StressMeter score={i.voiceStressScore} /></td>
-                  <td>
-                    {i.location.confirmed ? (
-                      i.location.confirmed.address
-                    ) : i.location.rough ? (
-                      <>
-                        ≈ {i.location.rough.lat.toFixed(3)}, {i.location.rough.lng.toFixed(3)}
-                        <div className="sub">Approximate ({i.location.rough.source === 'gps' ? 'GPS' : 'IP'})</div>
-                      </>
-                    ) : (
-                      <span className="muted-inline">Locating…</span>
-                    )}
-                  </td>
-                  <td className="mono">{formatElapsed(i.sessionStartedAt, now)}</td>
-                  <td title={formatTime(i.sessionStartedAt)}>{timeAgo(i.sessionStartedAt, now)}</td>
-                </tr>
+                  </div>
+                  <div className="row-cell row-people"><span className="incident-card-label">People</span>{f.peopleCount ?? '—'}</div>
+                  <div className="row-cell row-stress"><StressMeter score={i.voiceStressScore} /></div>
+                  <div className="row-cell row-location sub">
+                    {i.location.confirmed ? i.location.confirmed.address
+                      : i.location.rough ? `≈ ${i.location.rough.lat.toFixed(3)}, ${i.location.rough.lng.toFixed(3)}` : 'Locating…'}
+                  </div>
+                  <div className="row-cell row-time">
+                    <span className="mono">{formatElapsed(i.sessionStartedAt, now)}</span>
+                    <span className="sub">{timeAgo(i.sessionStartedAt, now)} · {formatTime(i.sessionStartedAt)}</span>
+                  </div>
+                </motion.div>
               )
             })}
-          </tbody>
-        </table>
-        <Pagination {...pager} noun="open incidents" onPage={pager.setPage} />
+          </div>
+          <Pagination {...pager} noun="open incidents" onPage={pager.setPage} />
         </>
       )}
     </section>

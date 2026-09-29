@@ -1,7 +1,7 @@
-import { arrayUnion, doc, getDoc, runTransaction, setDoc, updateDoc, type Firestore } from 'firebase/firestore'
+import { arrayUnion, doc, getDoc, runTransaction, setDoc, updateDoc, type Firestore, type Transaction } from 'firebase/firestore'
 import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
-import { deriveSeverity, maxSeverity } from './severity.ts'
+import { deriveSeverity, deriveRecommendation, describeSeverityChange, maxSeverity } from './severity.ts'
 import type { Channel, FieldConfidence, Incident, RoughLocation } from './types.ts'
 
 // Write side of the incident pipeline (Epic 3), called by the QuickBite app. The dashboard only reads.
@@ -12,6 +12,28 @@ const GPS_WAIT_MS = 5_000
 const now = () => new Date().toISOString()
 const sleep = (ms: number) => new Promise<null>((r) => setTimeout(() => r(null), ms))
 const ref = (db: Firestore, id: string) => doc(db, INCIDENTS, id)
+
+// A live call's own writes (updateLiveFields, recordVoiceStress) read-modify-write the same incident document a
+// responder may be actively viewing — a dashboard action like markViewed() or acknowledge() bumps the document's
+// version and invalidates any transaction reading it at that exact moment. Firestore's SDK already retries a
+// failed transaction automatically, but only up to its own small internal budget; under a live call firing
+// several of these in quick succession while a responder is also interacting with the same incident, that budget
+// can be exhausted and the write silently dropped (the promise rejects, and enqueueWrite in liveSession.ts
+// swallows it). This wrapper adds an outer retry with backoff specifically for that contention case, so a
+// responder opening the incident mid-call never costs the call a voice-stress sample or a field update.
+const TRANSACTION_RETRIES = 5
+async function runTransactionWithRetry<T>(db: Firestore, updateFn: (tx: Transaction) => Promise<T>): Promise<T> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < TRANSACTION_RETRIES; attempt++) {
+    try {
+      return await runTransaction(db, updateFn)
+    } catch (err) {
+      lastError = err
+      if (attempt < TRANSACTION_RETRIES - 1) await sleep(150 * 2 ** attempt)
+    }
+  }
+  throw lastError
+}
 
 export const newIncidentId = () => `INC-${Date.now().toString(36).toUpperCase()}`
 
@@ -77,7 +99,7 @@ async function attachRoughLocation(db: Firestore, id: string): Promise<RoughLoca
 // "aggressor present" later needs both remembered, not just the last one. dangerIndicators is deduped and
 // appended; notes (a single string, not an array, per the incident schema) has new distinct text appended.
 export function updateLiveFields(db: Firestore, id: string, patch: Partial<LiveFields>): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const existing = current.extractedFieldsLive
@@ -92,24 +114,89 @@ export function updateLiveFields(db: Firestore, id: string, patch: Partial<LiveF
     }
 
     const merged = { ...existing, ...mergedPatch }
-    const update: Record<string, unknown> = {
-      severity: maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore)),
-    }
+    const newSeverity = maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore))
+    const update: Record<string, unknown> = { severity: newSeverity }
     for (const [key, value] of Object.entries(mergedPatch)) update[`extractedFieldsLive.${key}`] = value
+
+    // Epic 16.2: live confidence per field — a direct report is confirmed as soon as it's said; dangerIndicators
+    // start inferred and are promoted to confirmed once the same indicator is reported again (a repeat/elaboration).
+    const liveConfidence = { ...current.fieldConfidenceLive }
+    if (typeof patch.peopleCount === 'number') liveConfidence.peopleCount = 'confirmed'
+    if (typeof patch.urgency === 'string') liveConfidence.urgency = 'confirmed'
+    if (typeof patch.notes === 'string' && patch.notes.trim()) liveConfidence.notes = 'confirmed'
+    if (patch.dangerIndicators?.length) {
+      const repeated = patch.dangerIndicators.some((d) => existing.dangerIndicators.includes(d))
+      liveConfidence.dangerIndicators = repeated || liveConfidence.dangerIndicators === 'confirmed' ? 'confirmed' : 'inferred'
+    }
+    update.fieldConfidenceLive = liveConfidence
+
+    // Epic 16.3/16.1: recompute the recommendation whenever fields change, and log a reasoning-trace line only
+    // when severity actually moved — keeps the trace a meaningful escalation log, not noise on every write.
+    update.recommendation = deriveRecommendation(merged, newSeverity)
+    if (newSeverity !== current.severity) {
+      const line = describeSeverityChange(current.severity, newSeverity, merged, current.voiceStressScore)
+      update.reasoningTrace = [...(current.reasoningTrace ?? []), { text: line, at: now() }]
+    }
+
+    // Epic 17.3: snapshot the merged fields so the replay scrubber can show "what was known at time T", not just
+    // the final picture. Capped at 500 entries (a call firing this every few seconds would take hours to hit it).
+    const history = [...(current.fieldHistory ?? []), { fields: merged, at: now() }]
+    update.fieldHistory = history.length > 500 ? history.slice(-500) : history
+
     tx.update(ref(db, id), update)
   })
 }
 
+// A one-off, best-effort AI estimate (not from anything the caller said) — plain overwrite, no severity coupling
+// (age/gender should never itself change urgency scoring).
+export function recordCallerEstimate(
+  db: Firestore,
+  id: string,
+  estimate: { ageGroup: 'child' | 'teen' | 'adult' | 'elderly' | 'unclear'; gender: 'male' | 'female' | 'unclear'; confidence?: number },
+): Promise<void> {
+  return updateDoc(ref(db, id), { callerEstimate: { ...estimate, confidence: estimate.confidence ?? null, at: now() } })
+}
+
 export function recordVoiceStress(db: Firestore, id: string, score: number): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
-    tx.update(ref(db, id), {
+    const newSeverity = maxSeverity(current.severity, deriveSeverity(current.extractedFieldsLive, score))
+    const update: Record<string, unknown> = {
       voiceStressScore: score,
       voiceStressTrend: arrayUnion({ timestamp: now(), score }),
-      severity: maxSeverity(current.severity, deriveSeverity(current.extractedFieldsLive, score)),
-    })
+      severity: newSeverity,
+      recommendation: deriveRecommendation(current.extractedFieldsLive, newSeverity),
+    }
+    if (newSeverity !== current.severity) {
+      const line = describeSeverityChange(current.severity, newSeverity, current.extractedFieldsLive, score)
+      update.reasoningTrace = [...(current.reasoningTrace ?? []), { text: line, at: now() }]
+    }
+    tx.update(ref(db, id), update)
   })
+}
+
+// Epic 17.1: writes a completed transcript line live during the call — plain arrayUnion, no transaction, since
+// a transcript line never needs to read the current document first (it only ever appends, never conditionally
+// changes based on existing state). This deliberately avoids the read-modify-write contention that the other
+// live-write functions above need retry hardening for for: appending each line is naturally the caller's own
+// speaker+text data, ordering is only cosmetic (display sorts by `at`), and Firestore's own write ordering per
+// client is already sufficient.
+export function appendTranscriptLine(db: Firestore, id: string, speaker: 'Caller' | 'Mia', text: string): Promise<void> {
+  return updateDoc(ref(db, id), { transcriptLines: arrayUnion({ speaker, text, at: now() }) })
+}
+
+// Live GPS point while the call is open; also keeps location.rough on the latest fix so maps follow the caller.
+export function appendTrackPoint(db: Firestore, id: string, p: { lat: number; lng: number; speed?: number | null }): Promise<void> {
+  const at = now()
+  return updateDoc(ref(db, id), {
+    'location.track': arrayUnion({ lat: p.lat, lng: p.lng, at, speed: p.speed ?? null }),
+    'location.rough': { lat: p.lat, lng: p.lng, source: 'gps', capturedAt: at },
+  })
+}
+
+export function setSafeRoute(db: Firestore, id: string, route: NonNullable<Incident['safeRoute']>): Promise<void> {
+  return updateDoc(ref(db, id), { safeRoute: route })
 }
 
 // Turns the caller's spoken "delivery address" into a pinned location. If geocoding fails, the spoken address is
@@ -123,13 +210,22 @@ export async function confirmAddress(
   const current = (await getDoc(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
   const rough = current?.location.rough ?? null
   const hit = await geocodeAddress(spokenAddress, { near: rough, googleMapsKey: opts.googleMapsKey })
-  const coords = hit ?? rough
-  if (!coords) return null
+  // If geocoding genuinely fails, the caller's IP-based rough location can be many km off (it has put callers in
+  // the wrong town entirely) — using it as "confirmed" coordinates silently produced a wrong pin and a wrong
+  // route with no sign anything was off. Better to save the spoken address as text with NO pin than a wrong one
+  // that looks identical to a real fix; the dashboard shows it as unlocated instead of confidently wrong.
+  if (!hit) {
+    const confirmed = { address: spokenAddress, lat: null, lng: null, confidence: 'uncertain' as const, confirmedAt: now() }
+    await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
+    return confirmed
+  }
+  // 'approximate' means only the pincode or town/city matched, not the street itself (likely mis-transcribed,
+  // e.g. "Vaisheri" heard for "Vazhicherry") — the pin is in the right area, not necessarily the right street.
   const confirmed = {
     address: spokenAddress,
-    lat: coords.lat,
-    lng: coords.lng,
-    confidence: hit ? ('confirmed' as const) : ('uncertain' as const),
+    lat: hit.lat,
+    lng: hit.lng,
+    confidence: hit.precision === 'exact' ? ('confirmed' as const) : ('uncertain' as const),
     confirmedAt: now(),
   }
   await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
@@ -162,7 +258,7 @@ export function reportSceneObservation(
   id: string,
   obs: { source: 'camera' | 'sound'; kind: string; detail?: string; confidence?: number },
 ): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const detail = obs.detail?.trim() ?? ''
@@ -197,7 +293,7 @@ export function upsertVideoRecording(
   id: string,
   entry: { camera: 'back' | 'front' } & Partial<Omit<VideoRecording, 'camera'>>,
 ): Promise<void> {
-  return runTransaction(db, async (tx) => {
+  return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const list = [...(current.videoRecording ?? [])]
@@ -206,6 +302,12 @@ export function upsertVideoRecording(
     else list.push({ status: 'recording', startedAt: now(), ...entry })
     tx.update(ref(db, id), { videoRecording: list })
   })
+}
+
+// Sets the call's audio-to-Drive entry (Epic 9.2's uploader, reused for audio) — a plain overwrite, unlike
+// upsertVideoRecording's per-camera merge, since a call has at most one audio recording.
+export function setAudioRecording(db: Firestore, id: string, entry: NonNullable<Incident['audioRecording']>): Promise<void> {
+  return updateDoc(ref(db, id), { audioRecording: entry })
 }
 
 // A second Gemini pass reviews the call for uninvolved third parties mentioned without consent (a bystander, a
@@ -219,7 +321,24 @@ export function recordLeakageCheck(db: Firestore, id: string, redactions: string
 export function consolidateIncident(
   db: Firestore,
   id: string,
-  patch: { consolidatedSummary: string; fieldConfidence: Record<string, FieldConfidence> },
+  patch: {
+    consolidatedSummary: string
+    fieldConfidence: Record<string, FieldConfidence>
+    bulletin?: Incident['bulletin']
+  },
 ): Promise<void> {
-  return updateDoc(ref(db, id), { consolidatedSummary: patch.consolidatedSummary, fieldConfidence: patch.fieldConfidence })
+  const update: Record<string, unknown> = { consolidatedSummary: patch.consolidatedSummary, fieldConfidence: patch.fieldConfidence }
+  if (patch.bulletin) update.bulletin = patch.bulletin
+  return updateDoc(ref(db, id), update)
+}
+
+// Epic 16.10: best-effort, separate from consolidateIncident() since Search grounding can fail/be unconfigured
+// independently of the rest of consolidation succeeding.
+export function recordGroundedContext(db: Firestore, id: string, context: string): Promise<void> {
+  return updateDoc(ref(db, id), { groundedContext: context })
+}
+
+// Epic 19.1: best-effort, separate from consolidateIncident() for the same reason as groundedContext above.
+export function recordCorrelatedIncidents(db: Firestore, id: string, matchIds: string[]): Promise<void> {
+  return updateDoc(ref(db, id), { correlatedIncidentIds: matchIds })
 }

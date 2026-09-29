@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, markHasRecording, upsertVideoRecording } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
 import { APP_NAME } from '../lib/brand'
 import { consolidateCall } from '../lib/gemini/consolidate'
-import { runLeakageCheck } from '../lib/gemini/leakageCheck'
+import { groundedLocationContext } from '../lib/gemini/groundedContext'
+import { findCorrelatedIncidents } from '../lib/gemini/correlate'
 import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
 import { saveCallRecording } from '../lib/gemini/uploadRecording'
@@ -16,6 +17,12 @@ import { acquireCallMedia, videoOnly } from '../lib/gemini/media'
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
+
+// Caps a slow/hung best-effort step (an AI call with no timeout of its own) so it can never block the rest of
+// call teardown — see the call site for what this fixed.
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([p, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))])
+}
 
 const STATUS_LABEL: Record<CallStatus, string> = {
   connecting: 'Connecting…',
@@ -36,6 +43,7 @@ export function CallPage() {
   // recorder handle. All optional — the call runs audio-only if there's no camera.
   const mediaRef = useRef<MediaStream | null>(null)
   const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
+  const micPublisherStopRef = useRef<(() => Promise<void>) | null>(null)
   const videoRecRef = useRef<VideoRecorderHandle | null>(null)
   const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   // Cart state at the moment this page mounted — later cart changes (e.g. adding items in another tab) must not
@@ -45,7 +53,7 @@ export function CallPage() {
   // finishCall is called from two places (the End button, and the model's end_call tool call once the caller
   // confirms or after 3 silent retries) — guard so whichever fires first wins and the other is a no-op.
   const endingRef = useRef(false)
-  const finishCallRef = useRef<() => void>(() => {})
+  const finishCallRef = useRef<(opts?: { dropped?: boolean }) => void>(() => {})
 
   useEffect(() => {
     // startedRef makes this a true one-shot for the component's whole lifetime, including across React
@@ -69,7 +77,7 @@ export function CallPage() {
         const handle = await startLiveCall(
           db,
           id,
-          { onStatusChange: setStatus, onCallEnd: () => finishCallRef.current() },
+          { onStatusChange: setStatus, onCallEnd: () => finishCallRef.current(), onCallDropped: () => finishCallRef.current({ dropped: true }) },
           {
             micStream: media ? new MediaStream(media.stream.getAudioTracks()) : undefined,
             videoStream: media?.hasVideo ? videoOnly(media.stream) : undefined,
@@ -78,6 +86,18 @@ export function CallPage() {
         callRef.current = handle
       } catch {
         setStatus('failed')
+      }
+
+      // Publish the caller's raw mic audio one-way, so a responder can listen live from the dashboard (separate
+      // from — and never sent back through — the caller's own call audio to Gemini). Best-effort: a blocked
+      // connection just means no listen-in, never blocks the call itself.
+      if (media?.stream) {
+        try {
+          const micOnly = new MediaStream(media.stream.getAudioTracks())
+          micPublisherStopRef.current = await startVideoPublisher(db, id, micOnly, { camera: 'mic' })
+        } catch {
+          // No listen-in feed; the call and recording continue.
+        }
       }
 
       // With a camera: stream it live to the dashboard, and (if Drive is configured) record video + audio for the
@@ -111,7 +131,10 @@ export function CallPage() {
     return () => clearInterval(timer)
   }, [status])
 
-  const finishCall = async () => {
+  // `dropped: true` means the connection failed and every reconnect attempt gave up — not the caller saying
+  // goodbye. Recorded as its own danger indicator so a responder can tell "the call was cut off, possibly
+  // mid-emergency" apart from a normal, confirmed-safe hangup — otherwise the case file reads identically either way.
+  const finishCall = async (opts: { dropped?: boolean } = {}) => {
     if (endingRef.current) return
     endingRef.current = true
     const id = incidentIdRef.current
@@ -126,36 +149,107 @@ export function CallPage() {
     const recording = await call?.end()
     // Stop the live feed (also marks video ended on the incident) and release the camera + mic.
     await publisherStopRef.current?.()
+    await micPublisherStopRef.current?.()
     mediaRef.current?.getTracks().forEach((t) => t.stop())
     setStatus('ended')
 
-    if (id) {
-      try {
-        const snap = await getDoc(doc(db, INCIDENTS, id))
-        const incident = snap.data() as Omit<Incident, 'id'> | undefined
-        const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
-        const stressTrend = incident?.voiceStressTrend ?? []
+    if (id && opts.dropped) {
+      void updateLiveFields(db, id, {
+        dangerIndicators: ['call disconnected unexpectedly - not a confirmed hangup, reconnect attempts failed'],
+        urgency: 'high',
+        notes: 'The call dropped and could not reconnect. This is not the caller confirming they are safe.',
+      })
+    }
 
-        const [consolidation, redactions] = await Promise.all([
-          consolidateCall(transcript, fields, stressTrend),
-          runLeakageCheck(transcript),
-        ])
-        await Promise.all([
-          consolidateIncident(db, id, consolidation),
-          recordLeakageCheck(db, id, redactions),
-        ])
+    if (id) {
+      // Every step below is best-effort AI/network work with no timeout of its own — a hung or very slow request
+      // (bad connection, quota, a stalled retry) previously blocked this whole block from ever finishing, which
+      // blocked zeroTraceExit() at the end of this function from ever running: the caller's screen stayed stuck
+      // on "ending call" no matter how many times they pressed End, since finishCall() awaits this in sequence.
+      // The recording and every live-extracted field are already saved regardless of whether this finishes, so
+      // capping it at 8s (generous for two Gemini calls including one retry) can only help, never lose data.
+      try {
+        await withTimeout((async () => {
+          const snap = await getDoc(doc(db, INCIDENTS, id))
+          const incident = snap.data() as Omit<Incident, 'id'> | undefined
+          const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
+          const stressTrend = incident?.voiceStressTrend ?? []
+          const address = incident?.location.confirmed?.address ?? null
+
+          // Retry once on failure (a transient network blip or rate limit shouldn't permanently lose the case
+          // summary) before giving up and flagging it for the dashboard. One request now covers both the case
+          // summary/bulletin and the privacy (leakage) check — was two separate model calls on the same
+          // transcript, which needlessly doubled how often a single call could hit the shared free-tier rate limit.
+          const withRetry = <T,>(fn: () => Promise<T>) => fn().catch(() => fn())
+          try {
+            const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address))
+            await Promise.all([
+              consolidateIncident(db, id, consolidation),
+              recordLeakageCheck(db, id, consolidation.redactions),
+            ])
+          } catch (e) {
+            console.error('[QuickBite call] consolidation failed after retry:', e)
+            await updateDoc(doc(db, INCIDENTS, id), { consolidationFailed: true }).catch(() => {})
+          }
+
+          if (address) {
+            void groundedLocationContext(address).then((context) => {
+              if (context) void recordGroundedContext(db, id, context)
+            })
+          }
+
+          if (incident) {
+            void findCorrelatedIncidents(db, { ...incident, id }).then((matchIds) => {
+              if (matchIds.length) void recordCorrelatedIncidents(db, id, matchIds)
+            })
+          }
+        })(), 8000)
       } catch {
         // Best-effort: the incident's live-extracted fields are already saved even if consolidation/leakage
         // check fails here (e.g. no key configured) — a responder still sees everything gathered during the call.
       }
 
       if (recording) {
-        try {
-          await saveCallRecording(id, recording)
-          await markHasRecording(db, id)
-        } catch {
-          // Best-effort: losing the recording (e.g. a long call too big for one Firestore document) shouldn't
-          // block ending the call — every other piece of the incident (fields, summary, location) is still saved.
+        // Drive first (no size cap, unlike the Firestore fallback below) when configured — same uploader as the
+        // call video. Uploaded in the background so ending the call stays instant; falls back to the Firestore
+        // subcollection doc only if Drive isn't configured or its upload fails.
+        if (driveConfigured) {
+          void updateDoc(doc(db, INCIDENTS, id), {
+            audioRecording: { status: 'recording', startedAt: new Date().toISOString() },
+          }).catch(() => {})
+          void (async () => {
+            try {
+              const result = await uploadCallVideo(recording, { incidentId: id, camera: 'audio', mimeType: recording.type || 'audio/webm' })
+              await setAudioRecording(db, id, {
+                status: 'uploaded',
+                driveFileId: result?.driveFileId ?? null,
+                driveUrl: result?.driveUrl ?? null,
+                startedAt: new Date().toISOString(),
+                endedAt: new Date().toISOString(),
+              })
+            } catch (e) {
+              console.error('[QuickBite call] Drive audio upload failed, falling back to Firestore:', e)
+              await setAudioRecording(db, id, { status: 'failed', startedAt: new Date().toISOString(), endedAt: new Date().toISOString() }).catch(() => {})
+              try {
+                await saveCallRecording(id, recording)
+                await markHasRecording(db, id)
+              } catch (e2) {
+                console.error('[QuickBite call] Firestore fallback also failed:', e2)
+                await updateDoc(doc(db, INCIDENTS, id), { recordingFailed: e2 instanceof Error ? e2.message.slice(0, 200) : 'Unknown error' }).catch(() => {})
+              }
+            }
+          })()
+        } else {
+          try {
+            await saveCallRecording(id, recording)
+            await markHasRecording(db, id)
+          } catch (e) {
+            // Best-effort: losing the recording (e.g. a long call too big for one Firestore document) shouldn't
+            // block ending the call — every other piece of the incident (fields, summary, location) is still saved.
+            // But it's flagged (not silently dropped) so the dashboard can say why there's no player.
+            console.error('[QuickBite call] saving the recording failed:', e)
+            await updateDoc(doc(db, INCIDENTS, id), { recordingFailed: e instanceof Error ? e.message.slice(0, 200) : 'Unknown error' }).catch(() => {})
+          }
         }
       }
 
@@ -172,8 +266,14 @@ export function CallPage() {
               driveUrl: result?.driveUrl ?? null,
               endedAt: new Date().toISOString(),
             })
-          } catch {
-            await upsertVideoRecording(db, id, { camera: 'back', status: 'failed', endedAt: new Date().toISOString() }).catch(() => {})
+          } catch (e) {
+            console.error('[QuickBite call] Drive video upload failed:', e)
+            await upsertVideoRecording(db, id, {
+              camera: 'back',
+              status: 'failed',
+              failReason: e instanceof Error ? e.message.slice(0, 200) : 'Unknown error',
+              endedAt: new Date().toISOString(),
+            }).catch(() => {})
           }
         })()
       }
@@ -185,7 +285,7 @@ export function CallPage() {
   }
 
   useEffect(() => {
-    finishCallRef.current = () => void finishCall()
+    finishCallRef.current = (opts) => void finishCall(opts)
   })
 
   const toggleMute = () => {
