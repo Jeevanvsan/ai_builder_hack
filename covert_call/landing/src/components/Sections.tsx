@@ -226,7 +226,7 @@ const VIDEOS: { file: string; drive?: string; title: string; d: string }[] = [
 ]
 
 function VideoSlide({ v, active }: { v: (typeof VIDEOS)[number]; active: boolean }) {
-  const [missing, setMissing] = useState(false)
+  const [missing, setMissing] = useState(!__VIDEOS__.includes(v.file))
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => {
     if (!ref.current) return
@@ -237,7 +237,7 @@ function VideoSlide({ v, active }: { v: (typeof VIDEOS)[number]; active: boolean
     return (
       <div className="slide-media">
         {active
-          ? <iframe src={`https://drive.google.com/file/d/${v.drive}/preview`} title={v.title} allow="autoplay; fullscreen" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
+          ? <iframe src={`https://drive.google.com/file/d/${v.drive}/preview`} title={v.title} allow="autoplay; fullscreen" style={{ width: '100%', height: '100%', border: 0 }} />
           : <div className="slide-placeholder"><div><div className="play">▶</div><b style={{ color: '#fff' }}>{v.title}</b></div></div>}
       </div>
     )

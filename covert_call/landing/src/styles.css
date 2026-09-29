@@ -494,7 +494,7 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
   .dive-visual .code-card > div:nth-child(2) { min-height: 150px !important; }
 
   /* bento: two rows that scroll sideways */
-  .bento { display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, 218px); grid-auto-rows: 218px; grid-auto-columns: 78%; align-content: start; }
+  .bento { display: grid; grid-auto-flow: column; grid-template-columns: none; grid-template-rows: repeat(2, 218px); grid-auto-rows: 218px; grid-auto-columns: 78%; align-content: start; }
   .bento-card { justify-content: flex-start; height: 218px; }
   .bento-card .ico { position: static; margin-bottom: 14px; font-size: 28px; }
   .bento-card .open { opacity: 1; }
