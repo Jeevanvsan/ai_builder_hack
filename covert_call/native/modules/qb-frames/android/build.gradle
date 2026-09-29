@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.quickbite'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.qbframes"
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}
+
+dependencies {
+  // ProcessorProvider / VideoFrameProcessor live in react-native-webrtc itself, and it exposes libwebrtc
+  // (org.jitsi:webrtc) as an `api` dependency, so org.webrtc.* comes along with this one line.
+  implementation project(':react-native-webrtc')
+}

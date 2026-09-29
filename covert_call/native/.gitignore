@@ -1,6 +1,11 @@
 .expo/
 .export-check/
 dist/
-android/
-ios/
 *.local
+
+# Leading slashes matter: these ignore `expo prebuild` output at the project root ONLY. Written as `android/`
+# and `ios/` they match any directory of that name at any depth, which silently excluded this app's own native
+# module (modules/qb-frames/android) from both git and the EAS upload — the module was missing from a build that
+# still reported success, so the feature simply did nothing on the device.
+/android/
+/ios/
