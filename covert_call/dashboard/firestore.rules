@@ -168,6 +168,11 @@ service cloud.firestore {
       allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
         && !changesResponderFields(resource.data, request.resource.data);
       allow delete: if false;
+      // A demo call listens for responder messages like a real one; nobody can send any here.
+      match /messages/{messageId} {
+        allow read: if true;
+        allow write: if false;
+      }
     }
 
     match /incidents/{incidentId} {
