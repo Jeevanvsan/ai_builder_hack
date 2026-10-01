@@ -659,13 +659,13 @@ fields except where noted.*
 
 *The largest, most speculative items from the brainstorm doc — deliberately not broken into buildable sub-tasks yet, since each needs a scoping/feasibility decision before that's useful. Attempt only after Epics 15-20 are solid, and only if time remains. See `covert_call/docs/extended_feature_brainstorm.md` for full detail on each.*
 
-### User Story 21.1 — Second-voice detection, in-character extraction, and second-party stress reading
+### User Story 21.1 — Second-voice detection, in-character extraction, and second-party stress reading (→ promoted to Epic 24, Phase 4)
 **As a responder, I want to know if someone other than the original caller has taken the phone, so that Mia can adapt and extract more instead of continuing to address someone who's no longer there.**
 - [ ] Prototype voice-change detection in isolation first (a throwaway test call where a second person deliberately joins mid-call) before committing further — false positives here are actively harmful, so do not build anything on top of this until detection is shown to be reliable
 - [ ] If reliable: persona instructions for staying in character and extracting useful information from a suspected second speaker (`persona.ts`), plus a distinct second-party stress reading (extending `report_stress_level`'s pattern, stored separately from the original caller's `voiceStressScore`/`voiceStressTrend`)
 - [ ] Cut this bundle entirely rather than ship it half-working if detection isn't reliable in rehearsal — a confidently-wrong "second voice detected" signal is worse than no signal
 
-### User Story 21.2 — Responder live-nudge channel
+### User Story 21.2 — Responder live-nudge channel (→ promoted to Epic 23, Phase 4)
 **As a responder, I want to inject a short instruction into an in-progress call, so that I can intervene the moment I see something the AI should ask about right now.**
 - [ ] New Firestore subcollection (e.g. `incidents/{id}/nudges`) + rules, written from a small input UI on `IncidentDetailPage.tsx`
 - [ ] `liveSession.ts` listens for new nudges and injects them via `session.sendClientContent()`, reusing the same `(System note, not the caller: ...)` pattern the existing silence-watchdog already uses
@@ -691,3 +691,81 @@ fields except where noted.*
 **As a responder, I want correlated incidents shown as a connected, pulsing graph, so that cross-case intelligence reads as alive, not a static text link.**
 - [ ] Depends entirely on 19.1 (correlation data) and 18.5 (multi-incident map/overview) already existing — not worth attempting before those are solid
 - [ ] Render correlated incidents as connected nodes with an animated pulse/glow the instant a new correlation is detected, as a separate mode alongside 18.5's map view
+
+---
+
+# PHASE 4 (planned 2026-10-01)
+
+*Full detail in [`phase4_call_intelligence_spec.md`](phase4_call_intelligence_spec.md). Promotes 21.1 to Epic 24 and 21.2 to Epic 23. Agree data-model changes (`shared/incidents/types.ts`, `dashboard/firestore.rules`) with Person B before coding. Native imports persona/tools from web, but `native/src/lib/gemini/liveSession.ts` changes must be mirrored by hand.*
+
+## EPIC 22 — Goal-Driven Persona (minimum facts, trigger-only follow-ups, time budget) 🔴
+
+### User Story 22.1
+**As a caller in danger, I want Mia to ask only what responders need, in an order that fits my situation, so that the call is short and doesn't break the disguise.**
+- [ ] Replace the fixed step list in `persona.ts` with goals: minimum facts (exact location, what's happening, immediate danger), trigger-only follow-ups (spec §1.2), "never ask" rules, and a stop condition
+- [ ] **Always ask exact location**, even with good GPS: building/floor/flat when staying put; landmark + direction when moving (replaces Step 7's skip-when-moving)
+- [ ] Remove the "aim for at least 4 follow-ups" rule
+- [ ] Keep the fixed guardrails: code meanings unchanged, meaning stated in the same sentence, nothing alarming aloud in covert mode
+
+### User Story 22.2
+**As Mia, I want a live summary of what's already known, so that I never ask about something the camera, audio or caller has already told us.**
+- [ ] `liveSession.ts` (web **and native**) sends a "Known: … Still needed: …" system note after each tool call and each scene/sound observation
+
+### User Story 22.3
+**As a responder, I want the suspect's number plate captured, so that police can trace the vehicle.**
+- [ ] Persona asks for a plate (open mode) only when a vehicle is involved; camera prompt reads any visible plate
+- [ ] `vehicleNumber { value, confidence, source }` + `vehicleRegion` in `extractedFieldsLive` (agree with Person B)
+- [ ] Offline RTO-prefix decode (e.g. `KL-04` → Alappuzha). **No owner lookup**: owner details stay with VAHAN and authorised agencies
+
+### User Story 22.4
+**As a caller, I want the call to end naturally within about 3 minutes unless I'm on the move, so that the "order call" never outlasts its disguise.**
+- [ ] Persona time budget: critical facts ≤ 60–90 s; start wrapping up at ~2:30 unless the caller is moving/chased or a responder is guiding; never hang up automatically on a caller in danger
+- [ ] Check that the order-placed screen keeps sending location while it's open
+
+### User Story 22.5 (Person B)
+**As a responder, I want the critical facts at the top of the incident page, so that I can act without hunting.**
+- [ ] Critical-info strip (where, what, weapon, how many, suspect, plate) filling in live
+- [ ] Completeness meter ("4 of 6 critical facts known")
+- [ ] Call timer turns amber at 3:00
+- [ ] Rehearsal: 5 scenarios (chased, trapped, hurt, third party, open mode). Location never skipped, no repeated questions, nothing asked that camera/audio already answered, ≤ 3 min unless moving
+
+## EPIC 23 — Responder → Caller Covert Messaging 🔴 (promotes 21.2)
+
+### User Story 23.1
+**As a responder, I want to send the caller a short instruction through Mia, so that I can guide them without breaking the disguise.**
+- [ ] (Person B) "Message caller via Mia" box with quick buttons + free text on the live incident page; `incidents/{id}/messages` + rules (signed-in responders only, status forward-only)
+- [ ] `liveSession.ts` (web **and native**) listens and injects each message as a system note on Mia's next turn, never interrupting the caller
+- [ ] Persona rewords it as delivery chat and calls `confirm_message_delivered { spokenAs }`; delivers only the safe part of anything that can't be disguised
+- [ ] (Person B) "✓ Delivered" + the exact wording Mia used, shown on the dashboard
+
+## EPIC 24 — Coercion Detection 🟡 (promotes 21.1)
+
+### User Story 24.1
+**As a responder, I want to know when the caller may be speaking under someone else's control, so that a forced "cancel" doesn't close a real emergency.**
+- [ ] Prototype first with a staged second-voice test call; cut the feature if detection is unreliable
+- [ ] Persona listens for voice change, flat or scripted tone, whispered asides, someone else answering, and never reacts aloud
+- [ ] `report_coercion_signal { kind, detail, confidence }` tool → incident field
+- [ ] (Person B) "Possible coercion" flag in the timeline; high confidence raises severity; "cancel" after danger signals keeps the incident open
+
+## EPIC 25 — Hidden Demo Call 🔴
+
+### User Story 25.1
+**As a judge or tester, I want to try a real call without alerting responders, so that I can see the product working safely.**
+- [ ] Long-press (~2 s) on the QuickBite logo in the top bar starts a demo call; a short press does nothing unusual; the heart double-tap stays the silent SOS. Add the same to native Home
+- [ ] Full real call flow, but written to a separate `demoIncidents` collection with `isDemo: true` (own rules)
+- [ ] (Person B) Live queue, history, analytics, AI insights, alerts and sirens never read `demoIncidents`
+- [ ] End-of-call "What the responder would see" card on the phone (facts, severity, voice stress, transcript)
+- [ ] Light per-device limit (e.g. 3/hour) to protect Gemini quota; document the gesture in the README and deck
+
+## EPIC 26 — Impact Analytics: BigQuery Sandbox + Looker Studio 🟢 (Person B)
+
+### User Story 26.1
+**As a judge or partner organisation, I want a public view of incident patterns and response times, so that the impact is measurable.**
+- [ ] `npm run export:bq` local script: anonymised table (~1 km grid cell, hour, weekday, severity, channel, danger categories, time to acknowledge/resolve). No names, notes, transcripts, addresses or plates
+- [ ] Load into the BigQuery sandbox (free, no billing)
+- [ ] Public Looker Studio report (area, hour/day, response-time trend, channel mix), linked from the landing page and deck
+
+## EPIC 27 — Firebase AI Logic + App Check ⏸️ ON HOLD
+
+- [ ] Move all Gemini calls off public `VITE_GEMINI_*` keys onto Firebase AI Logic, with App Check enforced
+- [ ] Stopgap until then: restrict each key to the Generative Language API + the app's HTTP referrers in Google Cloud Console
