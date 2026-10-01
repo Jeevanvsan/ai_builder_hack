@@ -39,3 +39,9 @@ skills-lock.json
 # Landing demo videos are large; they are deployed from local disk, not stored in git
 covert_call/landing/public/videos/*.mp4
 *.tsbuildinfo
+
+# Anonymised analytics exports (Epic 26), uploaded to BigQuery by hand
+covert_call/dashboard/exports/
+
+# Android build: large binary, deployed to the landing site from local disk, not stored in git
+covert_call/landing/public/download/*.apk

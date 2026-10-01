@@ -1183,3 +1183,36 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .smart-search .filter-search { flex: 1 1 18rem; }
 .smart-search-note { flex-basis: 100%; }
 .search-reason { display: block; font-size: 0.78rem; color: var(--accent, #d9480f); margin-bottom: 0.15rem; }
+
+/* Phase 4: critical facts strip (Epic 22.5) + message caller via Mia (Epic 23) */
+.phase4-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 14px; margin: 0 0 14px; }
+.phase4-row > :only-child { grid-column: 1 / -1; }
+@media (max-width: 1100px) { .phase4-row { grid-template-columns: 1fr; } }
+.critical-strip, .message-caller { background: var(--surface-solid); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+.critical-head, .message-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.critical-title { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.critical-meter { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.critical-bar { width: 90px; height: 6px; border-radius: 6px; background: #e8edf5; overflow: hidden; }
+.critical-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-glow)); transition: width .4s; }
+.critical-timer { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: #eef2f8; }
+.critical-timer.over { background: rgba(196, 118, 0, .14); color: var(--medium); }
+.coercion-flag { font-size: 12px; font-weight: 800; color: #fff; background: var(--high); padding: 3px 10px; border-radius: 999px; animation: coercion-pulse 1.6s ease-in-out infinite; }
+@keyframes coercion-pulse { 50% { box-shadow: 0 0 0 6px rgba(217, 42, 63, .18); } }
+.critical-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.critical-cell { border: 1px dashed var(--border); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+.critical-cell.known { border-style: solid; background: rgba(217, 72, 15, .04); }
+.critical-cell small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+.critical-cell b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.critical-cell:not(.known) b { color: var(--muted); font-weight: 500; }
+.message-head .muted { font-size: 12px; }
+.message-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.mc-chip { font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: #fff; cursor: pointer; }
+.mc-chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.message-form { display: flex; gap: 6px; }
+.message-form input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); }
+.mc-send { font: inherit; font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+.mc-send:disabled, .mc-chip:disabled { opacity: .5; cursor: default; }
+.message-error { color: var(--high); font-size: 12px; margin: 6px 0 0; }
+.message-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; font-size: 13px; max-height: 180px; overflow-y: auto; }
+.message-list li { border-left: 3px solid var(--border); padding-left: 8px; }
+.message-delivered { color: var(--live); font-size: 12px; margin-top: 2px; }

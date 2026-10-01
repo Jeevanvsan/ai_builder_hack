@@ -15,7 +15,8 @@
     "emulator": "npx firebase-tools emulators:start --only firestore --project quickbite-5cde0",
     "dev:emulator": "vite --mode emulator",
     "seed:emulator": "node --no-warnings scripts/seed.ts --emulator",
-    "simulate-call:emulator": "node --no-warnings scripts/simulate-call.ts --emulator"
+    "simulate-call:emulator": "node --no-warnings scripts/simulate-call.ts --emulator",
+    "export:bq": "node --no-warnings scripts/export-bq.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

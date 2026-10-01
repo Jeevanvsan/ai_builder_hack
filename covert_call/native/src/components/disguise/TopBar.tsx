@@ -31,10 +31,11 @@ export function TopBar() {
   return (
     <View style={styles.topbar}>
       <View style={styles.row}>
-        <View style={styles.brand}>
+        {/* Epic 25: a 2 s long-press on the logo starts a hidden demo call; a short press does nothing. */}
+        <Pressable style={styles.brand} delayLongPress={2000} onLongPress={() => nav.navigate('Call', { demo: true })} android_disableSound>
           <View style={styles.brandDot} />
           <Text style={styles.brandText}>{name}</Text>
-        </View>
+        </Pressable>
         <View style={styles.actions}>
           {/* No ripple/opacity feedback on purpose: the trigger must not look like it did anything (A2.4). */}
           <Pressable style={styles.iconBtn} onPress={onHeartTap} android_disableSound>
