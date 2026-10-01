@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { geminiConfigured, generateText } from './aiLogic.ts'
 
 // Epic 16.10: Gemini's Search grounding tool, narrowly scoped to non-personal, factual context — weather/road
 // conditions near a confirmed location. Never pass a person's name into this; only ever a location string, so it
@@ -13,12 +13,10 @@ const ENABLED = import.meta.env.VITE_ENABLE_GROUNDED_CONTEXT === 'true'
 
 export async function groundedLocationContext(address: string): Promise<string | null> {
   if (!ENABLED) return null
-  const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
-  if (!apiKey) return null
+  if (!geminiConfigured) return null
 
   try {
-    const client = new GoogleGenAI({ apiKey })
-    const response = await client.models.generateContent({
+    const response = await generateText({
       model: MODEL,
       contents: `One short factual sentence (max 20 words) about current weather or road conditions near this location, for an emergency responder's context: ${address}. If nothing relevant is found, reply with exactly "none".`,
       config: { tools: [{ googleSearch: {} }] },

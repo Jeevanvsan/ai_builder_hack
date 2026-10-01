@@ -1,5 +1,5 @@
 import { collection, getDocs, limit, orderBy, query, type Firestore } from 'firebase/firestore'
-import { GoogleGenAI } from '@google/genai'
+import { geminiConfigured, generateText } from './aiLogic.ts'
 import { INCIDENTS } from '../../../../shared/incidents/client.ts'
 import type { Incident } from '../../../../shared/incidents/types.ts'
 
@@ -28,8 +28,7 @@ function summarize(incident: Incident): string {
 }
 
 export async function findCorrelatedIncidents(db: Firestore, incident: Incident): Promise<string[]> {
-  const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
-  if (!apiKey) return []
+  if (!geminiConfigured) return []
 
   const hasSomethingToMatch = incident.location.confirmed?.address || incident.extractedFieldsLive.notes
   if (!hasSomethingToMatch) return []
@@ -41,7 +40,6 @@ export async function findCorrelatedIncidents(db: Firestore, incident: Incident)
     .filter((i) => i.id !== incident.id)
   if (!others.length) return []
 
-  const client = new GoogleGenAI({ apiKey })
   const prompt = `Emergency dispatch cross-reference check. Does the NEW incident below appear to describe the
 same person, vehicle, or location as any of the OTHER recent incidents? Only flag a genuine match (same specific
 address, same distinctive vehicle description, same clearly-matching detail) — do not flag on vague similarity
@@ -55,7 +53,7 @@ ${others.map(summarize).join('\n')}
 Return matchIds: the incident IDs from OTHER that appear to genuinely match, or an empty list if none do.`
 
   try {
-    const response = await client.models.generateContent({
+    const response = await generateText({
       model: MODEL,
       contents: prompt,
       config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },

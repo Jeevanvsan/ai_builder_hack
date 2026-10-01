@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { geminiConfigured, generateText } from './aiLogic.ts'
 
 // Gemini vision analysis of a photo attached on the silent tap-only screen (Epic 6.1). A person with no way to
 // talk can attach a picture of their situation; Gemini turns it into structured signal for a responder. Runs
@@ -37,9 +37,7 @@ function fileToBase64(file: Blob): Promise<string> {
 
 // Analyses one attached image into structured incident signal. Throws if Gemini isn't configured.
 export async function analyzePhoto(file: Blob): Promise<PhotoAnalysis> {
-  const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
-  if (!apiKey) throw new Error('Gemini is not configured')
-  const client = new GoogleGenAI({ apiKey })
+  if (!geminiConfigured) throw new Error('Gemini is not configured')
   const base64 = await fileToBase64(file)
 
   const prompt = `You are assisting an emergency responder. A person who cannot speak has attached this photo to a
@@ -50,7 +48,7 @@ silent help request. Describe only what is actually visible — do not invent. E
 - urgency: low / medium / high based on visible danger.
 - summary: one or two sentences a dispatcher can read at a glance.`
 
-  const response = await client.models.generateContent({
+  const response = await generateText({
     model: MODEL,
     contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: file.type || 'image/jpeg', data: base64 } }] }],
     config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },

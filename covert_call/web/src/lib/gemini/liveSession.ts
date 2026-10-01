@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import { arrayRemove, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
 import { INCIDENTS, appendTranscriptLine, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
@@ -9,6 +9,7 @@ import { startCallRecording, type CallRecorder } from './recorder.ts'
 import { isCallerMoving, knownFactsNote } from '../../../../shared/incidents/knownFacts.ts'
 import type { Incident } from '../../../../shared/incidents/types.ts'
 import { LIVE_CALL_TOOLS } from './tools.ts'
+import { geminiConfigured, liveConnect } from './aiLogic.ts'
 import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
 
 // The @google/genai SDK's own doc comment names gemini-live-2.5-flash-preview, but that model returned
@@ -50,10 +51,9 @@ export async function startLiveCall(
   // omitted, the mic is opened here as before. `videoStream` (Epic 10) turns on ~1 fps camera frames to Gemini.
   opts: { micStream?: MediaStream; videoStream?: MediaStream } = {},
 ): Promise<LiveCallHandle> {
-  const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
-  if (!apiKey) throw new Error('Gemini Live is not configured')
-
-  const client = new GoogleGenAI({ apiKey })
+  if (!geminiConfigured) throw new Error('Gemini Live is not configured')
+  // Epic 27: with Firebase AI Logic on, the call goes through Firebase's proxy (App Check protected) and no Gemini
+  // key is in the bundle; otherwise the original key-based connection is used.
   // Live GPS + route to safety; started once the session is open (turn notes are sent into it).
   let tracker: LiveTracker | null = null
   const player = createAudioPlayer()
@@ -338,7 +338,7 @@ export async function startLiveCall(
   callbacks.onStatusChange('connecting')
 
   const openSession = (resume?: string) =>
-    client.live.connect({
+    liveConnect({
       model: LIVE_MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
