@@ -1,4 +1,5 @@
-import { GoogleGenAI, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { geminiConfigured, liveConnect } from './aiLogic.ts'
 import type { Firestore } from 'firebase/firestore'
 import { appendTranscriptLine, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { startMicCapture } from './audio.ts'
@@ -21,10 +22,7 @@ export async function startSilentObserver(
   incidentId: string,
   opts: { micStream: MediaStream; videoStreams: MediaStream[] },
 ): Promise<SilentObserverHandle> {
-  const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
-  if (!apiKey) throw new Error('Gemini Live is not configured')
-
-  const client = new GoogleGenAI({ apiKey })
+  if (!geminiConfigured) throw new Error('Gemini Live is not configured')
   let finished = false
   let resumptionHandle: string | undefined
   let reconnects = 0
@@ -131,7 +129,7 @@ export async function startSilentObserver(
   let connected = false
 
   const openSession = (resume?: string) =>
-    client.live.connect({
+    liveConnect({
       model: LIVE_MODEL,
       config: {
         // gemini-3.8-live rejects TEXT-only responseModalities outright ("requested combination of response
