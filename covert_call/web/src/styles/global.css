@@ -1301,3 +1301,4 @@ img {
 .demo-tags span { background: #fdecee; color: #b3122a; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
 .demo-transcript { max-height: 260px; overflow-y: auto; }
 .demo-transcript p { margin: 0 0 6px; }
+.demo-result .primary-btn { flex: none; height: auto; min-height: 48px; margin-top: 4px; }
