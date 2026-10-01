@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Chip from '../../components/Chip'
-import CriticalStrip from '../../components/CriticalStrip'
-import MessageCaller from '../../components/MessageCaller'
 import DataState from '../../components/DataState'
 import ResponseActions from '../../components/ResponseActions'
 import CaseBoard from '../../components/board/CaseBoard'
@@ -89,11 +87,6 @@ export default function IncidentDetailPage() {
       </header>
 
       {changesSinceLastView && <div className="diff-banner">Since you last checked: {changesSinceLastView.join(', ')}</div>}
-
-      <div className="phase4-row">
-        <CriticalStrip incident={incident} live={live} now={now} />
-        <MessageCaller incidentId={incident.id} live={live && incident.channel === 'live-call'} />
-      </div>
 
       <div className="case-main">
         <CaseBoard incident={incident} live={live} now={now} timer={timer} />
