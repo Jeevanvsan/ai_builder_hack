@@ -3,7 +3,10 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 
 // The Android build: always the newest GitHub release, published from the team Drive folder by the
 // "Release Android APK" workflow (.github/workflows/android-release.yml). GitHub serves it as a direct download.
-export const APK_URL = 'https://github.com/Jeevanvsan/ai_builder_hack/releases/latest/download/QuickBite.apk'
+export const APK_URL_RELEASE = 'https://github.com/Jeevanvsan/ai_builder_hack/releases/latest/download/QuickBite.apk'
+// TEMPORARY until the first release exists (run the workflow once after PR #16 merges, then switch APK_URL to
+// APK_URL_RELEASE): Drive shows a "too large to scan" page with a Download anyway button.
+export const APK_URL = 'https://drive.usercontent.google.com/download?id=1sSKiKmJgq_t9nvqdemRnfLvcxnjxQSqz&export=download&confirm=t'
 
 export const LINKS = {
   web: 'https://quickbite-5cde0.web.app',

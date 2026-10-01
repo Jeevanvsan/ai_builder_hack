@@ -2,6 +2,7 @@ import { MotionConfig } from 'motion/react'
 import { useState } from 'react'
 import { Bento, DeepDives } from './components/Features'
 import Hero from './components/Hero'
+import Manual from './components/Manual'
 import Privacy from './components/Privacy'
 import { Compare, DemoSlider, Disguise, Download, Footer, HowItWorks, Marquee, Nav, Problem, SplitView } from './components/Sections'
 import { APK_URL, LINKS, Modal } from './components/ui'
@@ -14,6 +15,17 @@ export default function App() {
     // A user-initiated navigation to an attachment response downloads the file and leaves this page in place.
     window.location.href = APK_URL
     setApkOpen(true)
+  }
+  if (window.location.pathname.replace(/\/$/, '') === '/manual') {
+    document.title = 'User manual · Covert Call'
+    return (
+      <MotionConfig reducedMotion="user">
+        <Nav onDownload={openApk} />
+        <Manual />
+        <Footer />
+        <ApkModal open={apkOpen} onClose={() => setApkOpen(false)} />
+      </MotionConfig>
+    )
   }
   if (window.location.pathname.replace(/\/$/, '') === '/privacy') {
     document.title = 'Privacy Policy · Covert Call'
@@ -41,7 +53,14 @@ export default function App() {
         <Download onDownload={openApk} />
       </main>
       <Footer />
-      <Modal open={apkOpen} onClose={() => setApkOpen(false)}>
+      <ApkModal open={apkOpen} onClose={() => setApkOpen(false)} />
+    </MotionConfig>
+  )
+}
+
+function ApkModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+      <Modal open={open} onClose={onClose}>
         <div style={{ fontSize: 40, marginBottom: 10 }}>📦</div>
         <h3>Your download has started</h3>
         <p>QuickBite.apk (about 150 MB). To install: open the file, then allow installs from your browser when Android asks. Prefer not to install? The full experience also runs in your browser.</p>
@@ -50,6 +69,5 @@ export default function App() {
           <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open web app →</a>
         </div>
       </Modal>
-    </MotionConfig>
   )
 }

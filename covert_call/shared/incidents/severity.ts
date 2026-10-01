@@ -5,7 +5,7 @@ const rank: Record<Severity, number> = { low: 0, medium: 1, high: 2 }
 // Danger tags are free text from the model and are often negative ("No weapon involved", "No injury"). Keyword
 // checks matched the danger word and ignored the "No", so a call with no weapon was shown as armed and got a
 // "weapon reported" recommendation. Every keyword check on dangerIndicators goes through affirmed() first.
-const NEGATED = /\b(no|not|none|without|never|zero|unarmed)\b[^,;|]{0,24}\b(weapons?|guns?|firearms?|knife|knives|armed|injur\w*|hurt|blood|bleed\w*|harm\w*|fire|smoke|stab\w*)\b|\b(weapons?|injur\w*|fire)\s*[:-]\s*(none|no)\b|\bunarmed\b/i
+const NEGATED = /\b(no|not|none|without|never|zero|unarmed)\b[^,;|]{0,24}\b(weapons?|guns?|firearms?|knife|knives|armed|injur\w*|hurt|blood|bleed\w*|harm\w*|fire|smoke|stab\w*)\b|\b(weapons?|injur\w*|fire)\s*[:-]\s*(none|no|unsure|unknown|unclear|not sure|not known|not confirmed)\b|\b(unsure|unclear|not sure|unknown)\b[^,;|]{0,16}\b(weapons?|injur\w*)\b|\b(weapons?|injur\w*)\s+(unknown|unclear|unsure)\b|\bunarmed\b/i
 export const isNegatedIndicator = (d: string) => NEGATED.test(d)
 export const affirmed = (indicators: string[]) => indicators.filter((d) => !isNegatedIndicator(d))
 
