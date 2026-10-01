@@ -10,15 +10,17 @@ export function Nav({ onDownload }: { onDownload: () => void }) {
     <nav className={`nav${scrolled ? ' scrolled' : ''}`}>
       <motion.div style={{ scaleX: scrollYProgress, transformOrigin: 'left', height: 3, background: 'linear-gradient(90deg,var(--accent),var(--accent-glow))', position: 'absolute', top: 0, left: 0, right: 0 }} />
       <div className="container nav-inner">
-        <a href="#top" className="logo"><span className="logo-dot" />Covert Call</a>
+        <a href="/#top" className="logo"><span className="logo-dot" />Covert Call</a>
         <div className="nav-links">
-          <a href="#disguise">Disguise</a>
-          <a href="#how">How it works</a>
-          <a href="#features">Features</a>
-          <a href="#demo">Demo</a>
-          <a href="#download">Download</a>
+          <a href="/#disguise">Disguise</a>
+          <a href="/#how">How it works</a>
+          <a href="/#features">Features</a>
+          <a href="/#demo">Demo</a>
+          <a href="/#download">Download</a>
+          <a href="/manual" className={location.pathname.startsWith('/manual') ? 'active' : ''}>User manual</a>
         </div>
         <div className="nav-cta">
+          <a className="nav-manual-mobile" href="/manual">Manual</a>
           <a className="btn btn-ghost" href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a>
           <button className="btn btn-primary" onClick={onDownload}>Get the app</button>
         </div>
@@ -418,7 +420,7 @@ export function Download({ onDownload }: { onDownload: () => void }) {
               <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app runs live on Firebase with nothing to install. The Android build carries the same disguise as a real app icon.</p>
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
-              <button className="dl-opt" onClick={onDownload}><span className="ico">🤖</span><span><b>Download APK</b><small>Android · React Native build</small></span><span className="go">⬇</span></button>
+              <button className="dl-opt" onClick={onDownload}><span className="ico">🤖</span><span><b>Download APK</b><small>Android · about 150 MB</small></span><span className="go">⬇</span></button>
               <a className="dl-opt" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🍕</span><span><b>Open QuickBite web app</b><small>quickbite-5cde0.web.app</small></span><span className="go">↗</span></a>
               <a className="dl-opt" href={LINKS.github} target="_blank" rel="noreferrer"><span className="ico">💻</span><span><b>Source on GitHub</b><small>Public repository</small></span><span className="go">↗</span></a>
             </div>

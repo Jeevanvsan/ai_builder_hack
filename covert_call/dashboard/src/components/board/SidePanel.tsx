@@ -5,13 +5,15 @@ import BulletinCard from '../BulletinCard'
 import CallRecordingPlayer from '../CallRecordingPlayer'
 import LiveAudioListen from '../LiveAudioListen'
 import LiveVideo from '../LiveVideo'
+import MessageCaller from '../MessageCaller'
 import NoteForm from '../NoteForm'
 import ReplayScrubber from '../ReplayScrubber'
 import { channelLabel } from '../../lib/format'
 import Conversation from './Conversation'
 import DecodeText from './DecodeText'
+import SceneSketch from './SceneSketch'
 
-type Tab = 'conversation' | 'case'
+type Tab = 'conversation' | 'scene' | 'message' | 'case'
 const SUMMARY_WAIT_MS = 90_000
 
 // Right-hand panel: the live conversation while the call runs, the case file once it ends. It follows the call
@@ -20,6 +22,8 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
   const [chosen, setChosen] = useState<{ tab: Tab; whileLive: boolean } | null>(null)
   const tab: Tab = chosen && chosen.whileLive === live ? chosen.tab : live ? 'conversation' : 'case'
   const pick = (t: Tab) => setChosen({ tab: t, whileLive: live })
+  // Messaging the caller through Mia only exists on a voice call.
+  const canMessage = incident.channel === 'live-call'
 
   // Only while a feed is live — an ended feed is just a big black "feed ended" box taking the panel's space.
   const hasVideo = incident.video?.status === 'live' || incident.videoFront?.status === 'live'
@@ -41,13 +45,25 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
         <button type="button" role="tab" aria-selected={tab === 'conversation'} className={tab === 'conversation' ? 'active' : ''} onClick={() => pick('conversation')}>
           {live && <span className="live-dot" />}Conversation
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'scene'} className={tab === 'scene' ? 'active' : ''} onClick={() => pick('scene')}>
+          Scene
+        </button>
+        {canMessage && (
+          <button type="button" role="tab" aria-selected={tab === 'message'} className={tab === 'message' ? 'active' : ''} onClick={() => pick('message')}>
+            Message caller
+          </button>
+        )}
         <button type="button" role="tab" aria-selected={tab === 'case'} className={tab === 'case' ? 'active' : ''} onClick={() => pick('case')}>
           Case file
         </button>
       </div>
 
       <div className="panel-body">
-        {tab === 'conversation' ? (
+        {tab === 'scene' ? (
+          <SceneSketch incident={incident} />
+        ) : tab === 'message' ? (
+          <MessageCaller incidentId={incident.id} live={live} />
+        ) : tab === 'conversation' ? (
           <Conversation
             lines={incident.transcriptLines ?? []}
             emptyText={incident.channel === 'live-call'

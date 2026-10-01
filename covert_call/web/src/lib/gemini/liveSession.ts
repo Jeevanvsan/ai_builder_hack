@@ -1,12 +1,15 @@
-import { GoogleGenAI, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
-import { arrayRemove, doc, updateDoc, type Firestore } from 'firebase/firestore'
-import { INCIDENTS, appendTranscriptLine, confirmAddress, recordAdvice, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { arrayRemove, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
+import { INCIDENTS, appendTranscriptLine, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
 import { ALL_CODES } from '../../../../shared/codes.ts'
 import { startCallRecording, type CallRecorder } from './recorder.ts'
+import { isCallerMoving, knownFactsNote } from '../../../../shared/incidents/knownFacts.ts'
+import type { Incident } from '../../../../shared/incidents/types.ts'
 import { LIVE_CALL_TOOLS } from './tools.ts'
+import { geminiConfigured, liveConnect } from './aiLogic.ts'
 import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
 
 // The @google/genai SDK's own doc comment names gemini-live-2.5-flash-preview, but that model returned
@@ -48,10 +51,9 @@ export async function startLiveCall(
   // omitted, the mic is opened here as before. `videoStream` (Epic 10) turns on ~1 fps camera frames to Gemini.
   opts: { micStream?: MediaStream; videoStream?: MediaStream } = {},
 ): Promise<LiveCallHandle> {
-  const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
-  if (!apiKey) throw new Error('Gemini Live is not configured')
-
-  const client = new GoogleGenAI({ apiKey })
+  if (!geminiConfigured) throw new Error('Gemini Live is not configured')
+  // Epic 27: with Firebase AI Logic on, the call goes through Firebase's proxy (App Check protected) and no Gemini
+  // key is in the bundle; otherwise the original key-based connection is used.
   // Live GPS + route to safety; started once the session is open (turn notes are sent into it).
   let tracker: LiveTracker | null = null
   const player = createAudioPlayer()
@@ -123,6 +125,8 @@ export async function startLiveCall(
   // The model often never files the age/gender estimate on its own (the persona asks for it "once, early"), so a
   // one-off reminder goes out once the caller has spoken for a while — see the estimate timer below.
   let estimateReported = false
+  // Last time Mia reported voice stress (see the stress reminder below).
+  let lastStressAt = 0
   let finished = false
   // Tracks real socket health (set on onopen/onclose), independent of `finished` (which only means the caller/AI
   // ended the call). Every send must check both — see canSend() below.
@@ -181,6 +185,7 @@ export async function startLiveCall(
           : 'Saved. Do NOT give directions — they have not said they are being followed or moving. Keep them safe where they are.'
       }
       case 'report_stress_level': {
+        lastStressAt = Date.now()
         const score = args.score
         if (typeof score === 'number') enqueueWrite(() => recordVoiceStress(db, incidentId, Math.max(0, Math.min(100, score))))
         break
@@ -218,6 +223,29 @@ export async function startLiveCall(
       }
       case 'report_advice': {
         if (typeof args.text === 'string' && args.text.trim()) enqueueWrite(() => recordAdvice(db, incidentId, args.text as string))
+        break
+      }
+      case 'report_vehicle_number': {
+        const plate = args.plate
+        const source = args.source === 'camera' ? 'camera' : 'caller'
+        if (typeof plate === 'string' && plate.trim()) {
+          enqueueWrite(() => recordVehicleNumber(db, incidentId, { value: plate, source, confidence: typeof args.confidence === 'number' ? args.confidence : undefined }))
+        }
+        break
+      }
+      case 'report_coercion_signal': {
+        if (typeof args.kind === 'string') {
+          const confidence = typeof args.confidence === 'number' ? args.confidence : undefined
+          // A confident coercion sign is danger: silence afterwards keeps the line open, like any other danger.
+          if ((confidence ?? 0) >= 60) dangerReported = true
+          enqueueWrite(() => recordCoercionSignal(db, incidentId, { kind: args.kind as string, detail: typeof args.detail === 'string' ? args.detail : undefined, confidence }))
+        }
+        break
+      }
+      case 'confirm_message_delivered': {
+        if (typeof args.messageId === 'string' && typeof args.spokenAs === 'string') {
+          enqueueWrite(() => markMessageDelivered(db, incidentId, args.messageId as string, args.spokenAs as string))
+        }
         break
       }
       case 'end_call': {
@@ -310,7 +338,7 @@ export async function startLiveCall(
   callbacks.onStatusChange('connecting')
 
   const openSession = (resume?: string) =>
-    client.live.connect({
+    liveConnect({
       model: LIVE_MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
@@ -437,6 +465,58 @@ export async function startLiveCall(
 
   const canSend = () => connected && !finished
 
+  // Epic 22.2: tell Mia what is already known (from the caller, the camera and background sound) so she never
+  // asks for it again. Sent as context only (turnComplete: false), so it never makes her speak on its own, and
+  // only when the summary actually changes, at most every 8 s and never while she is talking.
+  let lastFacts = ''
+  let pendingFacts = ''
+  let lastFactsAt = 0
+  let callerMoving = false
+  const unsubIncident = onSnapshot(doc(db, INCIDENTS, incidentId), (snap) => {
+    const data = snap.data() as Omit<Incident, 'id'> | undefined
+    if (!data) return
+    callerMoving = isCallerMoving(data)
+    pendingFacts = knownFactsNote(data)
+  })
+  const factsTimer = setInterval(() => {
+    if (!canSend() || !pendingFacts || pendingFacts === lastFacts || player.isPlaying() || Date.now() - lastFactsAt < 8_000) return
+    lastFacts = pendingFacts
+    lastFactsAt = Date.now()
+    session.sendClientContent({ turns: pendingFacts, turnComplete: false })
+  }, 1_000)
+
+  // Epic 22.4: a real order call is one to three minutes. At 2:30 Mia is nudged to wrap up, unless the caller is
+  // moving or chased (then the call is a lifeline and stays open). Never an automatic hang-up.
+  const CALL_BUDGET_MS = 150_000
+  const callStartedAt = Date.now()
+  let budgetNoted = false
+  const budgetTimer = setInterval(() => {
+    if (budgetNoted || !canSend() || Date.now() - callStartedAt < CALL_BUDGET_MS || player.isPlaying()) return
+    budgetNoted = true
+    clearInterval(budgetTimer)
+    if (callerMoving) return
+    session.sendClientContent({
+      turns: '(System note, not the caller — time budget: the call is about two and a half minutes long. If the minimum facts are known and you are not guiding them to safety or relaying a responder message, start wrapping up naturally now, per your TIME BUDGET rule. If the caller is still in danger or mid-answer, carry on and wrap up when it is safe.)',
+    })
+  }, 5_000)
+
+  // Epic 23: responder -> caller messages. Each pending message is injected once, on a pause (never while Mia is
+  // talking), and Mia confirms delivery with confirm_message_delivered.
+  const injectedMessages = new Set<string>()
+  let queuedMessages: { id: string; text: string }[] = []
+  const unsubMessages = subscribeResponderMessages(db, incidentId, (messages) => {
+    queuedMessages = messages.filter((m) => m.status === 'pending' && !injectedMessages.has(m.id)).map((m) => ({ id: m.id, text: m.text }))
+  })
+  const messageTimer = setInterval(() => {
+    if (!canSend() || player.isPlaying()) return
+    const next = queuedMessages.shift()
+    if (!next || injectedMessages.has(next.id)) return
+    injectedMessages.add(next.id)
+    session.sendClientContent({
+      turns: `(System note, not the caller — responder message ${next.id}: "${next.text}". Pass it on to the caller on this turn as ordinary delivery chat, per your RESPONDER MESSAGES rule, then call confirm_message_delivered with this id and exactly what you said.)`,
+    })
+  }, 1_000)
+
   const mic = await startMicCapture((base64Pcm, level) => {
     // The caller is speaking (transcripts arrive late, after they finish): don't treat a long answer as silence.
     if (level > SPEAKING_LEVEL && !player.isPlaying()) lastActivityAt = Date.now()
@@ -465,6 +545,18 @@ export async function startLiveCall(
   }, 5_000)
 
   // Sent only while Mia isn't talking, so it doesn't interrupt her; retried every 5s until it goes out once.
+  // Voice stress is only as regular as the model remembers to report it, and in testing a 2-minute call produced
+  // none. If 25 s pass with no reading while the caller is talking, nudge for one, during a pause only.
+  const stressTimer = setInterval(() => {
+    if (!canSend() || player.isPlaying()) return
+    if (!transcriptLines.some((l) => l.speaker === 'Caller')) return
+    if (Date.now() - Math.max(lastStressAt, callStartedAt) < 25_000) return
+    lastStressAt = Date.now()
+    session.sendClientContent({
+      turns: '(System note, not the caller: call report_stress_level NOW with your current 0-100 estimate of the vocal stress of the caller — silently. Do not say anything about it and do not change what you were doing; if you were mid-conversation, just continue exactly where you were.)',
+    })
+  }, 5_000)
+
   const estimateTimer = setInterval(() => {
     if (finished || estimateReported) { clearInterval(estimateTimer); return }
     const callerLines = transcriptLines.filter((l) => l.speaker === 'Caller').length
@@ -535,6 +627,12 @@ export async function startLiveCall(
       flushTranscript(true)
       clearInterval(silenceTimer)
       clearInterval(estimateTimer)
+      clearInterval(factsTimer)
+      clearInterval(stressTimer)
+      clearInterval(budgetTimer)
+      clearInterval(messageTimer)
+      unsubIncident()
+      unsubMessages()
       tracker?.stop()
       clearInterval(transcriptFlushTimer)
       frameSampler?.stop()

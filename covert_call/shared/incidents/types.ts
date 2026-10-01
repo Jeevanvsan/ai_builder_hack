@@ -108,6 +108,15 @@ export interface Incident {
   // elderly caller. Absent until the model reports one; a call may not get one at all if it's short or unclear.
   callerEstimate?: { ageGroup: 'child' | 'teen' | 'adult' | 'elderly' | 'unclear'; gender: 'male' | 'female' | 'unclear'; confidence?: number | null; at: string }
   leakageCheckStatus: { reviewed: boolean; redactions: string[] }
+  // Epic 22.3: the suspect's vehicle number plate, from the caller or read off the camera. `region` is the
+  // registering RTO decoded offline from the prefix (e.g. "Alappuzha, Kerala"); never an owner lookup.
+  vehicle?: { number: string; region: string | null; source: 'caller' | 'camera'; confidence?: number | null; at: string }
+  // Epic 24: signs the caller may be speaking under someone else's control (a second voice takes over, a sudden
+  // flat or scripted tone, a forced "cancel"). Evidence for the responder; a confident one also lifts severity.
+  coercionSignals?: { kind: string; detail: string; confidence?: number | null; at: string }[]
+  // Epic 25: set on every incident written by a hidden demo call. Demo incidents live in the separate
+  // `demoIncidents` collection, which the dashboard never reads; this flag is a second safety net.
+  isDemo?: boolean
   severity: Severity
   // Present once the QuickBite app starts streaming the back camera (Epic 7.1). Absent means no video for this incident.
   video?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }
@@ -156,4 +165,16 @@ export interface Incident {
     viewedAt?: string | null
     viewedBy?: string | null
   }
+}
+
+// Epic 23: one responder -> caller message, stored in incidents/{id}/messages. Mia relays it on her next turn as
+// ordinary delivery chat and reports the exact words she used (spokenAs).
+export interface ResponderMessage {
+  id: string
+  text: string
+  sentBy: string
+  sentAt: string
+  status: 'pending' | 'delivered'
+  spokenAs?: string
+  deliveredAt?: string
 }

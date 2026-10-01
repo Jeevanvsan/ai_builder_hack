@@ -115,6 +115,9 @@ img {
   font-weight: 800;
   font-size: 20px;
   letter-spacing: -0.02em;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .brand-dot {
@@ -1270,3 +1273,32 @@ img {
   user-select: none;
   cursor: default;
 }
+
+/* Epic 25: hidden demo call */
+.demo-badge {
+  display: inline-block;
+  margin: 6px 0 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff3e0;
+  color: #b4530a;
+  font-size: 12px;
+  font-weight: 700;
+}
+.demo-result { padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 14px; }
+.demo-result h1 { font-size: 22px; margin: 0; }
+.demo-muted { color: #777; }
+.demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.demo-fact { background: #fff; border: 1px solid #eee; border-radius: 14px; padding: 12px; }
+.demo-fact small { display: block; color: #888; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.demo-fact b { font-size: 18px; text-transform: capitalize; }
+.demo-fact.tone-high b { color: #d92a3f; }
+.demo-fact.tone-medium b { color: #c47600; }
+.demo-fact.tone-low b { color: #2b6cb0; }
+.demo-section { background: #fff; border: 1px solid #eee; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; }
+.demo-section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #888; margin: 0 0 6px; }
+.demo-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.demo-tags span { background: #fdecee; color: #b3122a; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+.demo-transcript { max-height: 260px; overflow-y: auto; }
+.demo-transcript p { margin: 0 0 6px; }
+.demo-result .primary-btn { flex: none; height: auto; min-height: 48px; margin-top: 4px; }

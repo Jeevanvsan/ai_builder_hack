@@ -23,7 +23,8 @@ export type RootStackParamList = {
   // Carries the incident id from a coded order so the tracking screen can mirror the responder's progress as
   // ordinary delivery milestones (Epic 8.3). Undefined for an ordinary order — which is most of them.
   OrderPlaced: { incidentId?: string } | undefined
-  Call: undefined
+  // Epic 25: `demo` = hidden demo call (long-press the logo), written to demoIncidents, never on the dashboard.
+  Call: { demo?: boolean } | undefined
   SilentTap: undefined
   Sos: undefined
   Settings: undefined
