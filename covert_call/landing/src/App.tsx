@@ -8,8 +8,8 @@ import { APK_URL, LINKS, Modal } from './components/ui'
 
 export default function App() {
   const [apkOpen, setApkOpen] = useState(false)
-  // Starts the APK download (Drive's direct link answers with an attachment, so the page stays put), then shows
-  // how to install it, since Android asks to allow installs from the browser.
+  // Starts the APK download (GitHub serves release files as attachments, so the page stays put), then shows how
+  // to install it, since Android asks to allow installs from the browser.
   const openApk = () => {
     // A user-initiated navigation to an attachment response downloads the file and leaves this page in place.
     window.location.href = APK_URL
