@@ -48,7 +48,18 @@ function read(i: Incident) {
   const track = i.location.track ?? []
   const last = track[track.length - 1]
 
+  // Where this is happening, only from what was said: a room when the caller is inside, a road only with outdoor
+  // signs (a road or street named, being chased, moving on GPS, a suspect in a vehicle), otherwise left blank.
+  const inVehicle = hasVehicle && /attacker|subject|suspect|driving|in a|on a|rider|car follow|bike follow/i.test(vehicleText)
+  const moving = track.length >= 2
+  const indoorText = `${text} | ${i.location.confirmed?.address ?? ''}`
+  const indoor = /\b(home|house|room|bedroom|kitchen|bathroom|toilet|flat|apartment|inside|indoors|office|hostel|hotel|locked in|door)\b/i.test(indoorText)
+  const outdoor = /\b(road|street|outside|outdoors|bus stop|junction|highway|lane|park|market|parking|footpath)\b/i.test(text)
+    || has(/follow|chas|pursu|tailing/i) || moving || inVehicle
+  const setting: 'indoor' | 'outdoor' | 'unknown' = indoor && !moving && !inVehicle ? 'indoor' : outdoor ? 'outdoor' : indoor ? 'indoor' : 'unknown'
+
   return {
+    setting,
     weapon,
     weaponRuledOut: !weapon && ruledOut(/weapon|gun|knife|armed/i),
     injured: has(/injur|blood|bleed|hurt|wound/i),
@@ -56,10 +67,10 @@ function read(i: Incident) {
     chasing: has(/follow|chas|pursu|tailing/i),
     present: has(/still (present|here|outside|nearby)|inside the house|at the door/i),
     hasVehicle, vtype, color, plate, vehicleText,
-    inVehicle: hasVehicle && /attacker|subject|suspect|driving|in a|on a|rider|car follow|bike follow/i.test(vehicleText),
+    inVehicle,
     subjectCount, subjectDescribed, clothing,
     darkClothes: Boolean(clothing && /dark|black/i.test(clothing)),
-    moving: track.length >= 2,
+    moving,
     speedKmh: last?.speed != null ? Math.round(last.speed * 3.6) : null,
     coercion: i.coercionSignals ?? [],
     stress: i.voiceStressScore ?? null,
@@ -141,10 +152,22 @@ export default function SceneSketch({ incident }: { incident: Incident }) {
         <rect width="360" height="230" fill="url(#sk-paper)" />
 
         <g filter="url(#sk-pencil)">
-          {/* Road */}
-          <path className="sk-draw" pathLength={1} d="M0 96 Q180 90 360 97" stroke="#b9c2cf" strokeWidth="1.6" fill="none" />
-          <path className="sk-draw" pathLength={1} d="M0 150 Q180 156 360 149" stroke="#b9c2cf" strokeWidth="1.6" fill="none" />
-          <path d="M0 123 H360" stroke="#d3dae4" strokeWidth="1.4" strokeDasharray="12 10" />
+          {/* Setting: a road only when the caller is outside, a room when inside, nothing when not said */}
+          {s.setting === 'outdoor' && (
+            <g key="road">
+              <path className="sk-draw" pathLength={1} d="M0 96 Q180 90 360 97" stroke="#b9c2cf" strokeWidth="1.6" fill="none" />
+              <path className="sk-draw" pathLength={1} d="M0 150 Q180 156 360 149" stroke="#b9c2cf" strokeWidth="1.6" fill="none" />
+              <path d="M0 123 H360" stroke="#d3dae4" strokeWidth="1.4" strokeDasharray="12 10" />
+            </g>
+          )}
+          {s.setting === 'indoor' && (
+            <g key="room" stroke="#9aa6b6" strokeWidth="2.2" fill="none" strokeLinecap="round">
+              {/* Four walls with a doorway on the right wall */}
+              <path className="sk-draw" pathLength={1} d="M342 108 V62 H18 V196 H342 V148" />
+              <path className="sk-draw" pathLength={1} d="M342 108 Q318 112 314 136" strokeWidth="1.4" strokeDasharray="3 3" />
+              <text className="sk-note" x="326" y="214">door</text>
+            </g>
+          )}
 
           {/* Subject(s): a dashed "?" until the caller describes them */}
           <g key={`subj-${n}-${s.subjectDescribed}-${s.inVehicle}-${s.vtype}`} className="sk-pop" transform={`translate(${subjectX}, 128)`}>
@@ -157,7 +180,6 @@ export default function SceneSketch({ incident }: { incident: Incident }) {
             {!s.subjectDescribed && <text className="sk-q" y="-1">?</text>}
             {s.weapon && <g key={s.weapon} className="sk-pop" transform="translate(12, -30)"><WeaponIcon kind={s.weapon} /></g>}
           </g>
-          {s.present && <text className="sk-note" x={subjectX} y="160">still there</text>}
 
           {/* A vehicle reported but not as the subject's: parked beside them */}
           {s.hasVehicle && !s.inVehicle && (
@@ -217,6 +239,8 @@ export default function SceneSketch({ incident }: { incident: Incident }) {
         )}
         <text className="sk-label sk-red" x={subjectX} y="34">{s.subjectDescribed ? (s.subjectCount && s.subjectCount > 1 ? 'suspects' : 'suspect') : 'suspect: not described'}</text>
         {subjectBits && <text className="sk-sub" x={subjectX} y="48">{subjectBits}</text>}
+        {s.present && <text className="sk-note" x={subjectX} y="160">still there</text>}
+        {s.setting === 'unknown' && <text className="sk-note" x="180" y="208">inside or outside not said yet</text>}
         {s.address && <text className="sk-sub" x="180" y="222">📍 {s.address.length > 60 ? `${s.address.slice(0, 58)}…` : s.address}</text>}
       </svg>
 
