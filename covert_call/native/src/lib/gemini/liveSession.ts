@@ -125,6 +125,8 @@ export async function startLiveCall(
   // ordinary "no answer, end the call" case.
   let dangerReported = false
   let estimateReported = false
+  // Last time Mia reported voice stress (see the stress reminder below).
+  let lastStressAt = 0
   let finished = false
   // Real socket health, independent of `finished` (which only means the caller/AI ended the call).
   let connected = false
@@ -176,6 +178,7 @@ export async function startLiveCall(
         return 'Saved. If they are being chased, followed or need to move, call get_route_guidance now and guide them to the police station/hospital it gives.'
       }
       case 'report_stress_level': {
+        lastStressAt = Date.now()
         const score = args.score
         if (typeof score === 'number') {
           enqueueWrite(() => recordVoiceStress(db, incidentId, Math.max(0, Math.min(100, score))))
@@ -525,6 +528,18 @@ export async function startLiveCall(
 
   // The model often never files the age/gender estimate on its own, so remind it once the caller has spoken for
   // a while. Sent only while Mia isn't talking, so it doesn't interrupt her.
+  // Voice stress is only as regular as the model remembers to report it, and in testing a 2-minute call produced
+  // none. If 25 s pass with no reading while the caller is talking, nudge for one, during a pause only.
+  const stressTimer = setInterval(() => {
+    if (!canSend() || player.isPlaying()) return
+    if (!transcriptLines.some((l) => l.speaker === 'Caller')) return
+    if (Date.now() - Math.max(lastStressAt, callStartedAt) < 25_000) return
+    lastStressAt = Date.now()
+    session.sendClientContent({
+      turns: '(System note, not the caller: call report_stress_level NOW with your current 0-100 estimate of the vocal stress of the caller — silently. Do not say anything about it and do not change what you were doing; if you were mid-conversation, just continue exactly where you were.)',
+    })
+  }, 5_000)
+
   const estimateTimer = setInterval(() => {
     if (finished || estimateReported) {
       clearInterval(estimateTimer)
@@ -603,6 +618,7 @@ export async function startLiveCall(
       if (frameTimer) clearInterval(frameTimer)
       opts.frames?.stop()
       clearInterval(factsTimer)
+      clearInterval(stressTimer)
       clearInterval(budgetTimer)
       clearInterval(messageTimer)
       unsubIncident()

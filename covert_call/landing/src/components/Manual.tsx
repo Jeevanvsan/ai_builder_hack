@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { LINKS } from './ui'
 
 // User manual (/manual): every feature as What / When / How, written for the person using QuickBite.
@@ -19,7 +19,7 @@ const FEATURES: Feature[] = [
     id: 'call',
     icon: '📞',
     title: 'Call to order',
-    tag: 'You can talk',
+    tag: 'You can talk: freely, or with someone listening',
     what: <>A phone call to the &ldquo;QuickBite order desk&rdquo;. Mia, an AI assistant, sounds like a normal restaurant staff member, but everything you tell her goes straight to a response team as a live emergency report.</>,
     when: [
       'You can speak, even if someone nearby might be listening.',
@@ -141,6 +141,16 @@ const FEATURES: Feature[] = [
   },
 ]
 
+// Quick-pick: the situation the person is in, mapped to what to use. "Free to talk" is the same call as
+// "someone may be listening", in open mode (say "talk" at the start), so both point to the call section.
+const PICKS = [
+  { icon: '🗣️', situation: 'Free to talk, alone and safe to speak', use: 'Call to order, say "talk"', target: 'call' },
+  { icon: '📞', situation: 'Can talk, but someone may be listening', use: 'Call to order, say "order"', target: 'call' },
+  { icon: '🛒', situation: "Can't talk, can tap", use: 'Click & order', target: 'click-order' },
+  { icon: '📝', situation: "Can't make any sound", use: 'Delivery instructions', target: 'delivery-instructions' },
+  { icon: '🖤', situation: "Being held, can't touch the phone", use: 'Heart double-tap SOS', target: 'sos' },
+]
+
 const CODES: [string, string][] = [
   ['Cheesy Garlic Bread', 'Someone is following or chasing you'],
   ['Family Combo', 'You witnessed a crime'],
@@ -155,84 +165,148 @@ const CODES: [string, string][] = [
   ['Sealed To-Go Box', 'Someone is being taken'],
 ]
 
-export default function Manual() {
+// Client-side navigation inside the manual: /manual is the overview, /manual/<id> one feature per page.
+function go(e: ReactMouseEvent, href: string, onNavigate: (path: string) => void) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+  e.preventDefault()
+  window.history.pushState(null, '', href)
+  window.scrollTo({ top: 0 })
+  onNavigate(href)
+}
+
+const ALL_TABS = [...FEATURES.map((f) => ({ id: f.id, icon: f.icon, title: f.title })), { id: 'codes', icon: '🍕', title: 'Code table' }]
+
+export default function Manual({ path, onNavigate }: { path: string; onNavigate: (path: string) => void }) {
+  const slug = path.replace(/^\/manual\/?/, '').replace(/\/$/, '')
+  const feature = FEATURES.find((f) => f.id === slug)
+  const current = feature ? feature.id : slug === 'codes' ? 'codes' : null
+  const index = ALL_TABS.findIndex((t) => t.id === current)
+  const prev = index > 0 ? ALL_TABS[index - 1] : null
+  const next = index >= 0 && index < ALL_TABS.length - 1 ? ALL_TABS[index + 1] : null
+  const link = (href: string) => ({ href, onClick: (e: ReactMouseEvent) => go(e, href, onNavigate) })
+
   return (
     <main className="manual">
       <div className="container manual-inner">
-        <header className="manual-hero">
-          <span className="eyebrow">User manual</span>
-          <h1>How to use QuickBite</h1>
-          <p className="muted">
-            Four ways to ask for help, all hidden inside an ordinary food app. Pick whichever is safe right now. For each one: what it
-            is, when to use it, and exactly what to do.
-          </p>
-        </header>
-
-        <section className="manual-pick">
-          <h2>Which one should I use?</h2>
-          <div className="manual-pick-grid">
-            {FEATURES.slice(0, 4).map((f) => (
-              <a key={f.id} href={`#${f.id}`} className="manual-pick-card">
-                <span className="manual-icon">{f.icon}</span>
-                <b>{f.tag}</b>
-                <span>→ {f.title}</span>
-              </a>
-            ))}
-          </div>
-        </section>
-
-        <nav className="manual-toc" aria-label="Manual contents">
-          {FEATURES.map((f) => <a key={f.id} href={`#${f.id}`}>{f.icon} {f.title}</a>)}
-          <a href="#codes">🍕 Code table</a>
+        <nav className="manual-crumbs" aria-label="Breadcrumb">
+          <a href="/">Home</a>
+          <span>›</span>
+          {current ? <a {...link('/manual')}>User manual</a> : <span aria-current="page">User manual</span>}
+          {current && (
+            <>
+              <span>›</span>
+              <span aria-current="page">{ALL_TABS[index].title}</span>
+            </>
+          )}
         </nav>
 
-        {FEATURES.map((f) => (
-          <article key={f.id} id={f.id} className="manual-card">
+        <div className="manual-tabs" role="tablist" aria-label="Manual sections">
+          <a {...link('/manual')} role="tab" aria-selected={!current} className={!current ? 'on' : ''}>📖 Overview</a>
+          {ALL_TABS.map((t) => (
+            <a key={t.id} {...link(`/manual/${t.id}`)} role="tab" aria-selected={current === t.id} className={current === t.id ? 'on' : ''}>
+              {t.icon} {t.title}
+            </a>
+          ))}
+        </div>
+
+        {!current && (
+          <>
+            <header className="manual-hero">
+              <span className="eyebrow">User manual</span>
+              <h1>How to use QuickBite</h1>
+              <p className="muted">
+                Four ways to ask for help, all hidden inside an ordinary food app. Pick whichever is safe right now. Each one has
+                its own page: what it is, when to use it, and exactly what to do.
+              </p>
+            </header>
+            <section className="manual-pick">
+              <h2>Which one should I use?</h2>
+              <div className="manual-pick-grid">
+                {PICKS.map((p) => (
+                  <a key={p.situation} {...link(`/manual/${p.target}`)} className="manual-pick-card">
+                    <span className="manual-icon">{p.icon}</span>
+                    <b>{p.situation}</b>
+                    <span>→ {p.use}</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+            <section className="manual-pick">
+              <h2>All topics</h2>
+              <div className="manual-topics">
+                {ALL_TABS.map((t) => {
+                  const f = FEATURES.find((x) => x.id === t.id)
+                  return (
+                    <a key={t.id} {...link(`/manual/${t.id}`)} className="manual-topic">
+                      <span className="manual-icon">{t.icon}</span>
+                      <span><b>{t.title}</b><small>{f ? f.tag : 'What each coded menu item means'}</small></span>
+                      <span className="manual-go">→</span>
+                    </a>
+                  )
+                })}
+              </div>
+            </section>
+          </>
+        )}
+
+        {feature && (
+          <article className="manual-card">
             <div className="manual-card-head">
-              <span className="manual-icon">{f.icon}</span>
+              <span className="manual-icon">{feature.icon}</span>
               <div>
-                <h2>{f.title}</h2>
-                <span className="manual-tag">{f.tag}</span>
+                <h1 className="manual-title">{feature.title}</h1>
+                <span className="manual-tag">{feature.tag}</span>
               </div>
             </div>
             <div className="manual-cols">
               <div>
                 <h3>What it is</h3>
-                <p>{f.what}</p>
+                <p>{feature.what}</p>
                 <h3>When to use it</h3>
-                <ul>{f.when.map((w) => <li key={w}>{w}</li>)}</ul>
+                <ul>{feature.when.map((w) => <li key={w}>{w}</li>)}</ul>
               </div>
               <div>
                 <h3>How to use it</h3>
-                <ol>{f.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
-                {f.tips && (
+                <ol>{feature.how.map((h, i) => <li key={i}>{h}</li>)}</ol>
+                {feature.tips && (
                   <div className="manual-tips">
-                    {f.tips.map((t) => <p key={t}>💡 {t}</p>)}
+                    {feature.tips.map((t) => <p key={t}>💡 {t}</p>)}
                   </div>
                 )}
               </div>
             </div>
           </article>
-        ))}
+        )}
 
-        <article id="codes" className="manual-card">
-          <div className="manual-card-head">
-            <span className="manual-icon">🍕</span>
-            <div>
-              <h2>Code table</h2>
-              <span className="manual-tag">For Click &amp; order</span>
+        {current === 'codes' && (
+          <article className="manual-card">
+            <div className="manual-card-head">
+              <span className="manual-icon">🍕</span>
+              <div>
+                <h1 className="manual-title">Code table</h1>
+                <span className="manual-tag">For Click &amp; order</span>
+              </div>
             </div>
+            <p className="muted">
+              On a call you never need this: Mia says each meaning out loud. For a coded order, add the item that matches your
+              situation. You can also press and hold an item's picture in the app to check.
+            </p>
+            <div className="manual-codes">
+              {CODES.map(([food, meaning]) => (
+                <div key={food}><b>{food}</b><span>{meaning}</span></div>
+              ))}
+            </div>
+          </article>
+        )}
+
+        {slug && !current && <p className="muted">That page doesn't exist. Pick a topic above.</p>}
+
+        {current && (
+          <div className="manual-pager">
+            {prev ? <a {...link(`/manual/${prev.id}`)}>← {prev.icon} {prev.title}</a> : <a {...link('/manual')}>← Overview</a>}
+            {next && <a {...link(`/manual/${next.id}`)} className="next">{next.icon} {next.title} →</a>}
           </div>
-          <p className="muted">
-            On a call you never need this: Mia says each meaning out loud. For a coded order, add the item that matches your
-            situation. You can also press and hold an item's picture in the app to check.
-          </p>
-          <div className="manual-codes">
-            {CODES.map(([food, meaning]) => (
-              <div key={food}><b>{food}</b><span>{meaning}</span></div>
-            ))}
-          </div>
-        </article>
+        )}
 
         <div className="manual-help">
           <b>In an emergency, if it is safe to do so, call your local emergency number (112 in India).</b> QuickBite supports,

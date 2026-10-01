@@ -17,6 +17,10 @@
       {
         "source": "/manual",
         "destination": "/index.html"
+      },
+      {
+        "source": "/manual/**",
+        "destination": "/index.html"
       }
     ],
     "headers": [

@@ -1,5 +1,5 @@
 import { MotionConfig } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Bento, DeepDives } from './components/Features'
 import Hero from './components/Hero'
 import Manual from './components/Manual'
@@ -9,6 +9,13 @@ import { APK_URL, LINKS, Modal } from './components/ui'
 
 export default function App() {
   const [apkOpen, setApkOpen] = useState(false)
+  // The manual has its own pages (/manual, /manual/<topic>) navigated without a reload; Back/Forward work too.
+  const [path, setPath] = useState(() => window.location.pathname)
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname)
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
   // Starts the APK download (GitHub serves release files as attachments, so the page stays put), then shows how
   // to install it, since Android asks to allow installs from the browser.
   const openApk = () => {
@@ -16,12 +23,12 @@ export default function App() {
     window.location.href = APK_URL
     setApkOpen(true)
   }
-  if (window.location.pathname.replace(/\/$/, '') === '/manual') {
+  if (path.startsWith('/manual')) {
     document.title = 'User manual · Covert Call'
     return (
       <MotionConfig reducedMotion="user">
         <Nav onDownload={openApk} />
-        <Manual />
+        <Manual path={path} onNavigate={setPath} />
         <Footer />
         <ApkModal open={apkOpen} onClose={() => setApkOpen(false)} />
       </MotionConfig>
