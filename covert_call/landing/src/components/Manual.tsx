@@ -16,23 +16,47 @@ type Feature = {
 
 const FEATURES: Feature[] = [
   {
-    id: 'call',
-    icon: '📞',
-    title: 'Call to order',
-    tag: 'You can talk: freely, or with someone listening',
-    what: <>A phone call to the &ldquo;QuickBite order desk&rdquo;. Mia, an AI assistant, sounds like a normal restaurant staff member, but everything you tell her goes straight to a response team as a live emergency report.</>,
+    id: 'talk-freely',
+    icon: '🗣️',
+    title: 'Free to talk (open call)',
+    tag: 'Alone and safe to speak',
+    what: <>The same order call, but with no disguise. When you can speak freely, Mia drops the food cover and talks to you like a calm emergency dispatcher, in plain words and in your language.</>,
     when: [
-      'You can speak, even if someone nearby might be listening.',
-      'You are being followed, threatened, or are somewhere unsafe and need guidance.',
-      'You want to report something happening to someone else.',
+      'You are alone, or nobody dangerous can hear you.',
+      'You want to explain what is happening in your own words.',
+      'You are reporting an emergency you are watching, such as an accident, a fire or a fight.',
     ],
     how: [
       <>Open QuickBite and, with an <b>empty cart</b>, tap <b>Call to order</b> at the bottom of the home screen.</>,
-      <>Mia greets you and asks whether you can talk freely. Say <b>&ldquo;talk&rdquo;</b> if you are alone and safe to speak, or <b>&ldquo;order&rdquo;</b> if someone might be listening.</>,
-      <><b>If you said &ldquo;order&rdquo;:</b> Mia offers food choices and says what each one really means in the same sentence (e.g. &ldquo;garlic bread means someone is following you&rdquo;). Just repeat the food word and a number. You never need to remember any codes.</>,
-      <><b>If you said &ldquo;talk&rdquo;:</b> Mia drops the food cover and speaks like a calm emergency dispatcher. Answer her plainly.</>,
-      <>Always give your <b>exact location</b> when she asks for the &ldquo;delivery address&rdquo; (building, floor, flat number or a nearby landmark), even though your phone also shares GPS.</>,
-      <>If you are on the move, Mia guides you turn by turn to the nearest police station or hospital, phrased as directions to &ldquo;meet the rider&rdquo;.</>,
+      <>When Mia asks whether you can talk freely, say <b>&ldquo;talk&rdquo;</b>. You can also just start describing the emergency; she switches to open mode straight away.</>,
+      <>Answer her direct questions: is anyone hurt, are you safe right now, <b>exactly where you are</b> (area, road, town or a landmark), how many people, any weapon, which vehicle.</>,
+      <>Follow her instructions step by step. She gives practical first aid (bleeding, breathing, burns, choking) and safety advice while you wait.</>,
+      <>If you need to get away, she guides you turn by turn to the nearest police station or hospital, with the distance left.</>,
+      <>Stay on the line until she confirms you are safe. Tap the red button to hang up at any time.</>,
+    ],
+    tips: [
+      'If someone comes near or you need to whisper, just answer with food words: Mia switches back to the disguise at once.',
+      'Mia also reminds you to call 112 if you can. She stays on the line with you either way.',
+      'Speak in any language, including mixed speech like Manglish or Hinglish. Mia replies in the same one.',
+    ],
+  },
+  {
+    id: 'call',
+    icon: '📞',
+    title: 'Call to order (disguised)',
+    tag: 'Can talk, but someone may be listening',
+    what: <>A phone call to the &ldquo;QuickBite order desk&rdquo; that sounds like an ordinary food order. Mia, an AI assistant, asks food questions that secretly mean something, and everything you answer goes straight to a response team as a live emergency report.</>,
+    when: [
+      'You can speak, but someone nearby might hear you.',
+      'You are being followed, threatened, or watched and the call must sound normal.',
+      'You want to report something happening to someone else without anyone noticing.',
+    ],
+    how: [
+      <>Open QuickBite and, with an <b>empty cart</b>, tap <b>Call to order</b> at the bottom of the home screen.</>,
+      <>When Mia asks whether you can talk freely, say <b>&ldquo;order&rdquo;</b>.</>,
+      <>Mia offers food choices and says what each one really means in the same sentence (e.g. &ldquo;garlic bread means someone is following you&rdquo;). Just repeat the food word and a number. You never need to remember any codes.</>,
+      <>Give your <b>exact location</b> when she asks for the &ldquo;delivery address&rdquo; (building, floor, flat number or a nearby landmark), even though your phone also shares GPS.</>,
+      <>If you are on the move, Mia guides you to the nearest police station or hospital, phrased as directions to &ldquo;meet the rider&rdquo;.</>,
       <>Responders can send you messages through Mia. They sound like delivery updates (&ldquo;your rider is 5 minutes away, please wait inside&rdquo;).</>,
       <>Tap the red button to hang up at any time.</>,
     ],
@@ -142,10 +166,10 @@ const FEATURES: Feature[] = [
 ]
 
 // Quick-pick: the situation the person is in, mapped to what to use. "Free to talk" is the same call as
-// "someone may be listening", in open mode (say "talk" at the start), so both point to the call section.
+// "someone may be listening" in open mode, but each has its own page because what to do is different.
 const PICKS = [
-  { icon: '🗣️', situation: 'Free to talk, alone and safe to speak', use: 'Call to order, say "talk"', target: 'call' },
-  { icon: '📞', situation: 'Can talk, but someone may be listening', use: 'Call to order, say "order"', target: 'call' },
+  { icon: '🗣️', situation: 'Free to talk, alone and safe to speak', use: 'Free to talk (open call)', target: 'talk-freely' },
+  { icon: '📞', situation: 'Can talk, but someone may be listening', use: 'Call to order (disguised)', target: 'call' },
   { icon: '🛒', situation: "Can't talk, can tap", use: 'Click & order', target: 'click-order' },
   { icon: '📝', situation: "Can't make any sound", use: 'Delivery instructions', target: 'delivery-instructions' },
   { icon: '🖤', situation: "Being held, can't touch the phone", use: 'Heart double-tap SOS', target: 'sos' },
@@ -234,7 +258,7 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
               <span className="eyebrow">User manual</span>
               <h1>How to use QuickBite</h1>
               <p className="muted">
-                Four ways to ask for help, all hidden inside an ordinary food app. Pick whichever is safe right now. Each one has
+                Every way to ask for help, all inside an ordinary food app. Pick whichever is safe right now. Each one has
                 its own page: what it is, when to use it, and exactly what to do.
               </p>
             </header>
