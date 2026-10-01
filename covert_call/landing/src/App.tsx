@@ -4,11 +4,17 @@ import { Bento, DeepDives } from './components/Features'
 import Hero from './components/Hero'
 import Privacy from './components/Privacy'
 import { Compare, DemoSlider, Disguise, Download, Footer, HowItWorks, Marquee, Nav, Problem, SplitView } from './components/Sections'
-import { LINKS, Modal } from './components/ui'
+import { APK_URL, LINKS, Modal } from './components/ui'
 
 export default function App() {
   const [apkOpen, setApkOpen] = useState(false)
-  const openApk = () => setApkOpen(true)
+  // Starts the APK download (Drive's direct link answers with an attachment, so the page stays put), then shows
+  // how to install it, since Android asks to allow installs from the browser.
+  const openApk = () => {
+    // A user-initiated navigation to an attachment response downloads the file and leaves this page in place.
+    window.location.href = APK_URL
+    setApkOpen(true)
+  }
   if (window.location.pathname.replace(/\/$/, '') === '/privacy') {
     document.title = 'Privacy Policy · Covert Call'
     return (
@@ -36,11 +42,11 @@ export default function App() {
       </main>
       <Footer />
       <Modal open={apkOpen} onClose={() => setApkOpen(false)}>
-        <div style={{ fontSize: 40, marginBottom: 10 }}>🤖</div>
-        <h3>Android APK is on its way</h3>
-        <p>The React Native build is still being finished. In the meantime the full experience runs in your browser with nothing to install.</p>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>📦</div>
+        <h3>Your download has started</h3>
+        <p>QuickBite.apk (about 150 MB). To install: open the file, then allow installs from your browser when Android asks. Prefer not to install? The full experience also runs in your browser.</p>
         <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={() => setApkOpen(false)}>Close</button>
+          <a className="btn btn-ghost" href={APK_URL} download="QuickBite.apk">Download again</a>
           <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open web app →</a>
         </div>
       </Modal>

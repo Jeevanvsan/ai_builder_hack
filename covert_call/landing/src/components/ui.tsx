@@ -1,6 +1,10 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
+// The Android build. Drive's direct-download endpoint (not the Drive page): it answers with Content-Disposition:
+// attachment, so the click downloads the APK and the visitor stays on this page. Firebase's free plan won't host .apk.
+export const APK_URL = 'https://drive.usercontent.google.com/download?id=1sSKiKmJgq_t9nvqdemRnfLvcxnjxQSqz&export=download&confirm=t'
+
 export const LINKS = {
   web: 'https://quickbite-5cde0.web.app',
   github: 'https://github.com/Jeevanvsan/ai_builder_hack',
