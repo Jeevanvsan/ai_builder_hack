@@ -185,6 +185,19 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
   const next = index >= 0 && index < ALL_TABS.length - 1 ? ALL_TABS[index + 1] : null
   const link = (href: string) => ({ href, onClick: (e: ReactMouseEvent) => go(e, href, onNavigate) })
 
+  // Closes the phone dropdown after picking a topic.
+  const pick = (e: ReactMouseEvent) => (e.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open')
+  const SideLinks = () => (
+    <nav className="manual-side-links">
+      <a {...link('/manual')} className={!current ? 'on' : ''} onClickCapture={pick}>📖 Overview</a>
+      {ALL_TABS.map((t) => (
+        <a key={t.id} {...link(`/manual/${t.id}`)} className={current === t.id ? 'on' : ''} onClickCapture={pick}>
+          <span>{t.icon}</span> {t.title}
+        </a>
+      ))}
+    </nav>
+  )
+
   return (
     <main className="manual">
       <div className="container manual-inner">
@@ -200,14 +213,20 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
           )}
         </nav>
 
-        <div className="manual-tabs" role="tablist" aria-label="Manual sections">
-          <a {...link('/manual')} role="tab" aria-selected={!current} className={!current ? 'on' : ''}>📖 Overview</a>
-          {ALL_TABS.map((t) => (
-            <a key={t.id} {...link(`/manual/${t.id}`)} role="tab" aria-selected={current === t.id} className={current === t.id ? 'on' : ''}>
-              {t.icon} {t.title}
-            </a>
-          ))}
-        </div>
+        <div className="manual-layout">
+          <aside className="manual-side" aria-label="Manual topics">
+            <details className="manual-side-menu" open={false}>
+              <summary>
+                <span>Topics</span>
+                <b>{current ? `${ALL_TABS[index].icon} ${ALL_TABS[index].title}` : '📖 Overview'}</b>
+              </summary>
+              <SideLinks />
+            </details>
+            <div className="manual-side-list">
+              <SideLinks />
+            </div>
+          </aside>
+          <div className="manual-content">
 
         {!current && (
           <>
@@ -307,6 +326,9 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
             {next && <a {...link(`/manual/${next.id}`)} className="next">{next.icon} {next.title} →</a>}
           </div>
         )}
+
+          </div>
+        </div>
 
         <div className="manual-help">
           <b>In an emergency, if it is safe to do so, call your local emergency number (112 in India).</b> QuickBite supports,

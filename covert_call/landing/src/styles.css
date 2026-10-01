@@ -637,3 +637,28 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
   .manual-pager { flex-direction: column; }
   .manual-pager .next { margin-left: 0; }
 }
+
+/* Manual: left pane instead of tabs */
+.manual-inner { max-width: 1180px; }
+.manual-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; align-items: start; }
+.manual-side { position: sticky; top: 92px; }
+.manual-side-menu { display: none; }
+.manual-side-links { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); }
+.manual-side-links a { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; font-size: 14px; font-weight: 600; color: var(--muted); border-left: 3px solid transparent; }
+.manual-side-links a:hover { background: var(--bg); color: var(--text); }
+.manual-side-links a.on { background: rgba(217, 72, 15, .08); color: var(--accent); border-left-color: var(--accent); }
+.manual-content { min-width: 0; }
+.manual-content .manual-hero { margin-top: 0; }
+@media (max-width: 900px) {
+  .manual-layout { grid-template-columns: 1fr; gap: 16px; }
+  .manual-side { position: sticky; top: 62px; z-index: 6; }
+  .manual-side-list { display: none; }
+  .manual-side-menu { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 10px 30px -18px rgba(18, 21, 28, .4); }
+  .manual-side-menu summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; }
+  .manual-side-menu summary::-webkit-details-marker { display: none; }
+  .manual-side-menu summary span { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .manual-side-menu summary b { font-size: 14px; color: var(--accent); }
+  .manual-side-menu summary b::after { content: ' ▾'; }
+  .manual-side-menu[open] summary b::after { content: ' ▴'; }
+  .manual-side-menu .manual-side-links { border: 0; border-top: 1px solid var(--border); border-radius: 0 0 14px 14px; max-height: 60vh; overflow-y: auto; }
+}
