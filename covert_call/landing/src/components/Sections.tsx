@@ -418,7 +418,7 @@ export function Download({ onDownload }: { onDownload: () => void }) {
               <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app runs live on Firebase with nothing to install. The Android build carries the same disguise as a real app icon.</p>
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
-              <button className="dl-opt" onClick={onDownload}><span className="ico">🤖</span><span><b>Download APK</b><small>Android · React Native build</small></span><span className="go">⬇</span></button>
+              <button className="dl-opt" onClick={onDownload}><span className="ico">🤖</span><span><b>Download APK</b><small>Android · about 150 MB</small></span><span className="go">⬇</span></button>
               <a className="dl-opt" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🍕</span><span><b>Open QuickBite web app</b><small>quickbite-5cde0.web.app</small></span><span className="go">↗</span></a>
               <a className="dl-opt" href={LINKS.github} target="_blank" rel="noreferrer"><span className="ico">💻</span><span><b>Source on GitHub</b><small>Public repository</small></span><span className="go">↗</span></a>
             </div>

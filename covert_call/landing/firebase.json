@@ -2,12 +2,38 @@
   "hosting": {
     "target": "landing",
     "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "videos/**/*.mp4"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "videos/**/*.mp4"
+    ],
     "cleanUrls": true,
-    "rewrites": [{ "source": "/privacy", "destination": "/index.html" }],
+    "rewrites": [
+      {
+        "source": "/privacy",
+        "destination": "/index.html"
+      }
+    ],
     "headers": [
-      { "source": "/shots/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] },
-      { "source": "/videos/**", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
+      {
+        "source": "/shots/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=300"
+          }
+        ]
+      },
+      {
+        "source": "/videos/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=300"
+          }
+        ]
+      }
     ]
   }
 }
