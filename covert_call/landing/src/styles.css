@@ -565,7 +565,7 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
 .manual-hero p { font-size: 18px; line-height: 1.6; max-width: 680px; margin: 0; }
 .manual-pick { margin: 36px 0 18px; }
 .manual-pick h2, .manual-card h2 { font-size: 22px; margin: 0 0 14px; }
-.manual-pick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.manual-pick-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
 .manual-pick-card { display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); transition: transform .2s, border-color .2s; }
 .manual-pick-card:hover { transform: translateY(-3px); border-color: var(--accent); }
 .manual-pick-card b { font-size: 15px; }
@@ -608,3 +608,32 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
 @media (max-width: 900px) { .nav-manual-mobile { display: inline-block; } }
 .manual section { padding: 0; }
 .manual .manual-pick { margin: 34px 0 6px; }
+@media (max-width: 1000px) and (min-width: 801px) { .manual-pick-grid { grid-template-columns: repeat(3, 1fr); } }
+
+/* Manual: breadcrumbs, tabs, topics, pager */
+.manual-crumbs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+.manual-crumbs a { color: var(--muted); font-weight: 600; }
+.manual-crumbs a:hover { color: var(--accent); }
+.manual-crumbs [aria-current] { color: var(--text); font-weight: 700; }
+.manual-tabs { position: sticky; top: 72px; z-index: 5; display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); margin-bottom: 26px; background: var(--bg); scrollbar-width: none; }
+.manual-tabs::-webkit-scrollbar { display: none; }
+.manual-tabs a { white-space: nowrap; padding: 12px 14px; font-size: 14px; font-weight: 600; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.manual-tabs a:hover { color: var(--text); }
+.manual-tabs a.on { color: var(--accent); border-bottom-color: var(--accent); }
+.manual-title { font-size: clamp(26px, 4vw, 34px); margin: 0 0 6px; }
+.manual-topics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.manual-topic { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); transition: border-color .2s, transform .2s; }
+.manual-topic:hover { border-color: var(--accent); transform: translateY(-2px); }
+.manual-topic b { display: block; font-size: 15px; }
+.manual-topic small { color: var(--muted); font-size: 13px; }
+.manual-go { margin-left: auto; color: var(--accent); font-weight: 800; }
+.manual-pager { display: flex; justify-content: space-between; gap: 12px; margin: 6px 0 4px; }
+.manual-pager a { padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); font-weight: 700; font-size: 14px; }
+.manual-pager a:hover { border-color: var(--accent); color: var(--accent); }
+.manual-pager .next { margin-left: auto; }
+@media (max-width: 800px) {
+  .manual-tabs { top: 62px; }
+  .manual-topics { grid-template-columns: 1fr; }
+  .manual-pager { flex-direction: column; }
+  .manual-pager .next { margin-left: 0; }
+}

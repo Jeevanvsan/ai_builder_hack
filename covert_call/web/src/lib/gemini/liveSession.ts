@@ -125,6 +125,8 @@ export async function startLiveCall(
   // The model often never files the age/gender estimate on its own (the persona asks for it "once, early"), so a
   // one-off reminder goes out once the caller has spoken for a while — see the estimate timer below.
   let estimateReported = false
+  // Last time Mia reported voice stress (see the stress reminder below).
+  let lastStressAt = 0
   let finished = false
   // Tracks real socket health (set on onopen/onclose), independent of `finished` (which only means the caller/AI
   // ended the call). Every send must check both — see canSend() below.
@@ -183,6 +185,7 @@ export async function startLiveCall(
           : 'Saved. Do NOT give directions — they have not said they are being followed or moving. Keep them safe where they are.'
       }
       case 'report_stress_level': {
+        lastStressAt = Date.now()
         const score = args.score
         if (typeof score === 'number') enqueueWrite(() => recordVoiceStress(db, incidentId, Math.max(0, Math.min(100, score))))
         break
@@ -542,6 +545,18 @@ export async function startLiveCall(
   }, 5_000)
 
   // Sent only while Mia isn't talking, so it doesn't interrupt her; retried every 5s until it goes out once.
+  // Voice stress is only as regular as the model remembers to report it, and in testing a 2-minute call produced
+  // none. If 25 s pass with no reading while the caller is talking, nudge for one, during a pause only.
+  const stressTimer = setInterval(() => {
+    if (!canSend() || player.isPlaying()) return
+    if (!transcriptLines.some((l) => l.speaker === 'Caller')) return
+    if (Date.now() - Math.max(lastStressAt, callStartedAt) < 25_000) return
+    lastStressAt = Date.now()
+    session.sendClientContent({
+      turns: '(System note, not the caller: call report_stress_level NOW with your current 0-100 estimate of the vocal stress of the caller — silently. Do not say anything about it and do not change what you were doing; if you were mid-conversation, just continue exactly where you were.)',
+    })
+  }, 5_000)
+
   const estimateTimer = setInterval(() => {
     if (finished || estimateReported) { clearInterval(estimateTimer); return }
     const callerLines = transcriptLines.filter((l) => l.speaker === 'Caller').length
@@ -613,6 +628,7 @@ export async function startLiveCall(
       clearInterval(silenceTimer)
       clearInterval(estimateTimer)
       clearInterval(factsTimer)
+      clearInterval(stressTimer)
       clearInterval(budgetTimer)
       clearInterval(messageTimer)
       unsubIncident()
