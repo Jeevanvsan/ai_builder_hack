@@ -113,6 +113,59 @@ export const GET_ROUTE_GUIDANCE: FunctionDeclaration = {
   },
 }
 
+export const REPORT_VEHICLE_NUMBER: FunctionDeclaration = {
+  name: 'report_vehicle_number',
+  description:
+    "Report a suspect vehicle's number plate (Epic 22.3), full or partial, the moment you learn it: from the caller " +
+    '(source "caller") or read off a camera frame (source "camera"). Even part of a plate ("KL 04") helps. Never ' +
+    'say a plate you read on camera out loud.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      plate: { type: Type.STRING, description: 'The plate as heard or seen, e.g. "KL 04 AB 1234" or "KL 04"' },
+      source: { type: Type.STRING, enum: ['caller', 'camera'], description: "'caller' if they told you, 'camera' if you read it" },
+      confidence: { type: Type.NUMBER, description: '0-100 how sure you are of the characters' },
+    },
+    required: ['plate', 'source'],
+  },
+}
+
+export const REPORT_COERCION_SIGNAL: FunctionDeclaration = {
+  name: 'report_coercion_signal',
+  description:
+    "Report a sign the caller may be speaking under someone else's control (Epic 24): a different voice takes over " +
+    'the call, the caller suddenly turns flat, calm or scripted after sounding scared, someone whispers instructions ' +
+    'to them, or they abruptly try to cancel after danger was mentioned. Call it silently; never react out loud.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      kind: {
+        type: Type.STRING,
+        enum: ['second voice', 'scripted tone', 'whispered instructions', 'forced cancel', 'other'],
+        description: 'What you noticed',
+      },
+      detail: { type: Type.STRING, description: 'Short plain description for a responder, e.g. "male voice took the phone, said all fine"' },
+      confidence: { type: Type.NUMBER, description: '0-100 how sure you are' },
+    },
+    required: ['kind'],
+  },
+}
+
+export const CONFIRM_MESSAGE_DELIVERED: FunctionDeclaration = {
+  name: 'confirm_message_delivered',
+  description:
+    'Call this right after you pass a responder message on to the caller (Epic 23), with the exact words you said, ' +
+    'so the responder sees it was delivered and how it was phrased.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      messageId: { type: Type.STRING, description: 'The id given in the responder-message system note' },
+      spokenAs: { type: Type.STRING, description: 'Exactly what you said to the caller' },
+    },
+    required: ['messageId', 'spokenAs'],
+  },
+}
+
 export const END_CALL: FunctionDeclaration = {
   name: 'end_call',
   description: 'Call this the moment you finish your closing line (e.g. "your order\'s on its way, thanks for calling") — after the caller has confirmed they\'re done, whether that means they gave a clear closing signal or you\'ve gathered what you reasonably can. This actually ends the call, so only call it once you are done speaking.',
@@ -120,11 +173,11 @@ export const END_CALL: FunctionDeclaration = {
 }
 
 export const LIVE_CALL_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_ADVICE, GET_ROUTE_GUIDANCE, END_CALL] },
+  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_ADVICE, GET_ROUTE_GUIDANCE, REPORT_VEHICLE_NUMBER, REPORT_COERCION_SIGNAL, CONFIRM_MESSAGE_DELIVERED, END_CALL] },
 ]
 
 // Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools
 // (no address confirmation, no end_call — the person ends the SOS with the secret gesture).
 export const REPORT_SCENE_OBSERVATION_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE] },
+  { functionDeclarations: [REPORT_SITUATION, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_VEHICLE_NUMBER] },
 ]

@@ -15,7 +15,7 @@ export function deriveSeverity(fields: Incident['extractedFieldsLive'], voiceStr
   const danger = affirmed(fields.dangerIndicators)
   // Weapons and immediately life-threatening signals (a gunshot, a scream, fire) force high severity regardless
   // of the caller's stated urgency — these often come from what the AI sees/hears (Epic 10), not what's said.
-  const critical = danger.some((d) => /weapon|gun|firearm|knife|gunshot|scream|explosion|blast|fire|smoke|stab|blood/i.test(d))
+  const critical = danger.some((d) => /weapon|gun|firearm|knife|gunshot|scream|explosion|blast|fire|smoke|stab|blood|coercion/i.test(d))
   if (fields.urgency === 'high' || critical || stress >= 80) return 'high'
   if (fields.urgency === 'medium' || danger.length > 0 || stress >= 55) return 'medium'
   return 'low'

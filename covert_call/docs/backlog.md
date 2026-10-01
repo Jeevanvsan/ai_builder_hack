@@ -702,66 +702,66 @@ fields except where noted.*
 
 ### User Story 22.1
 **As a caller in danger, I want Mia to ask only what responders need, in an order that fits my situation, so that the call is short and doesn't break the disguise.**
-- [ ] Replace the fixed step list in `persona.ts` with goals: minimum facts (exact location, what's happening, immediate danger), trigger-only follow-ups (spec §1.2), "never ask" rules, and a stop condition
-- [ ] **Always ask exact location**, even with good GPS: building/floor/flat when staying put; landmark + direction when moving (replaces Step 7's skip-when-moving)
-- [ ] Remove the "aim for at least 4 follow-ups" rule
-- [ ] Keep the fixed guardrails: code meanings unchanged, meaning stated in the same sentence, nothing alarming aloud in covert mode
+- [x] Replace the fixed step list in `persona.ts` with goals: minimum facts (exact location, what's happening, immediate danger), trigger-only follow-ups (spec §1.2), "never ask" rules, and a stop condition
+- [x] **Always ask exact location**, even with good GPS: building/floor/flat when staying put; landmark + direction when moving (replaces Step 7's skip-when-moving)
+- [x] Remove the "aim for at least 4 follow-ups" rule
+- [x] Keep the fixed guardrails: code meanings unchanged, meaning stated in the same sentence, nothing alarming aloud in covert mode
 
 ### User Story 22.2
 **As Mia, I want a live summary of what's already known, so that I never ask about something the camera, audio or caller has already told us.**
-- [ ] `liveSession.ts` (web **and native**) sends a "Known: … Still needed: …" system note after each tool call and each scene/sound observation
+- [x] `liveSession.ts` (web **and native**) sends a "Known: … Still needed: …" system note after each tool call and each scene/sound observation
 
 ### User Story 22.3
 **As a responder, I want the suspect's number plate captured, so that police can trace the vehicle.**
-- [ ] Persona asks for a plate (open mode) only when a vehicle is involved; camera prompt reads any visible plate
-- [ ] `vehicleNumber { value, confidence, source }` + `vehicleRegion` in `extractedFieldsLive` (agree with Person B)
-- [ ] Offline RTO-prefix decode (e.g. `KL-04` → Alappuzha). **No owner lookup**: owner details stay with VAHAN and authorised agencies
+- [x] Persona asks for a plate (open mode) only when a vehicle is involved; camera prompt reads any visible plate
+- [x] `vehicleNumber { value, confidence, source }` + `vehicleRegion` in `extractedFieldsLive` (agree with Person B)
+- [x] Offline RTO-prefix decode (e.g. `KL-04` → Alappuzha). **No owner lookup**: owner details stay with VAHAN and authorised agencies
 
 ### User Story 22.4
 **As a caller, I want the call to end naturally within about 3 minutes unless I'm on the move, so that the "order call" never outlasts its disguise.**
-- [ ] Persona time budget: critical facts ≤ 60–90 s; start wrapping up at ~2:30 unless the caller is moving/chased or a responder is guiding; never hang up automatically on a caller in danger
+- [x] Persona time budget: critical facts ≤ 60–90 s; start wrapping up at ~2:30 unless the caller is moving/chased or a responder is guiding; never hang up automatically on a caller in danger
 - [ ] Check that the order-placed screen keeps sending location while it's open
 
 ### User Story 22.5 (Person B)
 **As a responder, I want the critical facts at the top of the incident page, so that I can act without hunting.**
-- [ ] Critical-info strip (where, what, weapon, how many, suspect, plate) filling in live
-- [ ] Completeness meter ("4 of 6 critical facts known")
-- [ ] Call timer turns amber at 3:00
+- [x] Critical-info strip (where, what, weapon, how many, suspect, plate) filling in live
+- [x] Completeness meter ("4 of 6 critical facts known")
+- [x] Call timer turns amber at 3:00
 - [ ] Rehearsal: 5 scenarios (chased, trapped, hurt, third party, open mode). Location never skipped, no repeated questions, nothing asked that camera/audio already answered, ≤ 3 min unless moving
 
 ## EPIC 23 — Responder → Caller Covert Messaging 🔴 (promotes 21.2)
 
 ### User Story 23.1
 **As a responder, I want to send the caller a short instruction through Mia, so that I can guide them without breaking the disguise.**
-- [ ] (Person B) "Message caller via Mia" box with quick buttons + free text on the live incident page; `incidents/{id}/messages` + rules (signed-in responders only, status forward-only)
-- [ ] `liveSession.ts` (web **and native**) listens and injects each message as a system note on Mia's next turn, never interrupting the caller
-- [ ] Persona rewords it as delivery chat and calls `confirm_message_delivered { spokenAs }`; delivers only the safe part of anything that can't be disguised
-- [ ] (Person B) "✓ Delivered" + the exact wording Mia used, shown on the dashboard
+- [x] (Person B) "Message caller via Mia" box with quick buttons + free text on the live incident page; `incidents/{id}/messages` + rules (signed-in responders only, status forward-only)
+- [x] `liveSession.ts` (web **and native**) listens and injects each message as a system note on Mia's next turn, never interrupting the caller
+- [x] Persona rewords it as delivery chat and calls `confirm_message_delivered { spokenAs }`; delivers only the safe part of anything that can't be disguised
+- [x] (Person B) "✓ Delivered" + the exact wording Mia used, shown on the dashboard
 
 ## EPIC 24 — Coercion Detection 🟡 (promotes 21.1)
 
 ### User Story 24.1
 **As a responder, I want to know when the caller may be speaking under someone else's control, so that a forced "cancel" doesn't close a real emergency.**
 - [ ] Prototype first with a staged second-voice test call; cut the feature if detection is unreliable
-- [ ] Persona listens for voice change, flat or scripted tone, whispered asides, someone else answering, and never reacts aloud
-- [ ] `report_coercion_signal { kind, detail, confidence }` tool → incident field
-- [ ] (Person B) "Possible coercion" flag in the timeline; high confidence raises severity; "cancel" after danger signals keeps the incident open
+- [x] Persona listens for voice change, flat or scripted tone, whispered asides, someone else answering, and never reacts aloud
+- [x] `report_coercion_signal { kind, detail, confidence }` tool → incident field
+- [x] (Person B) "Possible coercion" flag in the timeline; high confidence raises severity; "cancel" after danger signals keeps the incident open
 
 ## EPIC 25 — Hidden Demo Call 🔴
 
 ### User Story 25.1
 **As a judge or tester, I want to try a real call without alerting responders, so that I can see the product working safely.**
-- [ ] Long-press (~2 s) on the QuickBite logo in the top bar starts a demo call; a short press does nothing unusual; the heart double-tap stays the silent SOS. Add the same to native Home
-- [ ] Full real call flow, but written to a separate `demoIncidents` collection with `isDemo: true` (own rules)
-- [ ] (Person B) Live queue, history, analytics, AI insights, alerts and sirens never read `demoIncidents`
-- [ ] End-of-call "What the responder would see" card on the phone (facts, severity, voice stress, transcript)
-- [ ] Light per-device limit (e.g. 3/hour) to protect Gemini quota; document the gesture in the README and deck
+- [x] Long-press (~2 s) on the QuickBite logo in the top bar starts a demo call; a short press does nothing unusual; the heart double-tap stays the silent SOS. Add the same to native Home
+- [x] Full real call flow, but written to a separate `demoIncidents` collection with `isDemo: true` (own rules)
+- [x] (Person B) Live queue, history, analytics, AI insights, alerts and sirens never read `demoIncidents`
+- [x] End-of-call "What the responder would see" card on the phone (facts, severity, voice stress, transcript)
+- [x] Light per-device limit (e.g. 3/hour) to protect Gemini quota; document the gesture in the README and deck
 
 ## EPIC 26 — Impact Analytics: BigQuery Sandbox + Looker Studio 🟢 (Person B)
 
 ### User Story 26.1
 **As a judge or partner organisation, I want a public view of incident patterns and response times, so that the impact is measurable.**
-- [ ] `npm run export:bq` local script: anonymised table (~1 km grid cell, hour, weekday, severity, channel, danger categories, time to acknowledge/resolve). No names, notes, transcripts, addresses or plates
+- [x] `npm run export:bq` local script: anonymised table (~1 km grid cell, hour, weekday, severity, channel, danger categories, time to acknowledge/resolve). No names, notes, transcripts, addresses or plates
 - [ ] Load into the BigQuery sandbox (free, no billing)
 - [ ] Public Looker Studio report (area, hour/day, response-time trend, channel mix), linked from the landing page and deck
 

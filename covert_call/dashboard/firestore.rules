@@ -85,7 +85,7 @@ service cloud.firestore {
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
           'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven',
-          'videoControl'
+          'videoControl', 'vehicle', 'coercionSignals', 'isDemo'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -129,7 +129,12 @@ service cloud.firestore {
         && optionalString(d, 'recommendation', 200)
         && optionalString(d, 'groundedContext', 300)
         && optionalString(d, 'consolidatedSummary', 5000)
-        && optionalString(d, 'transcriptSummary', 5000);
+        && optionalString(d, 'transcriptSummary', 5000)
+        // Phase 4: suspect number plate (Epic 22.3), coercion signals (Epic 24), demo flag (Epic 25).
+        && (!('vehicle' in d) || (d.vehicle is map && d.vehicle.number is string && d.vehicle.number.size() <= 20
+          && d.vehicle.source in ['caller', 'camera']))
+        && (!('coercionSignals' in d) || (d.coercionSignals is list && d.coercionSignals.size() <= 100))
+        && (!('isDemo' in d) || d.isDemo is bool);
     }
 
     // Only forward progress: status never goes back (resolved stays resolved), an ended call never goes live
@@ -155,12 +160,37 @@ service cloud.firestore {
         || before.get('videoControl', null) != after.get('videoControl', null);
     }
 
+    // Epic 25: hidden demo calls. Same shape as a real incident so the call code is identical, but in its own
+    // collection that the dashboard never reads. No responder fields are ever written here, and nothing is deleted.
+    match /demoIncidents/{incidentId} {
+      allow read: if true;
+      allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data);
+      allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
+        && !changesResponderFields(resource.data, request.resource.data);
+      allow delete: if false;
+    }
+
     match /incidents/{incidentId} {
       allow read: if true;
       allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data);
       allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
         && (!changesResponderFields(resource.data, request.resource.data) || request.auth != null);
       allow delete: if false;
+
+      // Epic 23: responder -> caller messages, relayed by Mia. Only a signed-in responder can send one. The
+      // QuickBite app (unauthenticated) may only flip a pending message to delivered and record what Mia said.
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.keys().hasOnly(['text', 'sentBy', 'sentAt', 'status'])
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300
+          && request.resource.data.sentBy is string && request.resource.data.sentAt is string
+          && request.resource.data.status == 'pending';
+        allow update: if resource.data.status == 'pending' && request.resource.data.status == 'delivered'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'spokenAs', 'deliveredAt'])
+          && request.resource.data.spokenAs is string && request.resource.data.spokenAs.size() <= 500;
+        allow delete: if false;
+      }
 
       // Full call recording (mic + AI voice), base64-encoded — saved here instead of Firebase Storage since
       // Storage now requires the paid Blaze plan and this project stays on the free tier. Written unauthenticated
