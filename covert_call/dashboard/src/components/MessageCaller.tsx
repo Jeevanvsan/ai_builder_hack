@@ -34,14 +34,11 @@ export default function MessageCaller({ incidentId, live }: { incidentId: string
     }
   }
 
-  if (!live && messages.length === 0) return null
+  if (!live && messages.length === 0) return <p className="panel-empty">No messages were sent to the caller.</p>
 
   return (
     <div className="message-caller">
-      <div className="message-head">
-        <span className="critical-title">Message caller via Mia</span>
-        <span className="muted">Mia rephrases it as delivery chat, so the disguise holds.</span>
-      </div>
+      <p className="message-head muted">Mia passes it on as delivery chat, so the disguise holds.</p>
       {live && (
         <>
           <div className="message-quick">
