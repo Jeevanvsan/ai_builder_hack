@@ -11,8 +11,9 @@ import ReplayScrubber from '../ReplayScrubber'
 import { channelLabel } from '../../lib/format'
 import Conversation from './Conversation'
 import DecodeText from './DecodeText'
+import SceneSketch from './SceneSketch'
 
-type Tab = 'conversation' | 'message' | 'case'
+type Tab = 'conversation' | 'scene' | 'message' | 'case'
 const SUMMARY_WAIT_MS = 90_000
 
 // Right-hand panel: the live conversation while the call runs, the case file once it ends. It follows the call
@@ -44,6 +45,9 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
         <button type="button" role="tab" aria-selected={tab === 'conversation'} className={tab === 'conversation' ? 'active' : ''} onClick={() => pick('conversation')}>
           {live && <span className="live-dot" />}Conversation
         </button>
+        <button type="button" role="tab" aria-selected={tab === 'scene'} className={tab === 'scene' ? 'active' : ''} onClick={() => pick('scene')}>
+          Scene
+        </button>
         {canMessage && (
           <button type="button" role="tab" aria-selected={tab === 'message'} className={tab === 'message' ? 'active' : ''} onClick={() => pick('message')}>
             Message caller
@@ -55,7 +59,9 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
       </div>
 
       <div className="panel-body">
-        {tab === 'message' ? (
+        {tab === 'scene' ? (
+          <SceneSketch incident={incident} />
+        ) : tab === 'message' ? (
           <MessageCaller incidentId={incident.id} live={live} />
         ) : tab === 'conversation' ? (
           <Conversation
