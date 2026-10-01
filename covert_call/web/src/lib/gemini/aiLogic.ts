@@ -106,7 +106,9 @@ export async function connectLiveViaAiLogic(modelName: string, config: LiveConfi
 
   let session: LiveSession
   try {
-    session = await model.connect(config.sessionResumption?.handle ? { handle: config.sessionResumption.handle } : undefined)
+    // Always pass the resumption config (empty on a first connect) so the server sends resumption handles; without
+    // it a dropped call or SOS can only reconnect fresh, losing the conversation so far.
+    session = await model.connect(config.sessionResumption ? { ...config.sessionResumption } : undefined)
   } catch (e) {
     cb.onerror(e)
     throw e
