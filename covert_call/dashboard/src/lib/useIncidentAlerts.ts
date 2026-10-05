@@ -17,6 +17,7 @@ import {
 } from './alertOutputs'
 import { scopeQuery, toIncident } from './incidentsStore'
 import { isUnviewed } from './ranking'
+import { watchFlaggedDevices } from './credibility'
 
 export type AlertPermission = 'granted' | 'denied' | 'default' | 'unsupported'
 
@@ -76,6 +77,10 @@ export function useIncidentAlerts() {
   const [permission, setPermission] = useState<AlertPermission>(currentPermission)
   const [unviewedCount, setUnviewedCount] = useState(0)
   const [soundUnlocked, setSoundUnlocked] = useState(audioUnlocked)
+  // Epic 31: devices a responder marked false before. Their calls still show, but quietly: no siren or chime.
+  const flaggedRef = useRef<Map<string, number>>(new Map())
+  const [ringable, setRingable] = useState(0)
+  useEffect(() => watchFlaggedDevices((m) => { flaggedRef.current = m }), [])
 
   useEffect(() => {
     let known: Map<string, Incident> | null = null
@@ -85,7 +90,10 @@ export function useIncidentAlerts() {
       setUnviewedCount(unviewed.length)
       document.title = unviewed.length ? `(${unviewed.length}) ${BASE_TITLE}` : BASE_TITLE
 
-      const fresh: IncidentToast[] = known ? unviewed.filter((i) => !known!.has(i.id)) : []
+      const falseBefore = (i: Incident) => (i.callerUid ? flaggedRef.current.get(i.callerUid) ?? 0 : 0)
+      const quiet = (i: Incident) => falseBefore(i) > 0
+      setRingable(unviewed.filter((i) => !quiet(i)).length)
+      const fresh: IncidentToast[] = known ? unviewed.filter((i) => !known!.has(i.id)).map((i) => ({ ...i, falseBefore: falseBefore(i) })) : []
 
       // Epic 16.9: a re-alert for an already-viewed incident that materially changed — never for a brand-new
       // one (that's `fresh`'s job), so an incident is either a "new incident" toast or a "material change"
@@ -96,12 +104,12 @@ export function useIncidentAlerts() {
         for (const incident of incidents) {
           const prev = known.get(incident.id)
           const why = prev ? criticalChange(prev, incident) : null
-          if (why) critical.push({ incident, reason: why, at: Date.now() })
+          if (why && !quiet(incident)) critical.push({ incident, reason: why, at: Date.now() })
           if (isUnviewed(incident)) continue
           const before = known.get(incident.id)
           if (!before) continue
           const reason = materialChange(before, incident)
-          if (reason) changed.push({ ...incident, changeReason: reason })
+          if (reason) changed.push({ ...incident, changeReason: reason, falseBefore: falseBefore(incident) })
         }
       }
 
@@ -114,8 +122,8 @@ export function useIncidentAlerts() {
         ...prev.filter((t) => stillRelevant.has(t.id) && !fresh.some((f) => f.id === t.id) && !changed.some((c) => c.id === t.id)),
       ])
       if (!busyRef.current) {
-        fresh.forEach((i) => showSystemNotification(i, () => navigate(`/incident/${i.id}`)))
-        if (changed.length) playEscalationCue()
+        fresh.forEach((i) => showSystemNotification(i, () => navigate(`/incident/${i.id}`), i.falseBefore))
+        if (changed.some((c) => !c.falseBefore)) playEscalationCue()
       }
       // One alert per incident, updated in place with the latest development, so a burst of reports doesn't
       // stack up a pile of popups. Shown regardless of do-not-disturb.
@@ -145,7 +153,7 @@ export function useIncidentAlerts() {
 
   // Ring until every incident has been opened by someone; never while this responder is on an incident page.
   // Re-runs when sound unlocks, so the ring starts immediately instead of on the next interval.
-  const shouldRing = unviewedCount > 0 && !busy
+  const shouldRing = ringable > 0 && !busy
   useEffect(() => {
     if (shouldRing && soundUnlocked) startRinging()
     else stopRinging()

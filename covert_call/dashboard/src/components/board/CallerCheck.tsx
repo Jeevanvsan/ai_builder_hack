@@ -73,7 +73,7 @@ export default function CallerCheck({ incident, live }: { incident: Incident; li
       <div className="cc-outcome">
         <span className="sub">Your finding</span>
         {OUTCOMES.map((o) => (
-          <button key={o.id} type="button" className={`mc-chip${outcome === o.id ? ' on' : ''}`} onClick={() => void saveOutcome(incident.id, outcome === o.id ? null : o.id)}>
+          <button key={o.id} type="button" className={`mc-chip${outcome === o.id ? ' on' : ''}`} onClick={() => void saveOutcome(incident, outcome === o.id ? null : o.id)}>
             {o.label}
           </button>
         ))}
