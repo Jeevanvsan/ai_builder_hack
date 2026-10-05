@@ -190,6 +190,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Epic 31: devices a responder marked false alarm / prank (count only). Responders only.
+    match /flaggedDevices/{uid} {
+      allow read: if isResponder();
+      allow write: if isResponder() && request.resource.data.falseCount is int && request.resource.data.falseCount >= 0;
+    }
+
     // Epic 25: hidden demo calls. Same shape as a real incident so the call code is identical, but in its own
     // collection that the dashboard never reads. No responder fields are ever written here, and nothing is deleted.
     match /demoIncidents/{incidentId} {

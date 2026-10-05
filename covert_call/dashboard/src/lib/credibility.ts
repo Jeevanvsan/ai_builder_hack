@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore'
 import { INCIDENTS } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { db } from './firebase'
@@ -34,12 +34,15 @@ export async function loadCallerHistory(incident: Incident): Promise<CallerHisto
   const others = (snap?.docs ?? []).filter((d) => d.id !== incident.id).map((d) => d.data() as Omit<Incident, 'id'>)
   const dayAgo = Date.parse(incident.sessionStartedAt) - 24 * 3600_000
   const phone = (profile?.data()?.phone as string | undefined) ?? null
+  const markedFalse = others.filter((o) => o.response.outcome === 'false-alarm' || o.response.outcome === 'prank').length
+  // Backfill: devices marked false before flaggedDevices existed get their entry, so their alerts go quiet too.
+  if (markedFalse) void setDoc(doc(db, 'flaggedDevices', incident.callerUid), { falseCount: markedFalse, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {})
   return {
     phone,
     verified: Boolean(phone),
     previousCalls: others.length,
     callsLast24h: others.filter((o) => Date.parse(o.sessionStartedAt) >= dayAgo).length,
-    markedFalse: others.filter((o) => o.response.outcome === 'false-alarm' || o.response.outcome === 'prank').length,
+    markedFalse,
     markedGenuine: others.filter((o) => o.response.outcome === 'genuine').length,
   }
 }
@@ -112,5 +115,21 @@ export async function assessCredibility(incident: Incident, history: CallerHisto
 }
 
 export const saveCredibility = (id: string, c: Credibility) => updateDoc(doc(db, INCIDENTS, id), { credibility: c })
-export const saveOutcome = (id: string, outcome: Incident['response']['outcome']) =>
-  updateDoc(doc(db, INCIDENTS, id), { 'response.outcome': outcome ?? null })
+// Saves the responder's finding, then recounts this device's false/prank calls into flaggedDevices/{uid}, which
+// the alert system reads to keep later calls from that device quiet (no siren) and labelled.
+export async function saveOutcome(incident: Incident, outcome: Incident['response']['outcome']): Promise<void> {
+  await updateDoc(doc(db, INCIDENTS, incident.id), { 'response.outcome': outcome ?? null })
+  if (!incident.callerUid) return
+  const snap = await getDocs(query(collection(db, INCIDENTS), where('callerUid', '==', incident.callerUid)))
+  const falseCount = snap.docs.filter((d) => ['false-alarm', 'prank'].includes(d.data().response?.outcome)).length
+  await setDoc(doc(db, 'flaggedDevices', incident.callerUid), falseCount
+    ? { falseCount, updatedAt: new Date().toISOString() }
+    : { falseCount: 0, updatedAt: new Date().toISOString(), cleared: true }, { merge: true })
+}
+
+// Live set of device ids a responder has marked false at least once (for quiet, labelled alerts).
+export function watchFlaggedDevices(onChange: (flagged: Map<string, number>) => void): () => void {
+  return onSnapshot(query(collection(db, 'flaggedDevices'), where('falseCount', '>', 0)),
+    (snap) => onChange(new Map(snap.docs.map((d) => [d.id, Number(d.data().falseCount) || 0]))),
+    () => onChange(new Map()))
+}
