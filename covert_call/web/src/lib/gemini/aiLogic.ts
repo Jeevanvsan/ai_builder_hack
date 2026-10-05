@@ -1,6 +1,7 @@
 import { GoogleGenAI, type LiveServerMessage, type Session } from '@google/genai'
 import { getAI, getGenerativeModel, getLiveGenerativeModel, GoogleAIBackend, ResponseModality, type AI, type LiveSession } from 'firebase/ai'
 import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check'
+import { setLogLevel } from 'firebase/app'
 import { app } from '../firebase'
 
 // Firebase AI Logic (Epic 27): every Gemini call goes through Firebase's proxy instead of a Gemini API key shipped
@@ -25,7 +26,28 @@ function aiLogic(): AI {
 
 // Start App Check the moment the page loads: the first token takes a few seconds, and a call opened before it
 // arrives is refused ("App Check token is invalid").
-if (USE_AI_LOGIC) aiLogic()
+if (USE_AI_LOGIC) {
+  aiLogic()
+  // The Live API sends some messages the SDK doesn't recognise (empty frames) and it warns on every one, flooding
+  // the console. They're harmless; keep Firebase to real errors only.
+  setLogLevel('error')
+}
+
+// The SDK hides the Live WebSocket and always ends receive() the same way, so a server close (time limit, bad
+// config, quota) reached us as a plain "stream ended". Keep a handle on the Live socket to report its real close
+// code and reason.
+let lastLiveSocket: WebSocket | null = null
+if (USE_AI_LOGIC && typeof window !== 'undefined' && !(window.WebSocket as unknown as { __qbTracked?: boolean }).__qbTracked) {
+  const Native = window.WebSocket
+  class Tracked extends Native {
+    static __qbTracked = true
+    constructor(url: string | URL, protocols?: string | string[]) {
+      super(url, protocols)
+      if (String(url).includes('BidiGenerateContent')) lastLiveSocket = this
+    }
+  }
+  window.WebSocket = Tracked as unknown as typeof WebSocket
+}
 
 // Every AI Logic request waits for a valid App Check token first (resolves at once once one is cached).
 async function appCheckReady(): Promise<void> {
@@ -114,6 +136,9 @@ export async function connectLiveViaAiLogic(modelName: string, config: LiveConfi
     throw e
   }
   cb.onopen()
+  const socket = lastLiveSocket
+  let closeInfo: { code?: number; reason?: string } | null = null
+  socket?.addEventListener('close', (e) => { closeInfo = { code: e.code, reason: e.reason } }, { once: true })
 
   // Translate Firebase's messages into the @google/genai shape liveSession.ts already handles.
   void (async () => {
@@ -135,7 +160,9 @@ export async function connectLiveViaAiLogic(modelName: string, config: LiveConfi
           cb.onmessage({ sessionResumptionUpdate: { newHandle: (m as { newHandle?: string }).newHandle } } as unknown as LiveServerMessage)
         }
       }
-      cb.onclose({ code: 1000, reason: 'stream ended' })
+      // Give the socket's close event a moment to land so the real code and reason are reported.
+      await new Promise((r) => setTimeout(r, 50))
+      cb.onclose(closeInfo ?? { code: 1000, reason: 'stream ended' })
     } catch (e) {
       cb.onerror(e)
       cb.onclose({ code: 1011, reason: String(e) })

@@ -1,5 +1,7 @@
-import { getAuth, linkWithPhoneNumber, RecaptchaVerifier, signInAnonymously, type ConfirmationResult } from 'firebase/auth'
+import { getAuth, linkWithPhoneNumber, PhoneAuthProvider, RecaptchaVerifier, signInAnonymously, signInWithCredential, signInWithPhoneNumber, type ConfirmationResult, type User } from 'firebase/auth'
+import type { FirebaseError } from 'firebase/app'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { setCallerUid } from '../../../shared/incidents/client.ts'
 import { app, db } from './firebase'
 
 // Epic 31: who is calling. Every install signs in anonymously (invisible, no prompt), so all calls from one phone
@@ -55,13 +57,25 @@ export const saveContacts = (contacts: CallerProfile['contacts']) => saveProfile
 let verifier: RecaptchaVerifier | null = null
 export async function sendOtp(phoneE164: string, buttonId: string): Promise<ConfirmationResult> {
   await callerReady()
-  if (!auth.currentUser) throw new Error('Not signed in')
   verifier?.clear()
   verifier = new RecaptchaVerifier(auth, buttonId, { size: 'invisible' })
-  return linkWithPhoneNumber(auth.currentUser, phoneE164, verifier)
+  // Normally the number is linked to this phone's anonymous caller id; if anonymous sign-in wasn't available,
+  // signing in with the phone number gives the device its id instead.
+  return auth.currentUser ? linkWithPhoneNumber(auth.currentUser, phoneE164, verifier) : signInWithPhoneNumber(auth, phoneE164, verifier)
 }
 
 export async function confirmOtp(confirmation: ConfirmationResult, code: string): Promise<void> {
-  const cred = await confirmation.confirm(code)
-  await saveProfile({ phone: cred.user.phoneNumber, phoneVerifiedAt: new Date().toISOString() })
+  let user: User
+  try {
+    user = (await confirmation.confirm(code)).user
+  } catch (e) {
+    // This number was verified before on another device or browser: sign back into that account instead, so its
+    // trusted contacts and call history come back. (The new anonymous id is simply left unused.)
+    const old = (e as FirebaseError).code === 'auth/credential-already-in-use' ? PhoneAuthProvider.credentialFromError(e as FirebaseError) : null
+    if (!old) throw e
+    user = (await signInWithCredential(auth, old)).user
+  }
+  ready = Promise.resolve(user.uid)
+  setCallerUid(user.uid)
+  await saveProfile({ phone: user.phoneNumber, phoneVerifiedAt: new Date().toISOString() })
 }
