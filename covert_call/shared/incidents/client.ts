@@ -3,7 +3,7 @@ import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
 import { deriveSeverity, deriveRecommendation, describeSeverityChange, maxSeverity } from './severity.ts'
 import { decodePlateRegion, normalisePlate } from './plate.ts'
-import type { Channel, FieldConfidence, Incident, ResponderMessage, RoughLocation } from './types.ts'
+import type { Channel, FieldConfidence, Incident, MotionKind, ResponderMessage, RoughLocation } from './types.ts'
 
 // Write side of the incident pipeline (Epic 3), called by the QuickBite app. The dashboard only reads.
 
@@ -15,6 +15,9 @@ export const DEMO_INCIDENTS = 'demoIncidents'
 export let INCIDENTS = LIVE_INCIDENTS
 export const setDemoMode = (on: boolean) => { INCIDENTS = on ? DEMO_INCIDENTS : LIVE_INCIDENTS }
 export const isDemoMode = () => INCIDENTS === DEMO_INCIDENTS
+// Epic 31: the caller's anonymous device id, set once the app signs in; every new incident carries it.
+let callerUid: string | null = null
+export const setCallerUid = (uid: string | null) => { callerUid = uid }
 
 const GPS_WAIT_MS = 5_000
 const now = () => new Date().toISOString()
@@ -78,6 +81,7 @@ export async function startIncident(
     leakageCheckStatus: { reviewed: false, redactions: [] },
     severity: opts.severity ?? 'low',
     ...(isDemoMode() ? { isDemo: true } : {}),
+    ...(callerUid ? { callerUid } : {}),
     response: { status: 'new', acknowledgedBy: null, acknowledgedAt: null, resolvedAt: null, notes: [], viewedAt: null, viewedBy: null },
   }
   await setDoc(ref(db, id), initial)
@@ -386,6 +390,30 @@ export function recordCoercionSignal(
     const update: Record<string, unknown> = { coercionSignals: [...(current.coercionSignals ?? []), entry] }
     if ((signal.confidence ?? 0) >= 60) {
       const di = [...new Set([...current.extractedFieldsLive.dangerIndicators, `possible coercion: ${signal.kind}`])]
+      update['extractedFieldsLive.dangerIndicators'] = di
+      const merged = { ...current.extractedFieldsLive, dangerIndicators: di }
+      update.severity = maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore))
+      update.recommendation = deriveRecommendation(merged, update.severity as Incident['severity'])
+    }
+    tx.update(ref(db, id), update)
+  })
+}
+
+// Epic 30: a motion event from the caller's phone. Snatched / fall also become danger tags, so they show on the
+// Threat card and lift severity through the normal path; running and still are context for the responder.
+const MOTION_TAG: Partial<Record<MotionKind, string>> = {
+  snatched: 'phone snatched or thrown (motion sensor)',
+  fall: 'possible fall or phone dropped (motion sensor)',
+}
+export function recordMotionEvent(db: Firestore, id: string, ev: { kind: MotionKind; peakG?: number }): Promise<void> {
+  return runTransactionWithRetry(db, async (tx) => {
+    const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
+    if (!current) throw new Error(`Incident ${id} not found`)
+    const entry = { kind: ev.kind, at: now(), peakG: ev.peakG ?? null }
+    const update: Record<string, unknown> = { motionEvents: [...(current.motionEvents ?? []), entry].slice(-50) }
+    const tag = MOTION_TAG[ev.kind]
+    if (tag) {
+      const di = [...new Set([...current.extractedFieldsLive.dangerIndicators, tag])]
       update['extractedFieldsLive.dangerIndicators'] = di
       const merged = { ...current.extractedFieldsLive, dangerIndicators: di }
       update.severity = maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore))

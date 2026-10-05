@@ -1224,3 +1224,18 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .sk-facts li.danger::before { background: var(--high); } .sk-facts li.ok::before { background: var(--live); } .sk-facts li.route::before { background: #1a73e8; }
 .sk-facts li.unknown { border-style: dashed; color: var(--muted); font-weight: 500; }
 .sk-facts em { margin-left: auto; font-style: normal; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+/* Caller check (Epic 31): device / verified number, AI credibility, responder finding */
+.cc-ok { font-size: 11px; font-weight: 700; color: var(--live); margin-left: 4px; }
+.cc-warn { color: var(--high); font-weight: 600; }
+.cc-ai { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; }
+.cc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cc-head .btn { margin-left: auto; }
+.cc-title { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cc-badge { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; }
+.cc-likely-genuine { background: rgba(47, 158, 68, .12); color: var(--live); }
+.cc-uncertain { background: rgba(196, 118, 0, .14); color: var(--medium); }
+.cc-possible-false { background: rgba(217, 42, 63, .12); color: var(--high); }
+.cc-reasons { margin: 8px 0 4px; padding-left: 18px; font-size: 13px; display: grid; gap: 3px; }
+.cc-outcome { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.mc-chip.on { border-color: var(--accent); background: var(--accent); color: #fff; }

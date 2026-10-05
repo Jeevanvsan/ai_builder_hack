@@ -1302,3 +1302,15 @@ img {
 .demo-transcript { max-height: 260px; overflow-y: auto; }
 .demo-transcript p { margin: 0 0 6px; }
 .demo-result .primary-btn { flex: none; height: auto; min-height: 48px; margin-top: 4px; }
+
+/* My account (Epic 31/32): mobile OTP + "share live order updates" contacts */
+.account-help { margin: 0 0 10px; font-size: 13px; }
+.account-row, .account-contact { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.account-contact { flex-wrap: wrap; }
+.account-contact .account-input { flex: 1 1 140px; }
+.account-prefix { font-weight: 600; color: var(--muted); }
+.account-input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--card); color: var(--ink); }
+.account-btn { width: auto; padding: 10px 14px; white-space: nowrap; }
+.account-save { margin-top: 6px; }
+.account-verified { margin: 0; font-weight: 600; }
+.account-msg { margin: 8px 0 0; font-size: 13px; color: var(--muted); }

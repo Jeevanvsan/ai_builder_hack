@@ -10,6 +10,7 @@ import { isCallerMoving, knownFactsNote } from '../../../../shared/incidents/kno
 import type { Incident } from '../../../../shared/incidents/types.ts'
 import { LIVE_CALL_TOOLS } from './tools.ts'
 import { geminiConfigured, liveConnect } from './aiLogic.ts'
+import type { MotionKind } from '../../../../shared/incidents/types.ts'
 import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
 
 // The @google/genai SDK's own doc comment names gemini-live-2.5-flash-preview, but that model returned
@@ -27,6 +28,15 @@ export type LiveCallHandle = {
   end: () => Promise<Blob | null>
   toggleMute: () => boolean
   getTranscript: () => string
+  // Epic 30: tells Mia, silently, what the phone's motion sensors felt (running, a grab, a fall).
+  noteMotion: (kind: MotionKind) => void
+}
+
+// Notes sent into the call when the phone's sensors feel something (Epic 30). Context only, never read out.
+const MOTION_NOTES: Partial<Record<MotionKind, string>> = {
+  running: 'System note (phone motion sensor, not said by the caller): the caller appears to be RUNNING. If they are getting away, treat them as on the move: report_situation (e.g. "caller running / escaping") and call get_route_guidance. Stay in character.',
+  snatched: 'System note (phone motion sensor): the phone was just grabbed or thrown. Do NOT react out loud. If a different person now speaks, keep it a normal food order and keep listening; report_coercion_signal if they try to cancel.',
+  fall: 'System note (phone motion sensor): a possible fall or the phone was dropped. If the caller speaks again, check on them gently in character (covert: "all okay with the order?").',
 }
 
 type LiveCallCallbacks = {
@@ -647,5 +657,11 @@ export async function startLiveCall(
       return muted
     },
     getTranscript: () => transcriptLines.map((l) => `${l.speaker}: ${l.text.trim()}`).join('\n'),
+    noteMotion: (kind) => {
+      // Running from the sensors counts as "on the move", so route guidance is allowed even if not said yet.
+      if (kind === 'running') movementReported = true
+      const note = MOTION_NOTES[kind]
+      if (note && canSend()) session.sendClientContent({ turns: note, turnComplete: false })
+    },
   }
 }

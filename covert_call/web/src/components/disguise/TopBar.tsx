@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { requestMotionPermission } from '../../lib/motion'
 import { useNavigate } from 'react-router-dom'
 import { DELIVERY_ADDRESS } from '../../data/menu'
 import { APP_NAME } from '../../lib/brand'
@@ -14,6 +15,8 @@ export function TopBar() {
     const now = Date.now()
     if (now - lastTapRef.current < 400) {
       lastTapRef.current = 0
+      // iOS only shares motion data after a prompt from a real tap (Epic 30).
+      void requestMotionPermission()
       navigate('/sos')
     } else {
       lastTapRef.current = now
@@ -49,7 +52,7 @@ export function TopBar() {
           <button type="button" className="icon-btn" aria-label="Favourites" onClick={onHeartTap}>
             <HeartIcon size={19} />
           </button>
-          <button type="button" className="icon-btn avatar" aria-label="Account">
+          <button type="button" className="icon-btn avatar" aria-label="Account" onClick={() => navigate('/account')}>
             <UserIcon size={18} />
           </button>
         </div>
