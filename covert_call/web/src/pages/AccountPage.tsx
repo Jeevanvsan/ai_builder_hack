@@ -31,7 +31,11 @@ export function AccountPage() {
       setConfirmation(await sendOtp(`+91${digits}`, 'otp-send'))
       setPhoneMsg(`OTP sent to +91 ${digits}.`)
     } catch (e) {
-      setPhoneMsg(/already|in-use/i.test(String(e)) ? 'This number is already linked to another account.' : "Couldn't send the OTP. Try again in a minute.")
+      console.warn('[QuickBite] OTP send failed:', e)
+      const err = String(e)
+      setPhoneMsg(/already|in-use/i.test(err) ? 'This number is already linked to another account.'
+        : /quota|too-many/i.test(err) ? 'Too many OTPs today. Please try again tomorrow.'
+          : "Couldn't send the OTP. Try again in a minute.")
     } finally { setBusy(false) }
   }
 
@@ -93,13 +97,16 @@ export function AccountPage() {
         <p className="muted account-help">Family or friends who should get your live order status by email. Up to 3.</p>
         {contacts.map((c, i) => (
           <div key={i} className="account-contact">
-            <input className="account-input" placeholder="Name" value={c.name} onChange={(e) => setContact(i, { name: e.target.value })} />
-            <input className="account-input" type="email" placeholder="Email" value={c.email} onChange={(e) => setContact(i, { email: e.target.value })} />
-            <button type="button" className="link-btn" onClick={() => setContacts((cs) => cs.filter((_, j) => j !== i))}>Remove</button>
+            <div className="account-contact-head">
+              <span>Person {i + 1}</span>
+              <button type="button" className="link-btn" onClick={() => setContacts((cs) => cs.filter((_, j) => j !== i))}>Remove</button>
+            </div>
+            <input className="account-input" placeholder="Name" autoComplete="name" value={c.name} onChange={(e) => setContact(i, { name: e.target.value })} />
+            <input className="account-input" type="email" placeholder="Email" autoComplete="email" value={c.email} onChange={(e) => setContact(i, { email: e.target.value })} />
           </div>
         ))}
         {contacts.length < 3 && (
-          <button type="button" className="link-btn" onClick={() => setContacts((cs) => [...cs, { name: '', email: '' }])}>+ Add someone</button>
+          <button type="button" className="link-btn account-add" onClick={() => setContacts((cs) => [...cs, { name: '', email: '' }])}>+ Add someone</button>
         )}
         <button type="button" className="primary-btn account-save" onClick={() => void saveAll()}>Save</button>
         {contactMsg && <p className="account-msg">{contactMsg}</p>}
