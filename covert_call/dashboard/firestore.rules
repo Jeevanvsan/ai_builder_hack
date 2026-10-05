@@ -12,6 +12,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Epic 31: QuickBite callers now sign in anonymously too, so "signed in" no longer means "responder". Every
+    // responder-only rule uses this: an email account with an active responders/ record.
+    function isResponder() {
+      return isSignedIn()
+        && 'email' in request.auth.token
+        && exists(/databases/$(database)/documents/responders/$(request.auth.token.email))
+        && get(/databases/$(database)/documents/responders/$(request.auth.token.email)).data.status == 'active';
+    }
+
     function myResponderDoc() {
       return get(/databases/$(database)/documents/responders/$(myResponderId()));
     }
@@ -47,7 +56,7 @@ service cloud.firestore {
 
     // Document id = responder's email (stable, known upfront by whoever adds them; no Admin SDK UID lookup needed).
     match /responders/{email} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && 'email' in request.auth.token;
       allow create: if validResponder(request.resource.data) && request.resource.data.email == email
         && (isAdmin() || (isBootstrapAdmin(email) && request.resource.data.role == 'admin' && request.resource.data.status == 'active'));
       allow update: if isAdmin() && validResponder(request.resource.data) && request.resource.data.email == email;
@@ -64,8 +73,8 @@ service cloud.firestore {
     }
 
     match /analytics/aiInsights {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && validAiInsights(request.resource.data);
+      allow read: if isResponder();
+      allow write: if isResponder() && validAiInsights(request.resource.data);
     }
 
     function statusRank(s) {
@@ -85,7 +94,7 @@ service cloud.firestore {
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
           'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven',
-          'videoControl', 'vehicle', 'coercionSignals', 'isDemo'
+          'videoControl', 'vehicle', 'coercionSignals', 'motionEvents', 'isDemo', 'callerUid', 'credibility'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -134,7 +143,13 @@ service cloud.firestore {
         && (!('vehicle' in d) || (d.vehicle is map && d.vehicle.number is string && d.vehicle.number.size() <= 20
           && d.vehicle.source in ['caller', 'camera']))
         && (!('coercionSignals' in d) || (d.coercionSignals is list && d.coercionSignals.size() <= 100))
-        && (!('isDemo' in d) || d.isDemo is bool);
+        && (!('motionEvents' in d) || (d.motionEvents is list && d.motionEvents.size() <= 50))
+        && (!('isDemo' in d) || d.isDemo is bool)
+        // Epic 31: the caller's anonymous id (never their number) and the AI credibility check.
+        && (!('callerUid' in d) || (d.callerUid is string && d.callerUid.size() <= 128))
+        && (!('credibility' in d) || (d.credibility is map && d.credibility.score is number
+          && d.credibility.level in ['likely-genuine', 'uncertain', 'possible-false'] && d.credibility.reasons is list))
+        && (!('outcome' in d.response) || d.response.outcome in [null, 'genuine', 'false-alarm', 'prank']);
     }
 
     // Only forward progress: status never goes back (resolved stays resolved), an ended call never goes live
@@ -144,6 +159,7 @@ service cloud.firestore {
         && !(before.callState == 'ended' && after.callState == 'active')
         && after.sessionStartedAt == before.sessionStartedAt
         && after.channel == before.channel
+        && after.get('callerUid', null) == before.get('callerUid', null)
         && after.response.notes.size() >= before.response.notes.size()
         && (!('voiceStressTrend' in before) || after.voiceStressTrend.size() >= before.voiceStressTrend.size())
         && (!('reasoningTrace' in before) || after.reasoningTrace.size() >= before.reasoningTrace.size())
@@ -157,14 +173,29 @@ service cloud.firestore {
         || before.response.notes != after.response.notes
         || before.response.get('acknowledgedBy', null) != after.response.get('acknowledgedBy', null)
         || before.response.get('viewedAt', null) != after.response.get('viewedAt', null)
-        || before.get('videoControl', null) != after.get('videoControl', null);
+        || before.get('videoControl', null) != after.get('videoControl', null)
+        || before.get('credibility', null) != after.get('credibility', null)
+        || before.response.get('outcome', null) != after.response.get('outcome', null);
+    }
+
+    // Epic 31: a caller's profile. Only that caller writes it; only responders (and the caller) read it. The phone
+    // number must be the one Firebase verified by OTP for this account, so it can't be made up.
+    match /callers/{uid} {
+      allow read: if (isSignedIn() && request.auth.uid == uid) || isResponder();
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['phone', 'phoneVerifiedAt', 'contacts', 'updatedAt'])
+        && (!('phone' in request.resource.data) || request.resource.data.phone == null
+          || request.resource.data.phone == request.auth.token.get('phone_number', ''))
+        && (!('contacts' in request.resource.data) || (request.resource.data.contacts is list && request.resource.data.contacts.size() <= 3));
+      allow delete: if false;
     }
 
     // Epic 25: hidden demo calls. Same shape as a real incident so the call code is identical, but in its own
     // collection that the dashboard never reads. No responder fields are ever written here, and nothing is deleted.
     match /demoIncidents/{incidentId} {
       allow read: if true;
-      allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data);
+      allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data)
+        && (!('callerUid' in request.resource.data) || (isSignedIn() && request.resource.data.callerUid == request.auth.uid));
       allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
         && !changesResponderFields(resource.data, request.resource.data);
       allow delete: if false;
@@ -177,16 +208,17 @@ service cloud.firestore {
 
     match /incidents/{incidentId} {
       allow read: if true;
-      allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data);
+      allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data)
+        && (!('callerUid' in request.resource.data) || (isSignedIn() && request.resource.data.callerUid == request.auth.uid));
       allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
-        && (!changesResponderFields(resource.data, request.resource.data) || request.auth != null);
+        && (!changesResponderFields(resource.data, request.resource.data) || isResponder());
       allow delete: if false;
 
       // Epic 23: responder -> caller messages, relayed by Mia. Only a signed-in responder can send one. The
       // QuickBite app (unauthenticated) may only flip a pending message to delivered and record what Mia said.
       match /messages/{messageId} {
         allow read: if true;
-        allow create: if isSignedIn()
+        allow create: if isResponder()
           && request.resource.data.keys().hasOnly(['text', 'sentBy', 'sentAt', 'status'])
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300
           && request.resource.data.sentBy is string && request.resource.data.sentAt is string
@@ -202,7 +234,7 @@ service cloud.firestore {
       // by the QuickBite app on call end (same trust model as the incident doc itself); read is restricted to
       // signed-in responders since raw audio is far more sensitive than the extracted text fields.
       match /recording/{docId} {
-        allow read: if isSignedIn();
+        allow read: if isResponder();
         allow create: if docId == 'audio'
           && request.resource.data.keys().hasOnly(['base64', 'mimeType', 'savedAt'])
           && request.resource.data.base64 is string && request.resource.data.base64.size() < 1400000

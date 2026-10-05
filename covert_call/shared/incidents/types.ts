@@ -114,6 +114,13 @@ export interface Incident {
   // Epic 24: signs the caller may be speaking under someone else's control (a second voice takes over, a sudden
   // flat or scripted tone, a forced "cancel"). Evidence for the responder; a confident one also lifts severity.
   coercionSignals?: { kind: string; detail: string; confidence?: number | null; at: string }[]
+  // Epic 30: what the caller's phone sensors felt (accelerometer), so a responder knows why a call went quiet:
+  // the phone grabbed, a fall, the caller running, or the phone suddenly going still.
+  motionEvents?: { kind: MotionKind; at: string; peakG?: number | null }[]
+  // Epic 31: the caller's anonymous device id (never their phone number, which lives in callers/{uid}), and the
+  // AI credibility check on whether this may be a false or prank call. Advisory only: never closes a case.
+  callerUid?: string
+  credibility?: { score: number; level: 'likely-genuine' | 'uncertain' | 'possible-false'; reasons: string[]; at: string }
   // Epic 25: set on every incident written by a hidden demo call. Demo incidents live in the separate
   // `demoIncidents` collection, which the dashboard never reads; this flag is a second safety net.
   isDemo?: boolean
@@ -164,11 +171,15 @@ export interface Incident {
     // First time any responder opened the incident; until then the dashboard highlights it as new.
     viewedAt?: string | null
     viewedBy?: string | null
+    // Epic 31: what the responder found, which builds the caller device's history.
+    outcome?: 'genuine' | 'false-alarm' | 'prank' | null
   }
 }
 
 // Epic 23: one responder -> caller message, stored in incidents/{id}/messages. Mia relays it on her next turn as
 // ordinary delivery chat and reports the exact words she used (spokenAs).
+export type MotionKind = 'snatched' | 'fall' | 'running' | 'still'
+
 export interface ResponderMessage {
   id: string
   text: string

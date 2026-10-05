@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, setDemoMode, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, recordMotionEvent, setDemoMode, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
@@ -17,6 +17,7 @@ import { acquireCallMedia, videoOnly } from '../lib/gemini/media'
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
+import { watchMotion, type MotionWatch } from '../lib/motion'
 import { demoCallsLeft, minutesUntilNextDemo, recordDemoCall } from '../lib/demo'
 
 // Caps a slow/hung best-effort step (an AI call with no timeout of its own) so it can never block the rest of
@@ -49,6 +50,7 @@ export function CallPage() {
   // recorder handle. All optional — the call runs audio-only if there's no camera.
   const mediaRef = useRef<MediaStream | null>(null)
   const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
+  const motionRef = useRef<MotionWatch | null>(null)
   const micPublisherStopRef = useRef<(() => Promise<void>) | null>(null)
   const videoRecRef = useRef<VideoRecorderHandle | null>(null)
   const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -94,6 +96,11 @@ export function CallPage() {
           },
         )
         callRef.current = handle
+        // Epic 30: phone motion (grabbed, fall, running) goes to the incident and, silently, to Mia.
+        motionRef.current = watchMotion((kind, peakG) => {
+          void recordMotionEvent(db, id, { kind, peakG }).catch(() => {})
+          callRef.current?.noteMotion(kind)
+        })
       } catch {
         setStatus('failed')
       }
@@ -158,6 +165,7 @@ export function CallPage() {
 
     const recording = await call?.end()
     // Stop the live feed (also marks video ended on the incident) and release the camera + mic.
+    motionRef.current?.stop()
     await publisherStopRef.current?.()
     await micPublisherStopRef.current?.()
     mediaRef.current?.getTracks().forEach((t) => t.stop())

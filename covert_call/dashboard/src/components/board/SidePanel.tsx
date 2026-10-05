@@ -12,6 +12,7 @@ import { channelLabel } from '../../lib/format'
 import Conversation from './Conversation'
 import DecodeText from './DecodeText'
 import SceneSketch from './SceneSketch'
+import CallerCheck from './CallerCheck'
 
 type Tab = 'conversation' | 'scene' | 'message' | 'case'
 const SUMMARY_WAIT_MS = 90_000
@@ -106,6 +107,8 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
                 <FactSheet incident={incident} />
               )}
             </section>
+
+            <CallerCheck incident={incident} live={live} />
 
             {incident.bulletin && <BulletinCard incidentId={incident.id} bulletin={incident.bulletin} callerEstimate={incident.callerEstimate} />}
 
