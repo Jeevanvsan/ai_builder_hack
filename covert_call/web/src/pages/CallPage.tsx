@@ -18,6 +18,7 @@ import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/vid
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
 import { watchMotion, type MotionWatch } from '../lib/motion'
+import { watchForTrustedAlert } from '../lib/trustedAlert'
 import { demoCallsLeft, minutesUntilNextDemo, recordDemoCall } from '../lib/demo'
 
 // Caps a slow/hung best-effort step (an AI call with no timeout of its own) so it can never block the rest of
@@ -51,6 +52,7 @@ export function CallPage() {
   const mediaRef = useRef<MediaStream | null>(null)
   const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
   const motionRef = useRef<MotionWatch | null>(null)
+  const alertStopRef = useRef<(() => void) | null>(null)
   const micPublisherStopRef = useRef<(() => Promise<void>) | null>(null)
   const videoRecRef = useRef<VideoRecorderHandle | null>(null)
   const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -80,6 +82,8 @@ export function CallPage() {
     void (async () => {
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
+      // Epic 32: email trusted contacts once if this call turns high severity.
+      alertStopRef.current = watchForTrustedAlert(db, id)
 
       // Open the mic and the back camera together (falls back to audio-only if there's no camera).
       const media = await acquireCallMedia()
@@ -166,6 +170,7 @@ export function CallPage() {
     const recording = await call?.end()
     // Stop the live feed (also marks video ended on the incident) and release the camera + mic.
     motionRef.current?.stop()
+    alertStopRef.current?.()
     await publisherStopRef.current?.()
     await micPublisherStopRef.current?.()
     mediaRef.current?.getTracks().forEach((t) => t.stop())

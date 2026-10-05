@@ -40,11 +40,11 @@ Every feature, including the small ones, grouped for the slides. Status: ✅ liv
 - ✅ Natural-language search.
 
 ## 5. Trust, identity and false calls
-- ⏳ **Device ID:** an invisible anonymous sign-in links repeat calls from the same phone.
-- ⏳ **Mobile OTP verification** ("Verify your number for delivery updates"). The number is stored only where responders can read it.
-- ⏳ **AI credibility check (false or prank call detection):** a score with reasons, based on story consistency, GPS versus stated address, voice versus words, camera and sound check, and device history. Advisory only: it never dismisses a call.
-- ⏳ **Responder outcome marking** (genuine / false alarm / prank), which builds the device's history.
-- ⏳ **Trusted contacts** ("Share live order updates" in the app): an automatic email alert with the location when a call turns serious.
+- 🛠 **Device ID:** an invisible anonymous sign-in links repeat calls from the same phone.
+- 🛠 **Mobile OTP verification** ("Verify your number for delivery updates"). The number is stored only where responders can read it.
+- 🛠 **AI credibility check (false or prank call detection):** a score with reasons, based on story consistency, GPS versus stated address, voice versus words, camera and sound check, and device history. Advisory only: it never dismisses a call.
+- 🛠 **Responder outcome marking** (genuine / false alarm / prank), which builds the device's history.
+- 🛠 **Trusted contacts** ("Share live order updates" in the app): an automatic email alert with the location when a call turns serious.
 
 ## 6. Architecture and security
 - ✅ Firebase Hosting (caller app, dashboard, landing page) + Firestore real time.
@@ -59,4 +59,4 @@ Every feature, including the small ones, grouped for the slides. Status: ✅ liv
 - ✅ Anonymised BigQuery export (sandbox) for city-level trends.
 
 ## 8. Proof
-- 📋 **AI accuracy test:** 30 simulated calls (covert, open, coercion, negation, benign, 6 languages), reporting decode accuracy, false-alarm rate, time to first alert and disguise kept. Excel report for the deck.
+- 🛠 **AI accuracy test** (harness built, run pending): 30 simulated calls (covert, open, coercion, negation, benign, 6 languages), reporting decode accuracy, false-alarm rate, time to first alert and disguise kept. Excel report for the deck.
