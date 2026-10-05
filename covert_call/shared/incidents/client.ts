@@ -1,12 +1,23 @@
-import { arrayUnion, doc, getDoc, runTransaction, setDoc, updateDoc, type Firestore, type Transaction } from 'firebase/firestore'
+import { addDoc, arrayUnion, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, setDoc, updateDoc, type Firestore, type Transaction } from 'firebase/firestore'
 import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
 import { deriveSeverity, deriveRecommendation, describeSeverityChange, maxSeverity } from './severity.ts'
-import type { Channel, FieldConfidence, Incident, RoughLocation } from './types.ts'
+import { decodePlateRegion, normalisePlate } from './plate.ts'
+import type { Channel, FieldConfidence, Incident, MotionKind, ResponderMessage, RoughLocation } from './types.ts'
 
 // Write side of the incident pipeline (Epic 3), called by the QuickBite app. The dashboard only reads.
 
-export const INCIDENTS = 'incidents'
+// Epic 25: a hidden demo call runs the exact same code as a real call but writes to a separate collection that
+// the dashboard never reads, so testers and judges can try it without alerting responders. `let` on purpose:
+// every importer reads INCIDENTS at call time, so flipping it here redirects every write and listener at once.
+export const LIVE_INCIDENTS = 'incidents'
+export const DEMO_INCIDENTS = 'demoIncidents'
+export let INCIDENTS = LIVE_INCIDENTS
+export const setDemoMode = (on: boolean) => { INCIDENTS = on ? DEMO_INCIDENTS : LIVE_INCIDENTS }
+export const isDemoMode = () => INCIDENTS === DEMO_INCIDENTS
+// Epic 31: the caller's anonymous device id, set once the app signs in; every new incident carries it.
+let callerUid: string | null = null
+export const setCallerUid = (uid: string | null) => { callerUid = uid }
 
 const GPS_WAIT_MS = 5_000
 const now = () => new Date().toISOString()
@@ -69,6 +80,8 @@ export async function startIncident(
     voiceStressTrend: [],
     leakageCheckStatus: { reviewed: false, redactions: [] },
     severity: opts.severity ?? 'low',
+    ...(isDemoMode() ? { isDemo: true } : {}),
+    ...(callerUid ? { callerUid } : {}),
     response: { status: 'new', acknowledgedBy: null, acknowledgedAt: null, resolvedAt: null, notes: [], viewedAt: null, viewedBy: null },
   }
   await setDoc(ref(db, id), initial)
@@ -341,4 +354,88 @@ export function recordGroundedContext(db: Firestore, id: string, context: string
 // Epic 19.1: best-effort, separate from consolidateIncident() for the same reason as groundedContext above.
 export function recordCorrelatedIncidents(db: Firestore, id: string, matchIds: string[]): Promise<void> {
   return updateDoc(ref(db, id), { correlatedIncidentIds: matchIds })
+}
+
+// Epic 22.3: the suspect's number plate, from the caller or read off the camera. Plain overwrite with the latest,
+// but a camera read never replaces something the caller confirmed. Region is decoded offline from the prefix;
+// there is deliberately NO owner lookup (owner details belong to VAHAN and authorised agencies only).
+export function recordVehicleNumber(
+  db: Firestore,
+  id: string,
+  v: { value: string; source: 'caller' | 'camera'; confidence?: number },
+): Promise<void> {
+  return runTransactionWithRetry(db, async (tx) => {
+    const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
+    if (!current) throw new Error(`Incident ${id} not found`)
+    if (current.vehicle?.source === 'caller' && v.source === 'camera') return
+    const number = normalisePlate(v.value)
+    if (!number) return
+    tx.update(ref(db, id), {
+      vehicle: { number, region: decodePlateRegion(number), source: v.source, confidence: v.confidence ?? null, at: now() },
+    })
+  })
+}
+
+// Epic 24: a sign the caller may be speaking under someone else's control. Logged as evidence; a confident one
+// also becomes a danger indicator so severity rises through the normal path (deriveSeverity treats it as critical).
+export function recordCoercionSignal(
+  db: Firestore,
+  id: string,
+  signal: { kind: string; detail?: string; confidence?: number },
+): Promise<void> {
+  return runTransactionWithRetry(db, async (tx) => {
+    const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
+    if (!current) throw new Error(`Incident ${id} not found`)
+    const entry = { kind: signal.kind, detail: signal.detail?.trim() ?? '', confidence: signal.confidence ?? null, at: now() }
+    const update: Record<string, unknown> = { coercionSignals: [...(current.coercionSignals ?? []), entry] }
+    if ((signal.confidence ?? 0) >= 60) {
+      const di = [...new Set([...current.extractedFieldsLive.dangerIndicators, `possible coercion: ${signal.kind}`])]
+      update['extractedFieldsLive.dangerIndicators'] = di
+      const merged = { ...current.extractedFieldsLive, dangerIndicators: di }
+      update.severity = maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore))
+      update.recommendation = deriveRecommendation(merged, update.severity as Incident['severity'])
+    }
+    tx.update(ref(db, id), update)
+  })
+}
+
+// Epic 30: a motion event from the caller's phone. Snatched / fall also become danger tags, so they show on the
+// Threat card and lift severity through the normal path; running and still are context for the responder.
+const MOTION_TAG: Partial<Record<MotionKind, string>> = {
+  snatched: 'phone snatched or thrown (motion sensor)',
+  fall: 'possible fall or phone dropped (motion sensor)',
+}
+export function recordMotionEvent(db: Firestore, id: string, ev: { kind: MotionKind; peakG?: number }): Promise<void> {
+  return runTransactionWithRetry(db, async (tx) => {
+    const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
+    if (!current) throw new Error(`Incident ${id} not found`)
+    const entry = { kind: ev.kind, at: now(), peakG: ev.peakG ?? null }
+    const update: Record<string, unknown> = { motionEvents: [...(current.motionEvents ?? []), entry].slice(-50) }
+    const tag = MOTION_TAG[ev.kind]
+    if (tag) {
+      const di = [...new Set([...current.extractedFieldsLive.dangerIndicators, tag])]
+      update['extractedFieldsLive.dangerIndicators'] = di
+      const merged = { ...current.extractedFieldsLive, dangerIndicators: di }
+      update.severity = maxSeverity(current.severity, deriveSeverity(merged, current.voiceStressScore))
+      update.recommendation = deriveRecommendation(merged, update.severity as Incident['severity'])
+    }
+    tx.update(ref(db, id), update)
+  })
+}
+
+// Epic 23: responder -> caller messages, relayed by Mia as ordinary delivery chat.
+const messagesCol = (db: Firestore, id: string) => collection(db, INCIDENTS, id, 'messages')
+
+export function sendResponderMessage(db: Firestore, id: string, text: string, sentBy: string): Promise<unknown> {
+  return addDoc(messagesCol(db, id), { text: text.trim(), sentBy, sentAt: now(), status: 'pending' })
+}
+
+export function subscribeResponderMessages(db: Firestore, id: string, onChange: (messages: ResponderMessage[]) => void): () => void {
+  return onSnapshot(query(messagesCol(db, id), orderBy('sentAt')), (snap) =>
+    onChange(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ResponderMessage, 'id'>) }))),
+  )
+}
+
+export function markMessageDelivered(db: Firestore, id: string, messageId: string, spokenAs: string): Promise<void> {
+  return updateDoc(doc(db, INCIDENTS, id, 'messages', messageId), { status: 'delivered', spokenAs: spokenAs.trim(), deliveredAt: now() })
 }

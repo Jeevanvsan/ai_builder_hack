@@ -1,0 +1,87 @@
+# Publishes the Android build that is in the team Drive folder as a new GitHub release.
+# Run it from GitHub: Actions -> "Release Android APK" -> Run workflow.
+#
+# The landing page's Download button links to releases/latest/download/QuickBite.apk, so every run of this
+# workflow updates what visitors download without redeploying the site.
+#
+# Drive folder rule: keep exactly ONE .apk in the folder (the build you want to release). The workflow stops
+# if it finds none or more than one, rather than guessing which one is current.
+name: Release Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, e.g. v1.2 (leave empty to bump the last one automatically)'
+        required: false
+        default: ''
+      notes:
+        description: 'Release notes (optional)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  # Public "QuickByte Demo Videos > apk" folder (shared as "Anyone with the link can view").
+  DRIVE_FOLDER_ID: 1ovw9EAIsWWFtRCUr-Okg38cuvWFYdOaj
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # gdown handles Drive's "file too large to scan for viruses" confirmation that plain curl can't.
+      - name: Download the APK from Drive
+        run: |
+          pip install --quiet gdown
+          gdown --folder "https://drive.google.com/drive/folders/${DRIVE_FOLDER_ID}" -O drive
+          mapfile -t apks < <(find drive -type f -iname '*.apk')
+          if [ "${#apks[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one .apk in the Drive folder, found ${#apks[@]}: ${apks[*]}"
+            exit 1
+          fi
+          cp "${apks[0]}" QuickBite.apk
+          # An APK is a zip: refuse to publish an HTML error page saved under an .apk name.
+          if [ "$(head -c 2 QuickBite.apk)" != "PK" ]; then
+            echo "::error::The downloaded file is not a valid APK"
+            exit 1
+          fi
+          echo "Source file: ${apks[0]} ($(du -h QuickBite.apk | cut -f1))"
+
+      - name: Pick the version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            v="$INPUT_VERSION"
+          else
+            last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName // ""')
+            if [ -z "$last" ]; then
+              v="v1.0"
+            else
+              # v1.4 -> v1.5
+              v=$(echo "$last" | awk -F. '{ $NF = $NF + 1; print }' OFS=.)
+            fi
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Releasing $v"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          gh release create "$VERSION" QuickBite.apk \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "QuickBite Android $VERSION" \
+            --notes "${NOTES:-Android build of QuickBite, published from the team Drive folder.}" \
+            --latest

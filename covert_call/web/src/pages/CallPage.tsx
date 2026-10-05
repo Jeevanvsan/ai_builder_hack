@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, recordMotionEvent, setDemoMode, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
@@ -17,6 +17,9 @@ import { acquireCallMedia, videoOnly } from '../lib/gemini/media'
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
+import { watchMotion, type MotionWatch } from '../lib/motion'
+import { watchForTrustedAlert } from '../lib/trustedAlert'
+import { demoCallsLeft, minutesUntilNextDemo, recordDemoCall } from '../lib/demo'
 
 // Caps a slow/hung best-effort step (an AI call with no timeout of its own) so it can never block the rest of
 // call teardown — see the call site for what this fixed.
@@ -37,12 +40,19 @@ export function CallPage() {
   const [status, setStatus] = useState<CallStatus>('connecting')
   const [muted, setMuted] = useState(false)
   const [seconds, setSeconds] = useState(0)
+  // Epic 25: a hidden demo call (long-press the logo) runs the real call but writes to demoIncidents, which the
+  // dashboard never reads, and ends on a "what the responder would see" card instead of the zero-trace exit.
+  const [params] = useSearchParams()
+  const isDemo = params.get('demo') === '1'
+  const [demoBlocked] = useState(() => isDemo && demoCallsLeft() === 0)
   const incidentIdRef = useRef<string | null>(null)
   const callRef = useRef<LiveCallHandle | null>(null)
   // Back-camera video (Epic 9): the shared mic+camera stream, the live-feed publisher's stop fn, and the Drive
   // recorder handle. All optional — the call runs audio-only if there's no camera.
   const mediaRef = useRef<MediaStream | null>(null)
   const publisherStopRef = useRef<(() => Promise<void>) | null>(null)
+  const motionRef = useRef<MotionWatch | null>(null)
+  const alertStopRef = useRef<(() => void) | null>(null)
   const micPublisherStopRef = useRef<(() => Promise<void>) | null>(null)
   const videoRecRef = useRef<VideoRecorderHandle | null>(null)
   const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -62,12 +72,18 @@ export function CallPage() {
     // even finishes — tears down the one real call almost immediately after it connects. There is deliberately
     // no unmount cleanup here beyond this guard: the call's real end-of-life path is the End button
     // (finishCall) or the browser tab closing (which the OS cleans up regardless).
-    if (cartHadItemsOnMount.current || startedRef.current) return
+    if (cartHadItemsOnMount.current || startedRef.current || demoBlocked) return
     startedRef.current = true
+    if (isDemo) {
+      setDemoMode(true)
+      recordDemoCall()
+    }
 
     void (async () => {
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
+      // Epic 32: email trusted contacts once if this call turns high severity.
+      alertStopRef.current = watchForTrustedAlert(db, id)
 
       // Open the mic and the back camera together (falls back to audio-only if there's no camera).
       const media = await acquireCallMedia()
@@ -84,6 +100,11 @@ export function CallPage() {
           },
         )
         callRef.current = handle
+        // Epic 30: phone motion (grabbed, fall, running) goes to the incident and, silently, to Mia.
+        motionRef.current = watchMotion((kind, peakG) => {
+          void recordMotionEvent(db, id, { kind, peakG }).catch(() => {})
+          callRef.current?.noteMotion(kind)
+        })
       } catch {
         setStatus('failed')
       }
@@ -91,7 +112,7 @@ export function CallPage() {
       // Publish the caller's raw mic audio one-way, so a responder can listen live from the dashboard (separate
       // from — and never sent back through — the caller's own call audio to Gemini). Best-effort: a blocked
       // connection just means no listen-in, never blocks the call itself.
-      if (media?.stream) {
+      if (media?.stream && !isDemo) {
         try {
           const micOnly = new MediaStream(media.stream.getAudioTracks())
           micPublisherStopRef.current = await startVideoPublisher(db, id, micOnly, { camera: 'mic' })
@@ -102,7 +123,7 @@ export function CallPage() {
 
       // With a camera: stream it live to the dashboard, and (if Drive is configured) record video + audio for the
       // team's Drive archive. Both are best-effort and never block the call.
-      if (media?.hasVideo && mediaRef.current) {
+      if (media?.hasVideo && mediaRef.current && !isDemo) {
         try {
           publisherStopRef.current = await startVideoPublisher(db, id, videoOnly(mediaRef.current))
         } catch {
@@ -148,6 +169,8 @@ export function CallPage() {
 
     const recording = await call?.end()
     // Stop the live feed (also marks video ended on the incident) and release the camera + mic.
+    motionRef.current?.stop()
+    alertStopRef.current?.()
     await publisherStopRef.current?.()
     await micPublisherStopRef.current?.()
     mediaRef.current?.getTracks().forEach((t) => t.stop())
@@ -207,6 +230,14 @@ export function CallPage() {
       } catch {
         // Best-effort: the incident's live-extracted fields are already saved even if consolidation/leakage
         // check fails here (e.g. no key configured) — a responder still sees everything gathered during the call.
+      }
+
+      if (isDemo) {
+        // Demo: no recordings are kept. Show the tester what a responder would have seen, then leave demo mode
+        // on that page (it still reads demoIncidents).
+        void endIncidentForDemo(id)
+        navigate(`/demo-result/${id}`, { replace: true })
+        return
       }
 
       if (recording) {
@@ -280,6 +311,7 @@ export function CallPage() {
 
       zeroTraceExit(db, id, navigate)
     } else {
+      setDemoMode(false)
       navigate('/', { replace: true })
     }
   }
@@ -295,6 +327,19 @@ export function CallPage() {
 
   if (cart.count > 0) return <Navigate to="/cart" replace />
 
+  if (demoBlocked) {
+    return (
+      <div className="page call-page">
+        <div className="call-top">
+          <div className="call-avatar" aria-hidden="true">QB</div>
+          <h1>Demo limit reached</h1>
+          <p className="call-status">Try another demo call in about {minutesUntilNextDemo()} min.</p>
+          <Link to="/" className="link-btn" replace>Back to menu</Link>
+        </div>
+      </div>
+    )
+  }
+
   const minutes = String(Math.floor(seconds / 60)).padStart(2, '0')
   const secs = String(seconds % 60).padStart(2, '0')
 
@@ -303,6 +348,7 @@ export function CallPage() {
       <div className="call-top">
         <div className="call-avatar" aria-hidden="true">QB</div>
         <h1>{APP_NAME} Order Desk</h1>
+        {isDemo && <p className="demo-badge">Demo call · not sent to responders</p>}
         <p className="call-status">
           {status === 'live' ? `${minutes}:${secs}` : STATUS_LABEL[status]}
         </p>
@@ -331,4 +377,10 @@ export function CallPage() {
       </div>
     </div>
   )
+}
+
+// Demo calls end without the zero-trace exit (the tester goes to the result card instead), so mark the demo
+// incident ended here.
+async function endIncidentForDemo(id: string) {
+  await updateDoc(doc(db, INCIDENTS, id), { callState: 'ended', sessionEndedAt: new Date().toISOString() }).catch(() => {})
 }

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai'
+import { geminiConfigured, generateText } from './aiLogic.ts'
 import type { FieldConfidence, Incident } from '../../../../shared/incidents/types.ts'
 
 // Same lite text model as the dashboard's own Gemini feature (dashboard/src/lib/aiInsights.ts) — this is a
@@ -62,10 +62,8 @@ export async function consolidateCall(
   voiceStressTrend: Incident['voiceStressTrend'],
   address?: string | null,
 ): Promise<ConsolidationResult> {
-  const apiKey = import.meta.env.VITE_GEMINI_LIVE_API_KEY
-  if (!apiKey) throw new Error('Gemini is not configured')
+  if (!geminiConfigured) throw new Error('Gemini is not configured')
 
-  const client = new GoogleGenAI({ apiKey })
   const avgStress = voiceStressTrend.length
     ? Math.round(voiceStressTrend.reduce((sum, s) => sum + s.score, 0) / voiceStressTrend.length)
     : null
@@ -92,7 +90,7 @@ detail, where naming them isn't necessary to the report itself. Write redactions
 should be redacted (e.g. "child's name: Priya"), or an empty list if nothing needs redacting. Don't flag the
 caller themselves or clearly necessary details (like "my neighbor" without a name, or a stated address).`
 
-  const response = await client.models.generateContent({
+  const response = await generateText({
     model: MODEL,
     contents: prompt,
     config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },

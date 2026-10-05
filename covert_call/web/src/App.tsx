@@ -6,7 +6,9 @@ import { CheckoutPage } from './pages/CheckoutPage'
 import { HomePage } from './pages/HomePage'
 import { OrderPlacedPage } from './pages/OrderPlacedPage'
 import { SilentTapPage } from './pages/SilentTapPage'
+import { DemoResultPage } from './pages/DemoResultPage'
 import { SosPage } from './pages/SosPage'
+import { AccountPage } from './pages/AccountPage'
 
 function ScrollToTop() {
   const { pathname } = useLocation()
@@ -28,6 +30,8 @@ export default function App() {
         <Route path="/call" element={<CallPage />} />
         <Route path="/delivery-instructions" element={<SilentTapPage />} />
         <Route path="/sos" element={<SosPage />} />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/demo-result/:id" element={<DemoResultPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

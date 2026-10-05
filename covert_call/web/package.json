@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "deploy": "npm run build && npx firebase-tools deploy --only hosting"
+    "deploy": "npm run build && npx firebase-tools deploy --only hosting",
+    "build:staging": "vite build --mode staging",
+    "deploy:staging": "tsc -b && vite build --mode staging && npx firebase-tools deploy --only hosting --config firebase.staging.json"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

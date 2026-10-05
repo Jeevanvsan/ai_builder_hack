@@ -127,13 +127,17 @@ export function playEscalationCue(): void {
 export const notificationsSupported = () => typeof Notification !== 'undefined'
 
 // System notification for when the dashboard tab is in the background or another window has focus.
-export function showSystemNotification(incident: Incident, onOpen: () => void): void {
+// `falseBefore` (Epic 31): the device has calls marked false, so the notification is silent and says so.
+export function showSystemNotification(incident: Incident, onOpen: () => void, falseBefore = 0): void {
   if (!notificationsSupported() || Notification.permission !== 'granted') return
   if (document.visibilityState === 'visible' && document.hasFocus()) return
-  const n = new Notification(`New incident ${incident.id}`, {
-    body: `${channelLabel(incident.channel)} just started. Open the dashboard to respond.`,
+  const n = new Notification(`New incident ${incident.id}${falseBefore ? ' (marked false before)' : ''}`, {
+    body: falseBefore
+      ? `${channelLabel(incident.channel)} from a device with ${falseBefore} call${falseBefore > 1 ? 's' : ''} marked false. Still check it.`
+      : `${channelLabel(incident.channel)} just started. Open the dashboard to respond.`,
     tag: incident.id,
-    requireInteraction: true,
+    requireInteraction: !falseBefore,
+    silent: falseBefore > 0,
   })
   n.onclick = () => {
     window.focus()

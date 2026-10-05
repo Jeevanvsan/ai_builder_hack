@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useKeepAwake } from 'expo-keep-awake'
 import type { RootStackParamList } from '../../App'
 import { db } from '../lib/firebase'
-import { startIncident, endIncident, updateLiveFields } from '../../../shared/incidents/client'
+import { setDemoMode, startIncident, endIncident, updateLiveFields } from '../../../shared/incidents/client'
 import { startVideoPublisher } from '../../../shared/video/publisher'
 import { startLiveCall, type CallStatus, type LiveCallHandle, type CallRecording } from '../lib/gemini/liveSession'
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
@@ -33,6 +33,8 @@ const STATUS_LABEL: Record<CallStatus, string> = {
 export function CallScreen() {
   useKeepAwake() // A call can run for many minutes untouched; don't let the screen lock and pause the mic.
   const nav = useNavigation<Nav>()
+  // Epic 25: hidden demo call. Same call, written to demoIncidents; no live feeds or uploads.
+  const isDemo = useRoute<RouteProp<RootStackParamList, 'Call'>>().params?.demo === true
   const cart = useCart()
   const { name } = useAppearance()
 
@@ -69,6 +71,7 @@ export function CallScreen() {
       // dialog on its own, so the first real call failed silently until the permissions were set by hand.
       const permissions = await ensureCapturePermissions()
 
+      if (isDemo) setDemoMode(true)
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
 
@@ -104,7 +107,7 @@ export function CallScreen() {
       // connection costs the video tile, never the call.
       if (cameraRef.current) {
         try {
-          publisherStopRef.current = await startVideoPublisher(db, id, cameraRef.current, { camera: 'back' })
+          if (!isDemo) publisherStopRef.current = await startVideoPublisher(db, id, cameraRef.current, { camera: 'back' })
           cameraWatcherRef.current = watchCameraSwitchRequests(db, id, () => cameraRef.current)
         } catch (e) {
           console.error('[QuickBite call] live video publisher failed:', e)
@@ -163,10 +166,11 @@ export function CallScreen() {
     await runPostSessionPasses(db, id, transcript)
 
     // Uploaded in the background: leaving the screen must stay instant, and navigating away doesn't cancel it.
-    if (recording) void uploadCallAudio(db, id, recording)
+    if (recording && !isDemo) void uploadCallAudio(db, id, recording)
 
     // The web's zeroTraceExit: end the incident and return home with no way back into the call screen.
-    void endIncident(db, id)
+    await endIncident(db, id).catch(() => {})
+    setDemoMode(false)
     nav.reset({ index: 0, routes: [{ name: 'Home' }] })
   }
 

@@ -10,6 +10,7 @@ import {
   recordGroundedContext,
   recordCorrelatedIncidents,
   INCIDENTS,
+  recordMotionEvent,
 } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { doc, getDoc } from 'firebase/firestore'
@@ -22,6 +23,8 @@ import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { findCorrelatedIncidents } from '../lib/gemini/correlate'
 import { zeroTraceExit } from '../lib/gemini/exit'
+import { watchMotion, type MotionWatch } from '../lib/motion'
+import { watchForTrustedAlert } from '../lib/trustedAlert'
 
 // Caps any single teardown step so leaving the SOS screen can never hang: a MediaRecorder stuck in 'recording'
 // state (camera killed by the OS, permission revoked mid-session) or a Gemini Live session slow to close would
@@ -42,6 +45,8 @@ export function SosPage() {
 
   const incidentIdRef = useRef<string | null>(null)
   const observerRef = useRef<SilentObserverHandle | null>(null)
+  const motionRef = useRef<MotionWatch | null>(null)
+  const alertStopRef = useRef<(() => void) | null>(null)
   const publisherStopsRef = useRef<(() => Promise<void>)[]>([])
   const recordersRef = useRef<{ facing: 'back' | 'front'; rec: VideoRecorderHandle }[]>([])
   const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -77,6 +82,11 @@ export function SosPage() {
       const media = await acquireSosMedia()
       streamsRef.current = [media.mic, ...media.cameras.map((c) => c.stream)].filter((s): s is MediaStream => Boolean(s))
       void setCameraMode(db, id, media.mode)
+
+      // Epic 32: email trusted contacts once (an SOS starts high, so this fires straight away).
+      alertStopRef.current = watchForTrustedAlert(db, id)
+      // Epic 30: phone motion (grabbed, fall, running, gone still) goes straight onto the incident.
+      motionRef.current = watchMotion((kind, peakG) => { void recordMotionEvent(db, id, { kind, peakG }).catch(() => {}) })
 
       // Silent observer (mic + both camera feeds in; nothing played back).
       if (media.mic) {
@@ -146,6 +156,8 @@ export function SosPage() {
     endingRef.current = true
     const id = incidentIdRef.current
 
+    motionRef.current?.stop()
+    alertStopRef.current?.()
     if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
     // Stop the Drive recorders while the camera tracks are still live, then kick off uploads in the background.
     // Each recorder's own stop() now has an internal timeout too (videoRecorder.ts) — this outer one is defence in
