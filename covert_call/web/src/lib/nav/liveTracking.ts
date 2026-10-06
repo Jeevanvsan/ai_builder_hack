@@ -34,6 +34,17 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   // The route request in flight, shared: a guidance call made while a prefetch is running waits for that same
   // request instead of getting "no route".
   let inflight: Promise<SafeRoute | null> | null = null
+  // Set once the caller is known to be on the move. The route used to be worked out only when Mia called
+  // get_route_guidance, and she sometimes never did ("I'm guiding you to the police station" with no route,
+  // INC-MUWKHLNF), or the caller was reported moving before any position existed. Now the route starts as soon
+  // as both are true, and is handed to Mia as a navigation note.
+  let wantRoute: string | null = null
+  const routeIfWanted = () => {
+    if (!wantRoute || route || inflight || !pos || !(gpsFix || latestIncident?.location.confirmed)) return
+    void reroute(wantRoute).then((r) => {
+      if (r) onTurnNote(`Route to safety is ready: ${r.destination.name} (${r.destination.kind}), ${fmtM(r.distanceM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min. First: ${r.steps[0]?.instruction ?? 'continue ahead'}${r.steps[1] ? `, then ${r.steps[1].instruction}` : ''}. Tell the caller where you are taking them, the first direction and the distance.`)
+    })
+  }
 
   const adopt = (r: SafeRoute) => {
     route = r
@@ -79,6 +90,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     }
     gpsFix = true
     pos = { lat: p.coords.latitude, lng: p.coords.longitude }
+    routeIfWanted()
     const now = Date.now()
     if (!lastWrite || now - lastWrite.at > WRITE_EVERY_MS || distanceM(lastWrite.p, pos) > WRITE_EVERY_M) {
       lastWrite = { at: now, p: pos }
@@ -114,6 +126,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     const c = latestIncident?.location.confirmed
     if (!gpsFix && c && c.lat != null && c.lng != null && (!pos || distanceM(pos, { lat: c.lat, lng: c.lng }) > 150)) {
       pos = { lat: c.lat, lng: c.lng }
+      routeIfWanted()
       if (route) void reroute(route.reason).then((r) => r && onTurnNote(`Route updated from the confirmed address: ${fmtM(r.distanceM)} to ${r.destination.name}. Next: ${r.steps[0]?.instruction ?? 'continue'}.`))
     }
     const r = latestIncident?.safeRoute
@@ -197,7 +210,8 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       ].filter(Boolean).join(' ')
     },
     prefetch: (situation) => {
-      if (!route && pos && (gpsFix || latestIncident?.location.confirmed)) void reroute(situation ?? 'caller needs to reach safety')
+      wantRoute ??= situation ?? 'caller needs to reach safety'
+      routeIfWanted()
     },
     stop: () => {
       if (watchId != null) navigator.geolocation.clearWatch(watchId)

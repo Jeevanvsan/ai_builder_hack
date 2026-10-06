@@ -607,3 +607,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - **Route not drawn on the map although Mia quoted it**: in Node the same tracker code computes and saves the route (Alappuzha South police, 547 m). The phone-side failure is not reproduced yet. A failed save now logs `[QuickBite call] safe route not saved` with the reason and retries once; each route is logged as `[QuickBite call] route:`.
 - **Voice sounding male mid-call**: the voice config ("Kore") is sent on every connect, reconnect and key switch, so this is model drift. The persona now says to keep the same female voice for the whole call. If it persists, try another female voice (Aoede/Leda).
 - Deployed web staging. Ameen: the persona's first section gained 2 lines (spoken output only, same voice).
+
+### 2026-10-06 ~17:10 IST: routing no longer depends on Mia calling the tool (INC-MUWKHLNF)
+- That call had no precise GPS (no track), "chased" was reported before the address was confirmed, and Mia never called `get_route_guidance`; she said "I'm guiding you to the police station" with no route. The pin was correct (Convent Square, after the town-name fix).
+- Now: once the caller is reported moving, the tracker computes the route as soon as any trusted position exists (precise GPS or the confirmed address), saves it for the dashboard, and hands Mia a "route to safety is ready" note. Navigation notes wait until she is quiet and no route call is open. Tested in Node with this call's sequence: route saved, note sent 5.7 s after the address was confirmed.
+- Deployed web staging.

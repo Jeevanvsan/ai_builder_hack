@@ -577,9 +577,8 @@ export async function startLiveCall(
     // only a caller who is on the road, chased or leaving gets turn-by-turn guidance. The route still shows on
     // the dashboard for the responder either way.
     if (finished || !movementReported) return
-    session.sendClientContent({
-      turns: `(System note, not the caller — live navigation: ${note} If you are guiding the caller to safety, relay the next instruction now, phrased for the situation. Say only the words meant for the caller.)`,
-    })
+    // Delivered by the reply guard timer once Mia is quiet: a client turn interrupts whatever she is saying.
+    pendingRouteNote = note
   })
 
   const canSend = () => connected && !finished
@@ -684,11 +683,11 @@ export async function startLiveCall(
   const REPLY_WAIT_MS = 6_000
   const replyGuardTimer = setInterval(() => {
     if (!canSend()) return
-    if (pendingRouteNote && !player.isPlaying()) {
+    if (pendingRouteNote && !player.isPlaying() && routesPending === 0) {
       const note = pendingRouteNote
       pendingRouteNote = ''
-      console.info('[QuickBite call] relaying late route')
-      session.sendClientContent({ turns: `(System note, not the caller — live navigation, the route is ready: ${note} Relay the first direction now, phrased for the situation. Say only the words meant for the caller.)` })
+      console.info('[QuickBite call] navigation note:', note.slice(0, 90))
+      session.sendClientContent({ turns: `(System note, not the caller — live navigation: ${note} Relay it now, phrased for the situation. Say only the words meant for the caller.)` })
       return
     }
     if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return
