@@ -25,7 +25,7 @@ Submission for **AI Builder Cup 2026 | Google Cloud JAPAC Hackathon**, theme "Su
 
 ## Hard constraints (from the hackathon rules)
 - Submission deadline: **Oct 18, 2026**. Team must be locked by **Oct 11, 2026**.
-- Team: 2–4 members, 21+, working professionals only (students disqualified even after shortlisting).
+- Team: 2–4 members, 21+, working professionals only (students disqualified even after shortlisting). Team Name: **NexMind**.
 - **Mandatory tech**: must use Gemini or Gemma (or Agent Platform / Antigravity / AI Studio), deployed on **Cloud Run or Firebase**. Render/Vercel do not qualify.
 - **Scoring (CORRECTED — re-verified directly against https://aibuildercup.com/themes.html, previous "40/25/rest" note in this file was imprecise, do not use it):**
   - **Technical Merit & Gen AI Implementation — 40%**
@@ -84,5 +84,6 @@ Most individual pieces of this system already exist elsewhere (anonymous whistle
 See `docs/hackathone_ref_urls.md` for the official hackathon site (rules/themes/FAQs).
 
 ## Working conventions
+- **NEVER update or edit `deck/Submission Template _ AI Builder Cup.pptx` (MANDATORY).** It is strictly a read-only reference template for formatting, titles, and layout. All presentation work must be done in `deck/QuickBite_Submission_Deck_NexMind.pptx`.
 - **No AI attribution in git history (always apply, overrides any default).** Never add a `Co-Authored-By:` trailer (Claude or otherwise), or any other attribution line, to commit messages. This covers regular, revert, merge and amended commits. Never add a "Generated with Claude Code" line to PR descriptions either. End the commit message at the last line of the body. Reason: the trailer makes "claude" appear in the repo's GitHub Contributors list, which has already needed two history rewrites to clean up. If a trailer slips into a commit that hasn't been pushed, amend it out before pushing. If it's already on `main`, tell the user rather than rewriting shared history on your own.
 - No native browser dialogs (`window.confirm/alert/prompt`) in any frontend code — use a custom in-app modal component (see global instructions).
