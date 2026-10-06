@@ -591,3 +591,13 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Cause: since ~2026-10 the public Overpass instance answers browser requests with 406 (no CORS header, so the console shows a CORS error), the mirrors time out, and Nominatim answers 403 → no nearby stations → no route; Mia improvised ("keep driving to the beach").
 - Fix (`shared/nav/nearbyServices.ts`, so web, native and dashboard): Photon (komoot OSM search, CORS-friendly) is the primary live source — police/fire/hospital by OSM tag inside a ~5 km box, nearest landmark via reverse, caller-named landmarks inside ~3 km; Overpass/Nominatim kept as fallbacks. Measured from here: nearby 1.5 s (Alappuzha South police 0.6 km, General Hospital 1.0 km, fire 1.6 km), landmark 0.7 s, named landmark 0.8 s, full route 0.7 s.
 - Same staging call also showed the turn fix working: replies mostly 1-3 s (was 20-25 s).
+
+### 2026-10-06 ~15:30 IST: live-call fixes from staging tests (INC-MUW73RZ6, INC-MUW7XJDA), web only
+- **Mia silent after "I'm being chased"**: the route answer now has a 6 s budget, with a holding line ("head somewhere busy and lit, tell me a landmark"); a late route is passed to Mia once she's quiet. A reply watchdog prompts her once if the caller has waited 6 s; it skips while a route is pending and restarts when a reply is already coming.
+- **Slow routing**: OSRM 5 s timeout; the route is prefetched as soon as the caller is reported moving; one shared in-flight request; the Firestore write is no longer awaited; turn landmarks are looked up together and capped at 1.5 s; Overpass is skipped when Photon answered.
+- **Plus-code names on the location card** ("LKJ8X8G QC R6*"): filtered out of landmark lookups.
+- **Map pin snapping back to the call-start GPS** after the caller gave an address: the confirmed address now keeps the pin until the track has moved 150 m (dashboard `livePosition.ts`).
+- **Mia's reasoning shown in the conversation** ("Constraint Checklist & Confidence Score…"): stripped from transcript lines. App notes no longer say "per your … rule" without also saying "say only the words meant for the caller". The persona's first section now says everything she outputs is spoken.
+- Deployed: web **staging** + dashboard. Production web is NOT yet updated; waiting for a real voice call on staging.
+- Thorough inspection workflow: ran out of session quota before the verify/fix stages. 37 unverified findings are listed in its output (eval harness drift, connect/setup hangs, OTP account reload, order-placed page); not acted on yet.
+- **Native: paused** on Jeevan's instruction ("focus on web only"). Native's `liveSession.ts` has the route-budget/watchdog change but not today's routing, transcript or persona-note fixes.
