@@ -164,15 +164,24 @@ export async function startLiveCall(
   let pendingEmailAt = 0
   // Mia has spoken since the address was given (the read-back), so a "yes" now answers "is that right?".
   let emailReadBack = false
+  let emailSavedAs: string | null = null
   const saveReportEmail = (email: string) => {
     pendingEmail = null
+    emailSavedAs = email
     console.info('[QuickBite call] case report email confirmed:', email)
     enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { reportEmail: email }))
   }
   // The caller's "yes" right after the read-back saves it, even if Mia forgets the confirming tool call.
+  // What the caller says yes to is Mia's latest read-back, so that is the address saved. Neither her tool argument
+  // ("jeevanvsn gmail com") nor the caller's transcript ("jeevanjeevanvsa@gmail.com") was reliable on its own
+  // (INC-MUWO3P2Y: the read-back was right, the transcript version got sent).
+  const readBackEmail = () => {
+    const mia = [...transcriptLines].reverse().find((l) => l.speaker === 'Mia')
+    return mia ? emailIn(mia.text) : null
+  }
   const confirmEmailIfYes = (callerLine: string) => {
     if (!pendingEmail || !emailReadBack || Date.now() - pendingEmailAt > 60_000) return
-    if (/^\W*(yes|yeah|yep|yup|correct|right|that'?s (right|correct)|exactly|haan?|athe|sari)\b/i.test(callerLine.trim())) saveReportEmail(pendingEmail)
+    if (/^\W*(yes|yeah|yep|yup|correct|right|that'?s (right|correct)|exactly|haan?|athe|sari)\b/i.test(callerLine.trim())) saveReportEmail(readBackEmail() ?? pendingEmail)
   }
   const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
@@ -229,7 +238,7 @@ export async function startLiveCall(
   // "jeevanvsan@gmail.com". Spelled-out letters are joined back together. Null if there is no complete address.
   const emailIn = (raw: string): string | null => {
     const t = raw.toLowerCase()
-      .replace(/\b([a-z0-9])\s+(?=[a-z0-9]\b)/g, '$1')
+      .replace(/(?<![\w'’])[a-z0-9](?:\s+[a-z0-9](?![\w'’]))+/g, (run) => run.replace(/\s+/g, ''))
       .replace(/\s+(at|@)\s+/g, '@').replace(/\s*@\s*/g, '@')
       .replace(/\s+(dot|period)\s+/g, '.').replace(/\s+underscore\s+/g, '_').replace(/\s+(dash|hyphen)\s+/g, '-')
     const m = t.match(/[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}/)
@@ -259,14 +268,16 @@ export async function startLiveCall(
         // The caller's own words (speech-to-text) are more reliable for an address than the model's copy of it:
         // "jeevanvsan@gmail.com" was transcribed right but passed to this tool as "jeevanvsn gmail com". Use an
         // address found in the last few caller lines; the model's argument is the fallback.
-        const spoken = transcriptLines.filter((l) => l.speaker === 'Caller').slice(-3).reverse().map((l) => l.text)
+        // First guess to read back: the caller's own words if they contain an address, else Mia's copy.
+        const spoken = transcriptLines.filter((l) => l.speaker === 'Caller').slice(-2).reverse().map((l) => l.text)
         const email = [...spoken, String(args.email ?? '')].map(emailIn).find(Boolean)
         if (!email) return `"${args.email}" is not a complete email address. Ask them to spell it once more (name, then the part after the at sign), read it back, and call send_case_report again.`
         // Saved only once the caller confirms the read-back (Mia calling again with confirmed=true, or the caller's
         // own "yes" right after it, see confirmEmailIfYes).
-        if (args.confirmed === true && pendingEmail === email) {
-          saveReportEmail(email)
-          return `Confirmed and saved: ${email}. Tell them in one short line that the full case report with a reference number will be emailed there after the call.`
+        if (args.confirmed === true && (pendingEmail || emailSavedAs)) {
+          const confirmed = readBackEmail() ?? emailIn(String(args.email ?? '')) ?? pendingEmail ?? email
+          if (confirmed !== emailSavedAs) saveReportEmail(confirmed)
+          return `Confirmed and saved: ${confirmed}. Tell them in one short line that the full case report with a reference number will be emailed there after the call.`
         }
         pendingEmail = email
         pendingEmailAt = Date.now()

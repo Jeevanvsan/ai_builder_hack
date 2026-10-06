@@ -678,3 +678,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - After "I think I have reached the police station" the email prompt went out while a record-only tool batch was still unanswered (the 1.5 s deferral window). From then on Mia never replied (two watchdog nudges unanswered), and the dashboard flagged "caller silent after danger".
 - Now no app message to Mia (watchdog, navigation note, email prompt, silence/time-budget prompts, responder messages) goes out while any tool batch or route call is open. If she shows no activity 10 s after an app message, the session is closed and reopened with the resumption handle ("sorry, I lost you for a second").
 - Deployed web staging AND production (production had the same window).
+
+### 2026-10-06 ~23:00 IST: report email = the address the caller confirmed (INC-MUWO3P2Y)
+- The transcript misheard the email ("jeevanjeevanvsa@gmail.com"); Mia's last read-back was right ("J E E V A N V S A N at gmail dot com"); the caller said yes, but the transcript version was saved and emailed.
+- Now the saved address is the one parsed from Mia's latest read-back (what the caller actually confirmed); the transcript or her tool argument only supplies the first guess she reads back. Spelled-letter parsing fixed (it joined the "s" of "that's").
+- Deployed web staging + production.
