@@ -1,6 +1,7 @@
 import type { Incident } from '../../../shared/incidents/types'
 import { livePosition } from './livePosition'
 import { isNegatedIndicator } from '../../../shared/incidents/severity.ts'
+import { AI_FEATURES } from '../../../shared/aiFeatures.ts'
 
 // Sorts what an incident already knows into the case board's evidence tiles. Pure: no new data, no fetching.
 // Each tile has a fixed slot around the hub, so tiles never jump around as facts arrive, and a tile only exists
@@ -92,7 +93,8 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
           ? (c?.confidence === 'uncertain' ? 'Approximate — the exact street could not be matched, area only' : undefined)
           : c ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
       tone: pinned || movedOn ? 'live' : 'neutral',
-      pending: !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,
+      // Local conditions (weather/traffic) are paused (AI_FEATURES.groundedContext), so nothing is coming: no spinner.
+      pending: AI_FEATURES.groundedContext && !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,
     }
   }
 

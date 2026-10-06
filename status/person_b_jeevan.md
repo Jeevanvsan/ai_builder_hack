@@ -617,3 +617,10 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Console showed no route lookup at all; Mia's "500 m ahead" was invented. The tracker itself works: tested in Node and in a real (headless Edge) browser with this call's sequence, the route is saved and Mia's note sent.
 - Added a second trigger: the call's own incident listener starts the route whenever the incident says the caller is moving, and re-tries on every update (for example when the address is confirmed). Each step now logs one line (`caller is on the move`, `route waiting for a position`, `working out the route from`, `route:`, `no route found`, `route lookup failed`).
 - Deployed web staging.
+
+### 2026-10-06 ~18:05 IST: routing confirmed working on staging (INC-MUWKW3B7); camera reminder; leftovers
+- Routing works end to end on a real call: route started by the moving trigger, saved (Alappuzha South police, 529 m), drawn on the map, relayed to Mia.
+- Camera: the yellow car was in every frame, but Mia never reported it this call. With the camera on and nothing reported for 20 s, the next tool response now asks her to check the latest frame and report it (rides on tool responses, no extra message).
+- Overpass removed from the browser path (always 406 from browsers; Node/eval only). It was hit when Photon reverse took 6.9 s. Guarded the empty-list case so the nearby-services lookup can't hang.
+- Dashboard: "Checking local conditions…" no longer shows while the local-conditions feature is paused.
+- Deployed web staging + dashboard.

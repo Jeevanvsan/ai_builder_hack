@@ -17,7 +17,8 @@ export type NearbyService = {
 
 // The free public Overpass instance occasionally rate-limits or times out — try a second mirror before giving up,
 // rather than leaving the card permanently stuck on "couldn't load" for what's often a transient issue.
-const OVERPASS_URLS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']
+// Overpass refuses browsers (406 with no CORS header), so from the web app it only costs time: Node (the eval) only.
+const OVERPASS_URLS = typeof window === 'undefined' ? ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'] : []
 const RADIUS_M = 5_000
 // Short: this is one of two-plus mirrors tried in a race (see nearbyServices()) — a slow/dead mirror should give
 // up quickly so a working one isn't waited behind, not sit for the full 10s that made routing feel slow overall.
@@ -171,6 +172,7 @@ async function fetchNearbyServices(near: { lat: number; lng: number }): Promise<
   // failed, via the plain Promise.all fallback below.
   const overpassRace = () => new Promise<{ elements: OverpassElement[] } | null>((resolve) => {
     let remaining = OVERPASS_URLS.length
+    if (!remaining) resolve(null) // browser: no Overpass to ask
     for (const url of OVERPASS_URLS) {
       void queryOverpass(url, query).then((d) => {
         if (d) resolve(d)

@@ -139,6 +139,11 @@ export async function startLiveCall(
   // Set only once the caller has said they're being followed/chased or are on the move. Route guidance is gated on
   // it: a caller hiding at home who describes the ATTACKER's bike was being routed to a police station.
   let movementReported = false
+  // Last time Mia reported something from the camera. With the camera on and nothing reported for 20 s, the next
+  // tool response asks her to look at the latest frame (she sometimes never mentioned a yellow car that was in
+  // every frame, INC-MUWKW3B7).
+  let lastSceneAt = 0
+  let sceneDue = false
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
   const markMoving = () => {
     if (!movementReported) console.info('[QuickBite call] caller is on the move: starting the route')
@@ -241,6 +246,7 @@ export async function startLiveCall(
       case 'report_scene_observation': {
         const source = args.source
         const kind = args.kind
+        if (source === 'camera') lastSceneAt = Date.now()
         if ((source === 'camera' || source === 'sound') && typeof kind === 'string') {
           if (/weapon|gun|shot|knife|stab|scream|blood|explosion|fight|attack/i.test(`${kind} ${args.detail ?? ''}`)) dangerReported = true
           enqueueWrite(() =>
@@ -610,6 +616,7 @@ export async function startLiveCall(
     if (pendingFacts && pendingFacts !== lastFacts) { lastFacts = pendingFacts; parts.push(pendingFacts) }
     if (stressDue) { stressDue = false; lastStressAt = Date.now(); parts.push("(Also call report_stress_level silently with your current 0-100 estimate of the caller's vocal stress.)") }
     if (extraNotes.length) parts.push(...extraNotes.splice(0))
+    if (sceneDue) { sceneDue = false; lastSceneAt = Date.now(); parts.push('(Also look at the latest camera frame now: if a vehicle, person, weapon, injury, fire or readable number plate is visible, call report_scene_observation silently with its category and details: colour, type, plate.)') }
     if (estimateDue) { estimateDue = false; parts.push("(Also call report_caller_estimate silently with your best guess of the caller's age group and gender.)") }
     return parts.length ? ` ${parts.join(' ')}` : ''
   }
@@ -702,6 +709,7 @@ export async function startLiveCall(
   const stressTimer = setInterval(() => {
     if (!transcriptLines.some((l) => l.speaker === 'Caller')) return
     if (Date.now() - Math.max(lastStressAt, callStartedAt) >= 25_000) stressDue = true
+    if (opts.videoStream && Date.now() - Math.max(lastSceneAt, callStartedAt) >= 20_000) sceneDue = true
   }, 5_000)
 
   const estimateTimer = setInterval(() => {
