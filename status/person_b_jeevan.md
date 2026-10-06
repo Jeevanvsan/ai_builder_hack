@@ -683,3 +683,4 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - The transcript misheard the email ("jeevanjeevanvsa@gmail.com"); Mia's last read-back was right ("J E E V A N V S A N at gmail dot com"); the caller said yes, but the transcript version was saved and emailed.
 - Now the saved address is the one parsed from Mia's latest read-back (what the caller actually confirmed); the transcript or her tool argument only supplies the first guess she reads back. Spelled-letter parsing fixed (it joined the "s" of "that's").
 - Deployed web staging + production.
+- (~23:20) INC-MUWOZNEF: Mia read the address back as "J, E, E, V, A, N, V, S, A, N at gmail dot com" (comma-separated), which parsed as "n@gmail.com". Comma-separated spelled letters are now joined, and an address with a 1-2 letter name is rejected as a misparse (falls back to the next source). Deployed staging + production.

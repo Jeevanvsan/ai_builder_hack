@@ -238,11 +238,13 @@ export async function startLiveCall(
   // "jeevanvsan@gmail.com". Spelled-out letters are joined back together. Null if there is no complete address.
   const emailIn = (raw: string): string | null => {
     const t = raw.toLowerCase()
-      .replace(/(?<![\w'’])[a-z0-9](?:\s+[a-z0-9](?![\w'’]))+/g, (run) => run.replace(/\s+/g, ''))
+      .replace(/(?<![\w'’])[a-z0-9](?:[\s,]+[a-z0-9](?![\w'’]))+/g, (run) => run.replace(/[\s,]+/g, ''))
       .replace(/\s+(at|@)\s+/g, '@').replace(/\s*@\s*/g, '@')
       .replace(/\s+(dot|period)\s+/g, '.').replace(/\s+underscore\s+/g, '_').replace(/\s+(dash|hyphen)\s+/g, '-')
     const m = t.match(/[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}/)
-    return m ? m[0].replace(/\.+$/, '') : null
+    const email = m ? m[0].replace(/\.+$/, '') : null
+    // A one- or two-letter name is a misparse ("J, E, E, V…" read as "n@gmail.com", INC-MUWOZNEF), not an address.
+    return email && email.split('@')[0].length >= 3 ? email : null
   }
 
   // Returns the tool response text for calls whose answer matters to the model; undefined means plain "ok".
