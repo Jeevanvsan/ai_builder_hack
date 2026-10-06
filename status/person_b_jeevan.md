@@ -669,3 +669,4 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 ### 2026-10-06 ~21:50 IST: wrong report email fixed
 - The transcript had "jeevanvsan@gmail.com" but Mia passed "jeevanvsn gmail com" to `send_case_report`. The tool now takes the address from the caller's last 3 transcript lines (spelled-out letters joined, "at"/"dot" converted); Mia's argument is only the fallback. She's told to read back exactly the saved address and to re-call the tool if corrected.
 - Deployed web staging.
+- (~22:05) Email is now saved only after the caller confirms: the first `send_case_report` keeps it pending and tells Mia to read it back and ask "Is that right?". It's saved when she calls again with `confirmed=true`, or when the caller answers yes right after her read-back. A correction restarts the check. Deployed web staging.

@@ -159,6 +159,21 @@ export async function startLiveCall(
   // (INC-MUWM64RK ended on "take care"), so the app prompts her once she is quiet.
   let callerSafe = false
   let emailAsked = false
+  // An address the caller gave but hasn't confirmed yet, and whether one has been saved.
+  let pendingEmail: string | null = null
+  let pendingEmailAt = 0
+  // Mia has spoken since the address was given (the read-back), so a "yes" now answers "is that right?".
+  let emailReadBack = false
+  const saveReportEmail = (email: string) => {
+    pendingEmail = null
+    console.info('[QuickBite call] case report email confirmed:', email)
+    enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { reportEmail: email }))
+  }
+  // The caller's "yes" right after the read-back saves it, even if Mia forgets the confirming tool call.
+  const confirmEmailIfYes = (callerLine: string) => {
+    if (!pendingEmail || !emailReadBack || Date.now() - pendingEmailAt > 60_000) return
+    if (/^\W*(yes|yeah|yep|yup|correct|right|that'?s (right|correct)|exactly|haan?|athe|sari)\b/i.test(callerLine.trim())) saveReportEmail(pendingEmail)
+  }
   const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
@@ -247,8 +262,16 @@ export async function startLiveCall(
         const spoken = transcriptLines.filter((l) => l.speaker === 'Caller').slice(-3).reverse().map((l) => l.text)
         const email = [...spoken, String(args.email ?? '')].map(emailIn).find(Boolean)
         if (!email) return `"${args.email}" is not a complete email address. Ask them to spell it once more (name, then the part after the at sign), read it back, and call send_case_report again.`
-        enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { reportEmail: email }))
-        return `Saved: ${email}. Read exactly this address back to the caller, letter by letter for the part before the @, and say the full case report with a reference number will be emailed there after the call. If they correct it, call send_case_report again with the corrected address.`
+        // Saved only once the caller confirms the read-back (Mia calling again with confirmed=true, or the caller's
+        // own "yes" right after it, see confirmEmailIfYes).
+        if (args.confirmed === true && pendingEmail === email) {
+          saveReportEmail(email)
+          return `Confirmed and saved: ${email}. Tell them in one short line that the full case report with a reference number will be emailed there after the call.`
+        }
+        pendingEmail = email
+        pendingEmailAt = Date.now()
+        emailReadBack = false
+        return `Not saved yet. Read exactly this address back, letter by letter for the part before the @: ${email}. Then ask "Is that right?". If they say yes, call send_case_report again with confirmed=true. If they correct it, call send_case_report with the corrected address.`
       }
       case 'confirm_address': {
         const address = args.address
@@ -388,7 +411,7 @@ export async function startLiveCall(
   }
   // After danger, Mia is told in advance to ask for the report email in the same reply where the caller says they
   // are safe: a prompt sent after that reply came too late (INC-MUWN5ZK9 ended on "take care").
-  const EMAIL_NOTE = " (When the caller says they are safe or have arrived, in that same reply ask once for an email address to send their case report to, with a reference number for the police; covert mode: offer to email the order receipt. Read it back, then call send_case_report.)"
+  const EMAIL_NOTE = " (When the caller says they are safe or have arrived, in that same reply ask once for an email address to send their case report to, with a reference number for the police; covert mode: offer to email the order receipt. Call send_case_report with it, read the address back and ask if it is right; only after they say yes call send_case_report again with confirmed=true.)"
   const factsWithMode = (data: Omit<Incident, 'id'>) =>
     (dangerReported && !emailAsked ? EMAIL_NOTE : '') + (openMode ? "(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO food words, NO menu codes, NO 'rider', 'order' or sizes. Switch back only if they say they can't talk or someone is coming.) " : '') + knownFactsNote(data)
   let lastIncident: Omit<Incident, 'id'> | undefined
@@ -424,6 +447,7 @@ export async function startLiveCall(
       callerSpokeAt = Date.now()
       nudgedForTurn = false
       noteMode(callerText)
+      confirmEmailIfYes(transcriptLines.at(-1)?.text ?? callerText)
       if (dangerReported && !callerSafe && SAFE_NOW.test(transcriptLines.at(-1)?.text ?? callerText)) {
         callerSafe = true
         if (!emailAsked) extraNotes.push('(The caller just said they are safe: in this reply, ask once for their email for the case report.)')
@@ -446,6 +470,7 @@ export async function startLiveCall(
     if (audioPart?.inlineData?.data) {
       player.play(audioPart.inlineData.data)
       spokeSinceCaller = true
+      if (pendingEmail) emailReadBack = true
       lastActivityAt = Date.now()
     }
 

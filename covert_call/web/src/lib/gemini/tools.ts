@@ -57,11 +57,12 @@ export const REPORT_SITUATION: FunctionDeclaration = {
 
 export const SEND_CASE_REPORT: FunctionDeclaration = {
   name: 'send_case_report',
-  description: 'Call this once the caller has given (and you have read back) an email address for their case report. The full report (reference number, location, route, what was seen and heard) is emailed to it after the call.',
+  description: 'Call this when the caller gives an email address for their case report (confirmed=false), then read the address back and ask if it is right; call it again with confirmed=true only after they say yes. The full report (reference number, location, route, what was seen and heard) is emailed to it after the call.',
   parameters: {
     type: Type.OBJECT,
     properties: {
       email: { type: Type.STRING, description: 'The email address as the caller spelled it, e.g. "jeevan.v at gmail dot com"' },
+      confirmed: { type: Type.BOOLEAN, description: 'true only after the caller has confirmed the address you read back' },
     },
     required: ['email'],
   },
