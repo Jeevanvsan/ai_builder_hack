@@ -46,8 +46,11 @@ function instructionOf(s: OsrmStep): string {
 
 export async function drivingRoute(from: LatLng, to: LatLng) {
   const url = `${OSRM}/${from.lng},${from.lat};${to.lng},${to.lat}?steps=true&geometries=geojson&overview=full`
+  // The public OSRM server normally answers in ~1 s; a stalled request must not hold up the caller's directions.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5_000)
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: controller.signal })
     if (!res.ok) return null
     const data = await res.json()
     const r = data.routes?.[0]
@@ -69,6 +72,8 @@ export async function drivingRoute(from: LatLng, to: LatLng) {
     // Returning null here instead lets bestSafeRoute skip just this one candidate and still pick the best of the
     // rest, the same way a bad OSRM response (caught by `if (!res.ok)` above) was already handled.
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 

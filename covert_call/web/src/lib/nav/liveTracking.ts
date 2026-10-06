@@ -13,6 +13,9 @@ const TURN_NOTICE_M = 150
 export type LiveTracker = {
   // What Mia says next: computes a route to the best-fit station if none exists, then describes the next step.
   guidance: (situation?: string, landmark?: string) => Promise<string>
+  // Starts working out the route in the background (once the caller is known to be on the move), so the
+  // directions are ready, or nearly, by the time Mia asks for them.
+  prefetch: (situation?: string) => void
   stop: () => void
 }
 
@@ -28,7 +31,9 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   let route: SafeRoute | null = null
   let lastRouteAt = 0
   let notedStep = -1
-  let rerouting = false
+  // The route request in flight, shared: a guidance call made while a prefetch is running waits for that same
+  // request instead of getting "no route".
+  let inflight: Promise<SafeRoute | null> | null = null
 
   const adopt = (r: SafeRoute) => {
     route = r
@@ -36,21 +41,28 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     notedStep = -1
   }
 
-  const reroute = async (reason: string, requestedBy: 'ai' | 'responder' = 'ai') => {
-    if (!pos || rerouting) return route
-    rerouting = true
-    try {
-      const kind = route?.destination.kind ?? kindForSituation([reason])
-      const target = route && requestedBy === 'responder' ? { ...route.destination, distanceKm: 0 } : undefined
-      const next = await bestSafeRoute(pos, kind, reason, route?.requestedBy ?? requestedBy, target)
-      if (next) {
-        adopt(next)
-        await setSafeRoute(db, incidentId, next)
+  const reroute = (reason: string, requestedBy: 'ai' | 'responder' = 'ai'): Promise<SafeRoute | null> => {
+    if (!pos) return Promise.resolve(route)
+    if (inflight) return inflight
+    const from = pos
+    inflight = (async () => {
+      try {
+        const kind = route?.destination.kind ?? kindForSituation([reason])
+        const target = route && requestedBy === 'responder' ? { ...route.destination, distanceKm: 0 } : undefined
+        const next = await bestSafeRoute(from, kind, reason, route?.requestedBy ?? requestedBy, target)
+        if (next) {
+          adopt(next)
+          // Not awaited: Mia's directions don't wait on the dashboard write.
+          void setSafeRoute(db, incidentId, next).catch(() => {})
+        }
+        return route
+      } catch {
+        return route
+      } finally {
+        inflight = null
       }
-      return route
-    } finally {
-      rerouting = false
-    }
+    })()
+    return inflight
   }
 
   const onFix = (p: GeolocationPosition) => {
@@ -163,8 +175,9 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       const r: SafeRoute = route
       const prog = progressOnRoute(pos, r)
       const after = r.steps[prog.stepIndex + 1]
-      const lm = await landmarkAt(prog.next)
-      const here = await landmarkNear(pos)
+      // Landmarks only flavour the directions: looked up together, and never allowed to hold them up.
+      const within = <T,>(pr: Promise<T>, ms: number) => Promise.race([pr, new Promise<null>((r) => setTimeout(() => r(null), ms))])
+      const [lm, here] = await Promise.all([within(landmarkAt(prog.next), 1_500), within(landmarkNear(pos).catch(() => null), 1_500)])
       return [
         `Destination: ${r.destination.name} (${r.destination.kind}), ${fmtM(prog.toDestinationM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min.`,
         prog.next ? `Next: ${prog.next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(prog.toNextM)}.` : '',
@@ -177,6 +190,9 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
           : `Caller reports being at: "${landmark}" — could not find that near their confirmed area, so directions above are still from their last known position. If it still doesn't match what they see, ask for a different nearby landmark or road name (once), rather than assuming they've moved.`) : '',
         "Say it in the caller's language, with the landmark, the direction and the distance; if they ask what is there, describe the landmark and how far the destination is.",
       ].filter(Boolean).join(' ')
+    },
+    prefetch: (situation) => {
+      if (!route && pos && (gpsFix || latestIncident?.location.confirmed)) void reroute(situation ?? 'caller needs to reach safety')
     },
     stop: () => {
       if (watchId != null) navigator.geolocation.clearWatch(watchId)

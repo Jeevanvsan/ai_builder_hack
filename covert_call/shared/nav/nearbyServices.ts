@@ -228,17 +228,23 @@ export function suggestedServiceKind(dangerIndicators: string[]): ServiceKind {
 
 // The most recognisable named place within ~60 m of a point (a shop, temple, bank, bus stop, petrol pump...), so a
 // spoken turn can say "turn right at the Federal Bank" instead of a bare "turn right". Null if none or unreachable.
+// A name a caller could actually read on a sign. OSM also carries plus codes and reference codes as names
+// ("LKJ8X8G QC R6*"), which reached the dashboard's location card and Mia's directions.
+const isReadableName = (n?: string): n is string => !!n && !/[+*]/.test(n) && (/\p{Ll}/u.test(n) || !/\d/.test(n))
+
 export async function landmarkNear(p: { lat: number; lng: number }): Promise<string | null> {
   // Photon reverse: named places within ~150 m; prefer a shop/amenity/junction a caller can actually see.
   const feats = await photon(`/reverse?lat=${p.lat}&lon=${p.lng}&limit=8&radius=0.15`)
   if (feats?.length) {
     const rank = (k?: string, v?: string) => (k === 'amenity' || k === 'shop' || k === 'tourism' || v === 'junction' || k === 'junction' ? 0 : k === 'highway' ? 1 : 2)
-    const best = feats.filter((f) => f.properties?.name && f.properties?.osm_key !== 'place').sort((a, b) => rank(a.properties?.osm_key, a.properties?.osm_value) - rank(b.properties?.osm_key, b.properties?.osm_value))[0]
+    const best = feats.filter((f) => isReadableName(f.properties?.name) && f.properties?.osm_key !== 'place').sort((a, b) => rank(a.properties?.osm_key, a.properties?.osm_value) - rank(b.properties?.osm_key, b.properties?.osm_value))[0]
     if (best) {
       const kind = best.properties?.osm_key === 'highway' ? '' : (best.properties?.osm_value ?? '')
       return `${best.properties?.name}${kind && kind !== 'yes' ? ` (${kind.replace(/_/g, ' ')})` : ''}`
     }
   }
+  // Photon answered, just with nothing usable: Overpass only adds seconds (and 406s from a browser).
+  if (feats) return null
   const q = `[out:json][timeout:8];(nwr(around:60,${p.lat},${p.lng})[name][~"^(amenity|shop|tourism|leisure|highway|railway|building|office|historic)$"~"."];);out center 15;`
   for (const url of OVERPASS_URLS) {
     const data = await queryOverpass(url, q)
@@ -246,7 +252,7 @@ export async function landmarkNear(p: { lat: number; lng: number }): Promise<str
     const rank = (t: Record<string, string>) => (t.amenity === 'fuel' || t.amenity === 'place_of_worship' || t.amenity === 'bank' || t.highway === 'traffic_signals' || t.highway === 'bus_stop' ? 0 : t.amenity || t.shop ? 1 : 2)
     const best = data.elements
       .map((e) => ({ t: e.tags ?? {}, lat: e.lat ?? (e as { center?: { lat: number } }).center?.lat, lng: e.lon ?? (e as { center?: { lon: number } }).center?.lon }))
-      .filter((e) => e.t.name && e.lat != null)
+      .filter((e) => isReadableName(e.t.name) && e.lat != null)
       .sort((a, b) => rank(a.t) - rank(b.t) || haversineKm(p, a as { lat: number; lng: number }) - haversineKm(p, b as { lat: number; lng: number }))[0]
     if (!best) return null
     const kind = best.t.amenity ?? best.t.shop ?? best.t.highway ?? best.t.tourism ?? ''
@@ -280,9 +286,10 @@ export async function locateLandmark(text: string, near: { lat: number; lng: num
     .filter((h): h is { name: string; lat: number; lng: number } => !!h.name && h.lat != null && h.lng != null)
     .sort((a, b) => haversineKm(near, a) - haversineKm(near, b))
   if (phits[0]) return { ...phits[0], confidence: weakMatch || haversineKm(near, phits[0]) > 1.5 ? 'low' : 'high' }
+  // Overpass is only worth trying when Photon itself was unreachable (it 406s from browsers and is slow).
+  for (const url of pfeats ? [] : OVERPASS_URLS) {
   const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\"]/g, '')).join('.*')
   const q = `[out:json][timeout:10];nwr(around:3000,${near.lat},${near.lng})[name~"${pattern}",i];out center 10;`
-  for (const url of OVERPASS_URLS) {
     const data = await queryOverpass(url, q)
     if (!data) continue
     const hits = data.elements

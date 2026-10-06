@@ -6,11 +6,25 @@ export type LivePosition = { lat: number; lng: number; at: string | null; source
 // The caller's best current position: whichever of the live track and the confirmed address is newer, then the
 // rough fix. The map, the location tile and the route tile all read this, so they can't disagree about where the
 // caller is (previously the map followed the track while the location tile only ever read the confirmed address).
+// A confirmed address keeps the pin until the track shows the caller has really moved since they gave it: GPS
+// points that stay where the phone was when the address was confirmed are the same place again (often a less
+// accurate fix of it), not a move. Previously any newer GPS point won, so a caller who said "Convent Square
+// Junction" was pinned there, then snapped back to the call-start GPS spot a few seconds later.
+const MOVED_SINCE_ADDRESS_M = 150
+
 export function livePosition(loc: Incident['location']): LivePosition | null {
-  const last = loc.track?.at(-1) ?? null
+  const track = loc.track ?? []
+  const last = track.at(-1) ?? null
   const c = loc.confirmed
   const pinned = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng, at: c.confirmedAt } : null
-  if (last && (!pinned || Date.parse(last.at) >= Date.parse(pinned.at))) return { lat: last.lat, lng: last.lng, at: last.at, source: 'track' }
+  if (last && pinned && Date.parse(last.at) >= Date.parse(pinned.at)) {
+    const pinnedAt = Date.parse(pinned.at)
+    // Where the track was when the address was confirmed (or its first point after, if it started later).
+    const base = [...track].reverse().find((t) => Date.parse(t.at) <= pinnedAt) ?? track.find((t) => Date.parse(t.at) >= pinnedAt)
+    if (base && distanceM(base, last) >= MOVED_SINCE_ADDRESS_M) return { lat: last.lat, lng: last.lng, at: last.at, source: 'track' }
+    return { ...pinned, source: 'address' }
+  }
+  if (last && !pinned) return { lat: last.lat, lng: last.lng, at: last.at, source: 'track' }
   if (pinned) return { ...pinned, source: 'address' }
   // The caller gave an address but it couldn't be placed ("MiG showroom" with no area): show the rough fix rather
   // than an empty map. It's marked 'rough' (approximate area), and the location card says the address couldn't be

@@ -85,10 +85,21 @@ export async function startLiveCall(
   // last line is re-written only when it has grown (the dashboard shows the newest version of a growing line).
   // Previously a periodic flush marked the open line as done, so the rest of the caller's sentence (which
   // arrives in fragments, often after Mia starts replying) was never written and lines appeared cut off.
+  // The Live model occasionally voices its own self-check after the real reply ("* *Constraint Checklist &
+  // Confidence Score:* 1. Responds in same language? Yes ... Spoken text: \"...\"", INC-MUW7XJDA). The responder
+  // view keeps only the words meant for the caller: the quoted spoken text if the leak names it, otherwise
+  // everything before the leak starts.
+  const LEAK_START = /\*+\s*\*?\s*(constraint checklist|confidence score|mental sandbox|key learnings?)|\bconstraint checklist\b|\bconfidence score\b/i
+  const spokenPart = (text: string) => {
+    const at = text.search(LEAK_START)
+    if (at < 0) return text
+    const quoted = [...text.slice(at).matchAll(/(?:spoken text|speech)\s*:?\s*\*?\s*["“]([^"”]{3,})["”]/gi)].at(-1)?.[1]
+    return quoted ?? text.slice(0, at)
+  }
   const written: number[] = []
   const writeLine = (i: number) => {
     const line = transcriptLines[i]
-    const text = line.text.replace(/[<{[(]\s*(no speech( detected)?|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]/gi, '').trim()
+    const text = (line.speaker === 'Mia' ? spokenPart(line.text) : line.text).replace(/[<{[(]\s*(no speech( detected)?|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]/gi, '').trim()
     if (!text || (written[i] ?? 0) >= line.text.length) return
     written[i] = line.text.length
     const speaker = line.speaker === 'Mia' ? 'Mia' : 'Caller'
@@ -128,6 +139,11 @@ export async function startLiveCall(
   // Set only once the caller has said they're being followed/chased or are on the move. Route guidance is gated on
   // it: a caller hiding at home who describes the ATTACKER's bike was being routed to a police station.
   let movementReported = false
+  // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
+  const markMoving = () => {
+    movementReported = true
+    tracker?.prefetch()
+  }
   const SILENT_TAG = 'caller silent after danger - line kept open'
   let silentTagged = false
   const MOVEMENT = /(followed|chased|chasing|stalked|stalking|fleeing|escaping)|following (me|her|him|them|the caller)|on the move|moving around|abduct|taken somewhere|running away|in the road|leaving the (house|home|room|building)/i
@@ -185,7 +201,7 @@ export async function startLiveCall(
         // the silence-timer guard below. Never reset back to false: danger doesn't un-happen mid-call.
         if (args.urgency === 'high' || (Array.isArray(args.dangerIndicators) && args.dangerIndicators.length)) dangerReported = true
         // Danger tags only, never free-text notes ("follow-up" in a note matched and routed a caller hiding at home).
-        if (Array.isArray(args.dangerIndicators) && args.dangerIndicators.some((t) => typeof t === 'string' && MOVEMENT.test(t))) movementReported = true
+        if (Array.isArray(args.dangerIndicators) && args.dangerIndicators.some((t) => typeof t === 'string' && MOVEMENT.test(t))) markMoving()
         enqueueWrite(() => updateLiveFields(db, incidentId, patch))
         break
       }
@@ -397,7 +413,7 @@ export async function startLiveCall(
       for (const call of routeCalls) {
         const args = (call.args ?? {}) as { situation?: string; landmark?: string }
         // Mia's own situation text counts only if it says the CALLER is followed/chased/moving ("attacker on bike" doesn't).
-        if (args.situation && MOVEMENT.test(args.situation)) movementReported = true
+        if (args.situation && MOVEMENT.test(args.situation)) markMoving()
         if (!movementReported) {
           const silent = replyQueued || spokeSinceCaller
           if (!silent) replyStarted()
@@ -562,7 +578,7 @@ export async function startLiveCall(
     // the dashboard for the responder either way.
     if (finished || !movementReported) return
     session.sendClientContent({
-      turns: `(System note, not the caller — live navigation: ${note} If you are guiding the caller to safety, relay the next instruction now, phrased for the situation per your GETTING TO SAFETY rules.)`,
+      turns: `(System note, not the caller — live navigation: ${note} If you are guiding the caller to safety, relay the next instruction now, phrased for the situation. Say only the words meant for the caller.)`,
     })
   })
 
@@ -609,7 +625,7 @@ export async function startLiveCall(
     clearInterval(budgetTimer)
     if (callerMoving) return
     session.sendClientContent({
-      turns: '(System note, not the caller — time budget: the call is about two and a half minutes long. If the minimum facts are known and you are not guiding them to safety or relaying a responder message, start wrapping up naturally now, per your TIME BUDGET rule. If the caller is still in danger or mid-answer, carry on and wrap up when it is safe.)',
+      turns: '(System note, not the caller — time budget: the call is about two and a half minutes long. If the minimum facts are known and you are not guiding them to safety or relaying a responder message, start wrapping up naturally now, per your TIME BUDGET rule. If the caller is still in danger or mid-answer, carry on and wrap up when it is safe. Say only the words meant for the caller.)',
     })
   }, 5_000)
 
@@ -626,7 +642,7 @@ export async function startLiveCall(
     if (!next || injectedMessages.has(next.id)) return
     injectedMessages.add(next.id)
     session.sendClientContent({
-      turns: `(System note, not the caller — responder message ${next.id}: "${next.text}". Pass it on to the caller on this turn as ordinary delivery chat, per your RESPONDER MESSAGES rule, then call confirm_message_delivered with this id and exactly what you said.)`,
+      turns: `(System note, not the caller — responder message ${next.id}: "${next.text}". Pass it on to the caller on this turn as ordinary delivery chat, per your RESPONDER MESSAGES rule, then call confirm_message_delivered with this id and exactly what you said. Say only the words meant for the caller.)`,
     })
   }, 1_000)
 
@@ -672,14 +688,14 @@ export async function startLiveCall(
       const note = pendingRouteNote
       pendingRouteNote = ''
       console.info('[QuickBite call] relaying late route')
-      session.sendClientContent({ turns: `(System note, not the caller — live navigation, the route is ready: ${note} Relay the first direction now, phrased for the situation.)` })
+      session.sendClientContent({ turns: `(System note, not the caller — live navigation, the route is ready: ${note} Relay the first direction now, phrased for the situation. Say only the words meant for the caller.)` })
       return
     }
     if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return
     if (Date.now() - callerSpokeAt < REPLY_WAIT_MS) return
     nudgedForTurn = true
     console.info('[QuickBite call] reply watchdog: caller waiting, nudging Mia')
-    session.sendClientContent({ turns: '(System note, not the caller: the caller finished speaking and is waiting. Answer them now, briefly, following your instructions.)' })
+    session.sendClientContent({ turns: '(System note, not the caller: the caller finished speaking and is waiting. Reply to what they just said, briefly. Say only the words meant for the caller.)' })
   }, 1_000)
 
   const stressTimer = setInterval(() => {
@@ -724,11 +740,11 @@ export async function startLiveCall(
     }
     if (silentNudges <= 3) {
       session.sendClientContent({
-        turns: `(System note, not the caller: the caller has been silent. Silence attempt ${silentNudges} of 3 — follow your SILENCE rule and gently repeat your last question with its meaning. If the caller has just answered it, ignore this note and continue.)`,
+        turns: `(System note, not the caller: the caller has been silent. Silence attempt ${silentNudges} of 3 — follow your SILENCE rule and gently repeat your last question with its meaning. If the caller has just answered it, ignore this note and continue. Say only the words meant for the caller.)`,
       })
     } else if (silentNudges === 4) {
       session.sendClientContent({
-        turns: '(System note, not the caller: still no response after 3 attempts, and nothing dangerous has been reported this call. Follow your SILENCE rule now — report it, say goodbye, and call end_call.)',
+        turns: '(System note, not the caller: still no response after 3 attempts, and nothing dangerous has been reported this call. Follow your SILENCE rule now — report it, say goodbye, and call end_call. Say only the words meant for the caller.)',
       })
       // Failsafe in case the model doesn't hang up on its own. Re-checks dangerReported at fire time too, in
       // case danger gets reported in the 20s between this nudge and the failsafe running.
@@ -781,7 +797,7 @@ export async function startLiveCall(
     getTranscript: () => transcriptLines.map((l) => `${l.speaker}: ${l.text.trim()}`).join('\n'),
     noteMotion: (kind) => {
       // Running from the sensors counts as "on the move", so route guidance is allowed even if not said yet.
-      if (kind === 'running') movementReported = true
+      if (kind === 'running') markMoving()
       const note = MOTION_NOTES[kind]
       // Rides on the next silent tool response (takeFacts): a turnComplete=false message would hold the turn open.
       if (note) extraNotes.push(note)
