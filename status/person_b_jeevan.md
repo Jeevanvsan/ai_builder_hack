@@ -601,3 +601,9 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Deployed: web **staging** + dashboard. Production web is NOT yet updated; waiting for a real voice call on staging.
 - Thorough inspection workflow: ran out of session quota before the verify/fix stages. 37 unverified findings are listed in its output (eval harness drift, connect/setup hangs, OTP account reload, order-placed page); not acted on yet.
 - **Native: paused** on Jeevan's instruction ("focus on web only"). Native's `liveSession.ts` has the route-budget/watchdog change but not today's routing, transcript or persona-note fixes.
+
+### 2026-10-06 ~16:45 IST: staging call INC-MUWJYDV8 follow-up (web only)
+- **Pin in the wrong place**: "Convent Square Junction, Alleppey" found nothing (OpenStreetMap uses "Alappuzha"), so the loose fallback pinned another "convent" 1.2 km away. Old town names are now mapped to official ones (Alleppey, Cochin, Trivandrum, Calicut, Trichur, Quilon, Cannanore, Palghat, Bangalore, Bombay, Madras), and fallback phrases are searched near the caller (hits more than 25 km away are ignored). Now resolves to the real junction.
+- **Route not drawn on the map although Mia quoted it**: in Node the same tracker code computes and saves the route (Alappuzha South police, 547 m). The phone-side failure is not reproduced yet. A failed save now logs `[QuickBite call] safe route not saved` with the reason and retries once; each route is logged as `[QuickBite call] route:`.
+- **Voice sounding male mid-call**: the voice config ("Kore") is sent on every connect, reconnect and key switch, so this is model drift. The persona now says to keep the same female voice for the whole call. If it persists, try another female voice (Aoede/Leda).
+- Deployed web staging. Ameen: the persona's first section gained 2 lines (spoken output only, same voice).

@@ -53,7 +53,12 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
         if (next) {
           adopt(next)
           // Not awaited: Mia's directions don't wait on the dashboard write.
-          void setSafeRoute(db, incidentId, next).catch(() => {})
+          void setSafeRoute(db, incidentId, next).catch((err) => {
+            // INC-MUWJYDV8: Mia had the route but the dashboard never got it. Say why, and try once more.
+            console.warn('[QuickBite call] safe route not saved, retrying:', err)
+            setTimeout(() => void setSafeRoute(db, incidentId, route ?? next).catch((e) => console.warn('[QuickBite call] safe route save failed again:', e)), 2_000)
+          })
+          console.info('[QuickBite call] route:', next.destination.name, `${next.distanceM} m`)
         }
         return route
       } catch {

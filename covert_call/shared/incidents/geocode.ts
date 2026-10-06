@@ -187,16 +187,33 @@ async function nominatimVerified(query: string, near: Coordinates | null): Promi
   return { ...unbiased, precision: 'approximate' }
 }
 
-async function viaNominatim(address: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+// Callers (and the speech-to-text) still use the old English town names, but OpenStreetMap only knows the
+// official ones: "Convent Square Junction, Alleppey" found nothing, and the looser fallbacks then pinned a
+// different "convent" 1.2 km away (INC-MUWJYDV8). "Convent Square Junction, Alappuzha" is an exact hit.
+const TOWN_NAMES: [RegExp, string][] = [
+  [/\balleppey\b/gi, 'Alappuzha'], [/\bcochin\b/gi, 'Kochi'], [/\btrivandrum\b/gi, 'Thiruvananthapuram'],
+  [/\bcalicut\b/gi, 'Kozhikode'], [/\btrichur\b/gi, 'Thrissur'], [/\bquilon\b/gi, 'Kollam'],
+  [/\bcannanore\b/gi, 'Kannur'], [/\bpalghat\b/gi, 'Palakkad'], [/\bbangalore\b/gi, 'Bengaluru'],
+  [/\bbombay\b/gi, 'Mumbai'], [/\bmadras\b/gi, 'Chennai'],
+]
+const officialNames = (address: string) => TOWN_NAMES.reduce((a, [re, name]) => a.replace(re, name), address)
+
+// A fallback match more than this far from where the caller is known to be is a same-named place elsewhere.
+const FALLBACK_MAX_KM = 25
+
+async function viaNominatim(spoken: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+  const address = officialNames(spoken)
   const direct = await nominatimVerified(address, near)
   if (direct) return direct
 
   // Try dropping one mis-transcribed segment at a time before falling back to just the town — this can still
   // land on the exact landmark (a specific place, not just a general area) even when one part of what the
   // caller said didn't come through clearly.
+  // Shorter phrases are loose ("Convent, Alappuzha" is any convent), so they are searched near the caller and a
+  // hit far from them is ignored.
   for (const variant of [...droppingOneSegment(address), ...relaxedQueries(address)]) {
-    const hit = await nominatimSearch(variant, null)
-    if (hit) return { ...hit, precision: 'approximate' }
+    const hit = await nominatimSearch(variant, near)
+    if (hit && (!near || distanceKm(near, hit) <= FALLBACK_MAX_KM)) return { ...hit, precision: 'approximate' }
   }
 
   // These two fallbacks are deliberately unambiguous ON THEIR OWN (a 6-digit pincode; a named town/city), so
