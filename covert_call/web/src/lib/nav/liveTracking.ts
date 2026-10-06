@@ -39,9 +39,17 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   // INC-MUWKHLNF), or the caller was reported moving before any position existed. Now the route starts as soon
   // as both are true, and is handed to Mia as a navigation note.
   let wantRoute: string | null = null
+  let waitLogged = false
   const routeIfWanted = () => {
-    if (!wantRoute || route || inflight || !pos || !(gpsFix || latestIncident?.location.confirmed)) return
+    if (!wantRoute || route || inflight) return
+    if (!pos || !(gpsFix || latestIncident?.location.confirmed)) {
+      if (!waitLogged) console.info('[QuickBite call] route waiting for a position (GPS fix or confirmed address)')
+      waitLogged = true
+      return
+    }
+    console.info('[QuickBite call] working out the route from', pos)
     void reroute(wantRoute).then((r) => {
+      if (!r) console.warn('[QuickBite call] no route found')
       if (r) onTurnNote(`Route to safety is ready: ${r.destination.name} (${r.destination.kind}), ${fmtM(r.distanceM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min. First: ${r.steps[0]?.instruction ?? 'continue ahead'}${r.steps[1] ? `, then ${r.steps[1].instruction}` : ''}. Tell the caller where you are taking them, the first direction and the distance.`)
     })
   }
@@ -72,7 +80,8 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
           console.info('[QuickBite call] route:', next.destination.name, `${next.distanceM} m`)
         }
         return route
-      } catch {
+      } catch (err) {
+        console.warn('[QuickBite call] route lookup failed:', err)
         return route
       } finally {
         inflight = null

@@ -141,6 +141,7 @@ export async function startLiveCall(
   let movementReported = false
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
   const markMoving = () => {
+    if (!movementReported) console.info('[QuickBite call] caller is on the move: starting the route')
     movementReported = true
     tracker?.prefetch()
   }
@@ -593,6 +594,7 @@ export async function startLiveCall(
     const data = snap.data() as Omit<Incident, 'id'> | undefined
     if (!data) return
     callerMoving = isCallerMoving(data)
+    if (callerMoving || movementReported) markMoving()
     lastIncident = data
     pendingFacts = factsWithMode(data)
   })

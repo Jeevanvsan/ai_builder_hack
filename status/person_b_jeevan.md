@@ -612,3 +612,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - That call had no precise GPS (no track), "chased" was reported before the address was confirmed, and Mia never called `get_route_guidance`; she said "I'm guiding you to the police station" with no route. The pin was correct (Convent Square, after the town-name fix).
 - Now: once the caller is reported moving, the tracker computes the route as soon as any trusted position exists (precise GPS or the confirmed address), saves it for the dashboard, and hands Mia a "route to safety is ready" note. Navigation notes wait until she is quiet and no route call is open. Tested in Node with this call's sequence: route saved, note sent 5.7 s after the address was confirmed.
 - Deployed web staging.
+
+### 2026-10-06 ~17:40 IST: route still missing on INC-MUWKMTTG
+- Console showed no route lookup at all; Mia's "500 m ahead" was invented. The tracker itself works: tested in Node and in a real (headless Edge) browser with this call's sequence, the route is saved and Mia's note sent.
+- Added a second trigger: the call's own incident listener starts the route whenever the incident says the caller is moving, and re-tries on every update (for example when the address is confirmed). Each step now logs one line (`caller is on the move`, `route waiting for a position`, `working out the route from`, `route:`, `no route found`, `route lookup failed`).
+- Deployed web staging.
