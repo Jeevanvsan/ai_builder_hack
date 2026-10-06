@@ -20,7 +20,7 @@ import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
 import { stopDemoInject, watchDemoControl } from '../lib/demoInject'
 import { watchMotion, type MotionWatch } from '../lib/motion'
-import { sendCaseReport, watchForTrustedAlert } from '../lib/trustedAlert'
+import { startCaseReport, watchForTrustedAlert } from '../lib/trustedAlert'
 import { demoCallsLeft, minutesUntilNextDemo, recordDemoCall } from '../lib/demo'
 
 // Caps a slow/hung best-effort step (an AI call with no timeout of its own) so it can never block the rest of
@@ -202,6 +202,8 @@ export function CallPage() {
           const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
           const stressTrend = incident?.voiceStressTrend ?? []
           const address = incident?.location.confirmed?.address ?? null
+          // Case report email goes out now, in parallel with the summary (the script waits for it briefly).
+          void startCaseReport(db, id, incident)
 
           // Retry once on failure (a transient network blip or rate limit shouldn't permanently lose the case
           // summary) before giving up and flagging it for the dashboard. One request now covers both the case
@@ -220,8 +222,6 @@ export function CallPage() {
             console.error('[QuickBite call] consolidation failed after retry:', e)
             await updateDoc(doc(db, INCIDENTS, id), { consolidationFailed: true }).catch(() => {})
           }
-          // The summary is in (or failed): email the case report if the caller asked for one during the call.
-          void getDoc(doc(db, INCIDENTS, id)).then((snap) => sendCaseReport(id, (snap.data() as Incident | undefined)?.reportEmail)).catch(() => {})
 
           if (address) {
             void groundedLocationContext(address).then((context) => {

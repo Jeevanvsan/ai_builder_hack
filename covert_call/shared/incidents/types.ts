@@ -47,6 +47,8 @@ export interface Incident {
   safeRoute?: import('../nav/route.ts').SafeRoute
   // Where the caller asked their case report to be emailed (send_case_report), sent after the call.
   reportEmail?: string
+  // Delivery of that report: set to 'sending' by the app at call end, then 'sent'/'failed' by the Apps Script.
+  reportEmailStatus?: { status: 'sending' | 'sent' | 'failed'; to: string; at: string; error?: string }
   extractedFieldsLive: {
     peopleCount: number | null
     dangerIndicators: string[]

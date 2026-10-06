@@ -1,4 +1,6 @@
-import { doc, onSnapshot, type Firestore } from 'firebase/firestore'
+import { addDoc, collection, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
+import type { Incident } from '../../../shared/incidents/types.ts'
+import { buildCaseSketch } from './caseSketch'
 import { INCIDENTS, isDemoMode } from '../../../shared/incidents/client.ts'
 import { loadProfile } from './caller'
 
@@ -29,12 +31,19 @@ export function watchForTrustedAlert(db: Firestore, incidentId: string): () => v
   return stop
 }
 
-// After a call: if the caller gave an email (send_case_report), ask the Apps Script to email them the case report.
-// The script reads the address from the incident itself, never from this request, so the open script URL can't be
-// used to mail anyone else. Best effort, and only once the summary has been written (or has failed).
-export function sendCaseReport(incidentId: string, reportEmail: string | undefined): void {
-  if (!ALERT_URL || !reportEmail || isDemoMode()) return
-  void fetch(ALERT_URL, {
+// The moment a call ends: if the caller gave an email (send_case_report), mark the report as sending, draw the
+// scene sketch, save it with the camera snaps, and ask the Apps Script to send it. The script reads the address
+// from the incident itself (never from this request), waits briefly for the AI summary, emails the report with a
+// PDF, and records 'sent' or 'failed' on the incident for the dashboard.
+export async function startCaseReport(db: Firestore, incidentId: string, incident: Omit<Incident, 'id'> | undefined): Promise<void> {
+  if (!ALERT_URL || !incident?.reportEmail || isDemoMode()) return
+  const now = () => new Date().toISOString()
+  await updateDoc(doc(db, INCIDENTS, incidentId), { reportEmailStatus: { status: 'sending', to: incident.reportEmail, at: now() } }).catch(() => {})
+  const sketch = await buildCaseSketch(incidentId, incident).catch(() => null)
+  if (sketch) {
+    await addDoc(collection(db, INCIDENTS, incidentId, 'snaps'), { kind: 'sketch', base64: sketch, mimeType: 'image/jpeg', at: now(), caption: 'Scene sketch: where the call started, the address given, the movement trail and the route to safety' }).catch(() => {})
+  }
+  await fetch(ALERT_URL, {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain' },

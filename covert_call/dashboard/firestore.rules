@@ -94,7 +94,7 @@ service cloud.firestore {
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
           'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven',
-          'videoControl', 'vehicle', 'coercionSignals', 'motionEvents', 'isDemo', 'callerUid', 'credibility', 'aiUsage', 'reportEmail'
+          'videoControl', 'vehicle', 'coercionSignals', 'motionEvents', 'isDemo', 'callerUid', 'credibility', 'aiUsage', 'reportEmail', 'reportEmailStatus'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -107,6 +107,7 @@ service cloud.firestore {
         && (!('track' in d.location) || (d.location.track is list && d.location.track.size() <= 2000))
         && (!('safeRoute' in d) || d.safeRoute is map)
         && optionalString(d, 'reportEmail', 120)
+        && (!('reportEmailStatus' in d) || d.reportEmailStatus is map)
         && d.extractedFieldsLive is map
         && d.response is map
         && d.response.status in ['new', 'acknowledged', 'in_progress', 'resolved']
@@ -207,6 +208,17 @@ service cloud.firestore {
       allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
         && (!changesResponderFields(resource.data, request.resource.data) || isResponder());
       allow delete: if false;
+      // Case report images (camera snaps taken when Mia reports something, and the scene sketch drawn at call
+      // end), read by the Apps Script that emails the report. Write once, never changed.
+      match /snaps/{snapId} {
+        allow read: if true;
+        allow create: if request.resource.data.keys().hasOnly(['kind', 'base64', 'mimeType', 'at', 'caption'])
+          && request.resource.data.kind in ['camera', 'sketch']
+          && request.resource.data.base64 is string && request.resource.data.base64.size() < 900000
+          && request.resource.data.caption is string && request.resource.data.caption.size() <= 300;
+        allow update, delete: if false;
+      }
+
       // A demo call listens for responder messages like a real one; nobody can send any here.
       match /messages/{messageId} {
         allow read: if true;
@@ -242,6 +254,17 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'spokenAs', 'deliveredAt'])
           && request.resource.data.spokenAs is string && request.resource.data.spokenAs.size() <= 500;
         allow delete: if false;
+      }
+
+      // Case report images (camera snaps taken when Mia reports something, and the scene sketch drawn at call
+      // end), read by the Apps Script that emails the report. Write once, never changed.
+      match /snaps/{snapId} {
+        allow read: if true;
+        allow create: if request.resource.data.keys().hasOnly(['kind', 'base64', 'mimeType', 'at', 'caption'])
+          && request.resource.data.kind in ['camera', 'sketch']
+          && request.resource.data.base64 is string && request.resource.data.base64.size() < 900000
+          && request.resource.data.caption is string && request.resource.data.caption.size() <= 300;
+        allow update, delete: if false;
       }
 
       // Full call recording (mic + AI voice), base64-encoded — saved here instead of Firebase Storage since

@@ -642,3 +642,11 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Mia didn't ask for the email: the call ended on "take care" after "I have reached the police station, the car is gone". Now, once danger was reported and the caller says they're safe (reached / safe now / car gone / at the station), the app prompts her once, when she's quiet, to ask for the email (skipped if she already mentioned email).
 - The `failed-precondition` 400 in the console is a voice-stress transaction conflict that the SDK retries (the score was written); harmless.
 - Deployed web staging.
+
+### 2026-10-06 ~20:15 IST: full case report email with PDF, scene sketch, camera snaps, dashboard status
+- Sent the moment the call ends (in parallel with the AI summary; the script waits up to ~25 s for it).
+- Contents (HTML email + PDF attachment): overview, summary, key points (bulletin), danger list, locations with map links/coordinates/movement trail, route with destination, distance, reason and every turn, people, vehicle (plate + camera descriptions), everything seen/heard, other signals, voice stress, recording links, AI reasoning, advice given, responder notes, full timestamped conversation.
+- Images: scene sketch (OSM map drawn in the caller's browser at call end: start point, address pin, movement trail, route, safe place) + up to 4 camera snaps saved when Mia reports a vehicle/person/weapon/injury/fire/plate. Stored in `incidents/{id}/snaps` (new rules, public read so the script can include them).
+- Status: app sets `reportEmailStatus` = sending; the script sets sent/failed. Shown on the dashboard Case file tab.
+- **Jeevan: paste the updated `covert_call/docs/setup/trusted-alert-Code.gs` over Code.gs again and deploy a new version.**
+- Deployed: rules, web staging, dashboard.

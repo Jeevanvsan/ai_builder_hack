@@ -1,7 +1,7 @@
 import { AI_MODELS } from '../../../../shared/aiModels.ts'
 import { AI_FEATURES } from '../../../../shared/aiFeatures.ts'
 import { FunctionResponseScheduling, MediaResolution, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
-import { arrayRemove, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
+import { addDoc, arrayRemove, collection, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
 import { usageFromMetadata } from '../../../../shared/aiModels.ts'
 import { INCIDENTS, recordAiUsage, appendTranscriptLine, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
@@ -143,6 +143,18 @@ export async function startLiveCall(
   // tool response asks her to look at the latest frame (she sometimes never mentioned a yellow car that was in
   // every frame, INC-MUWKW3B7).
   let lastSceneAt = 0
+  // Camera snaps for the case report: the frame on screen when Mia reports something that matters (a vehicle,
+  // person, weapon, injury, fire or a plate). At most 4 per call, 8 s apart.
+  let lastFrame: string | null = null
+  let snapsTaken = 0
+  let lastSnapAt = 0
+  const saveSnap = (caption: string) => {
+    if (!lastFrame || snapsTaken >= 4 || Date.now() - lastSnapAt < 8_000) return
+    snapsTaken++
+    lastSnapAt = Date.now()
+    const base64 = lastFrame
+    void addDoc(collection(db, INCIDENTS, incidentId, 'snaps'), { kind: 'camera', base64, mimeType: 'image/jpeg', at: new Date().toISOString(), caption: caption.slice(0, 300) }).catch(() => {})
+  }
   // Case report email: asked once the caller is safe after a danger call. The persona alone didn't make her ask
   // (INC-MUWM64RK ended on "take care"), so the app prompts her once she is quiet.
   let callerSafe = false
@@ -261,7 +273,10 @@ export async function startLiveCall(
       case 'report_scene_observation': {
         const source = args.source
         const kind = args.kind
-        if (source === 'camera') lastSceneAt = Date.now()
+        if (source === 'camera') {
+          lastSceneAt = Date.now()
+          if (['vehicle', 'person', 'weapon', 'injury', 'fire_hazard'].includes(String(args.category)) || args.plate) saveSnap(`${kind}${args.detail ? `: ${args.detail}` : ''}`)
+        }
         if ((source === 'camera' || source === 'sound') && typeof kind === 'string') {
           if (/weapon|gun|shot|knife|stab|scream|blood|explosion|fight|attack/i.test(`${kind} ${args.detail ?? ''}`)) dangerReported = true
           enqueueWrite(() =>
@@ -702,6 +717,7 @@ export async function startLiveCall(
   let frameSampler: FrameSampler | null = null
   if (opts.videoStream) {
     frameSampler = startFrameSampler(opts.videoStream, (base64Jpeg) => {
+      lastFrame = base64Jpeg
       if (canSend()) session.sendRealtimeInput({ video: { data: base64Jpeg, mimeType: 'image/jpeg' } })
     })
   }

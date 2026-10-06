@@ -75,6 +75,20 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
           />
         ) : (
           <div className="case-file">
+            {(incident.reportEmailStatus || incident.reportEmail) && (
+              <section className="case-section">
+                <h3>Case report email</h3>
+                <p className={`report-email report-email-${incident.reportEmailStatus?.status ?? 'requested'}`}>
+                  {!incident.reportEmailStatus
+                    ? `Caller asked for the report at ${incident.reportEmail}; it is sent when the call ends.`
+                    : incident.reportEmailStatus.status === 'sending'
+                      ? `Sending the case report to ${incident.reportEmailStatus.to}…`
+                      : incident.reportEmailStatus.status === 'sent'
+                        ? `Case report (with PDF) emailed to ${incident.reportEmailStatus.to} at ${new Date(incident.reportEmailStatus.at).toLocaleTimeString()}`
+                        : `Case report to ${incident.reportEmailStatus.to} failed${incident.reportEmailStatus.error ? `: ${incident.reportEmailStatus.error}` : ''}`}
+                </p>
+              </section>
+            )}
             <section className="case-section">
               <h3>Case summary</h3>
               {incident.consolidatedSummary ? (
