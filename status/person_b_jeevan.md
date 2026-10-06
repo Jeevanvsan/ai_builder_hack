@@ -650,3 +650,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Status: app sets `reportEmailStatus` = sending; the script sets sent/failed. Shown on the dashboard Case file tab.
 - **Jeevan: paste the updated `covert_call/docs/setup/trusted-alert-Code.gs` over Code.gs again and deploy a new version.**
 - Deployed: rules, web staging, dashboard.
+
+### 2026-10-06 ~20:45 IST: case report email verified end to end (INC-MUWMRXPL)
+- Mia asked for the email after the caller was safe, read it back, and the report arrived with the sketch, the camera snap (yellow sports car) and the PDF.
+- Sketch fix: the laptop's start position (~40 km away) zoomed the map out to the whole district. Points more than 3 km from the address/route are now left off, with a note at the bottom; the sketch zooms to the incident (address pin, route, police station).
+- Deployed web staging.

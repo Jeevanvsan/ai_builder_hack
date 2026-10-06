@@ -15,6 +15,14 @@ function project(p: P, z: number) {
   return { x: ((p.lng + 180) / 360) * size, y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * size }
 }
 
+function distanceKm(a: P, b: P) {
+  const R = 6371
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
 function loadTile(z: number, x: number, y: number): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image()
@@ -29,10 +37,18 @@ function loadTile(z: number, x: number, y: number): Promise<HTMLImageElement | n
 // Base64 JPEG (no data: prefix), or null when the incident has no position at all.
 export async function buildCaseSketch(id: string, i: Omit<Incident, 'id'>): Promise<string | null> {
   const route = i.safeRoute
-  const track = i.location.track ?? []
   const c = i.location.confirmed
   const pinned = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null
-  const start = i.location.rough ?? track[0] ?? null
+  // The sketch is centred on the incident: the address and the route. A phone fix far from them (a laptop's IP or
+  // Wi-Fi position tens of km away) zoomed the map out to a whole district, INC-MUWMRXPL. Such points are left off
+  // the map and mentioned in a note instead.
+  const anchor = pinned ?? route?.geometry[0] ?? null
+  const near = (p: P) => !anchor || distanceKm(anchor, p) <= 3
+  const allTrack = i.location.track ?? []
+  const track = allTrack.filter(near)
+  const startRaw = i.location.rough ?? allTrack[0] ?? null
+  const start = startRaw && near(startRaw) ? startRaw : null
+  const startFar = startRaw && !start ? distanceKm(anchor!, startRaw) : null
   const pts: P[] = [...(route?.geometry ?? []), ...track, ...(pinned ? [pinned] : []), ...(route ? [route.destination] : []), ...(start ? [start] : [])]
   if (!pts.length) return null
 
@@ -131,6 +147,14 @@ export async function buildCaseSketch(id: string, i: Omit<Incident, 'id'>): Prom
   ctx.font = '12px Arial'
   const legend = `${route ? `Route ${Math.round(route.distanceM)} m to ${route.destination.kind}` : 'No route'}${track.length ? ` · trail ${track.length} points` : ''}`
   ctx.fillText(legend, W - ctx.measureText(legend).width - 12, 24)
+  if (startFar != null) {
+    const note = `Phone's own location at the start was ${Math.round(startFar)} km away (approximate) and is not shown`
+    ctx.font = '12px Arial'
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.fillRect(0, H - 18, ctx.measureText(note).width + 16, 18)
+    ctx.fillStyle = '#444'
+    ctx.fillText(note, 8, H - 5)
+  }
   ctx.fillStyle = 'rgba(255,255,255,0.85)'
   ctx.fillRect(W - 190, H - 18, 190, 18)
   ctx.fillStyle = '#333'
