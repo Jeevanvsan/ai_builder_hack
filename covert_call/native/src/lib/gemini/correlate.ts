@@ -1,15 +1,16 @@
+import { AI_MODELS } from '../../../../shared/aiModels'
+import { geminiKeys, generateWithFallback } from './keys'
 import { collection, getDocs, limit, orderBy, query, type Firestore } from 'firebase/firestore'
 import { GoogleGenAI } from '@google/genai'
 import { INCIDENTS } from '../../../../shared/incidents/client'
 import type { Incident } from '../../../../shared/incidents/types'
-import { GEMINI_API_KEY } from '../config'
 
 // Native port of web/src/lib/gemini/correlate.ts — keep in sync.
 //
 // Checks whether this incident's confirmed address, any vehicle description, or any name mentioned matches
 // another open or recent incident already in Firestore. Stays entirely inside data we already legitimately hold
 // — no external lookups, no identity resolution.
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.caseLinking // shared/aiModels.ts
 const RECENT_LIMIT = 25
 
 const RESPONSE_SCHEMA = {
@@ -27,7 +28,7 @@ function summarize(incident: Incident): string {
 }
 
 export async function findCorrelatedIncidents(db: Firestore, incident: Incident): Promise<string[]> {
-  if (!GEMINI_API_KEY) return []
+  if (!geminiKeys.configured) return []
 
   const hasSomethingToMatch = incident.location.confirmed?.address || incident.extractedFieldsLive.notes
   if (!hasSomethingToMatch) return []
@@ -38,8 +39,6 @@ export async function findCorrelatedIncidents(db: Firestore, incident: Incident)
     .map((d) => ({ id: d.id, ...(d.data() as Omit<Incident, 'id'>) }))
     .filter((i) => i.id !== incident.id)
   if (!others.length) return []
-
-  const client = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
   const prompt = `Emergency dispatch cross-reference check. Does the NEW incident below appear to describe the
 same person, vehicle, or location as any of the OTHER recent incidents? Only flag a genuine match (same specific
 address, same distinctive vehicle description, same clearly-matching detail) — do not flag on vague similarity
@@ -53,7 +52,7 @@ ${others.map(summarize).join('\n')}
 Return matchIds: the incident IDs from OTHER that appear to genuinely match, or an empty list if none do.`
 
   try {
-    const response = await client.models.generateContent({
+    const response = await generateWithFallback({
       model: MODEL,
       contents: prompt,
       config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },

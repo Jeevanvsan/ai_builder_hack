@@ -1,10 +1,15 @@
+import { AI_MODELS } from '../../../../shared/aiModels'
+import { AI_FEATURES } from '../../../../shared/aiFeatures'
+import { geminiKeys, liveConnectWithFallback } from './keys'
 import {
   GoogleGenAI,
+  FunctionResponseScheduling,
   Modality,
   StartSensitivity,
   type FunctionCall,
   type LiveServerMessage,
   type Session,
+  MediaResolution,
 } from '@google/genai'
 import { doc, onSnapshot, type Firestore } from 'firebase/firestore'
 import {
@@ -23,12 +28,14 @@ import {
 import { PERSONA_SYSTEM_INSTRUCTION } from '../../../../web/src/lib/gemini/persona'
 import { isCallerMoving, knownFactsNote } from '../../../../shared/incidents/knownFacts'
 import type { Incident } from '../../../../shared/incidents/types'
-import { LIVE_CALL_TOOLS } from '../../../../web/src/lib/gemini/tools'
+import { LIVE_CALL_TOOLS, batchResponses, toolResponse } from '../../../../web/src/lib/gemini/tools'
 import { startLiveTracking, type LiveTracker } from '../../../../web/src/lib/nav/liveTracking'
 import { startMicCapture, createAudioPlayer, type MicHandle, type Player } from '../platform/audio'
 import { startCallRecording, type CallRecorder } from './recorder'
 import type { FrameSource } from '../../../modules/qb-frames'
-import { GEMINI_API_KEY } from '../config'
+
+// A camera still every 2 s (web: frames.ts FRAMES_PER_SECOND = 0.5).
+const FRAME_INTERVAL_MS = 2_000
 
 // Native port of web/src/lib/gemini/liveSession.ts — keep the two in sync.
 //
@@ -38,7 +45,7 @@ import { GEMINI_API_KEY } from '../config'
 // (see lib/platform/audio.ts) and how the recording is produced (see recorder.ts).
 //
 // The web's `?model=extended` switch is web-only; native always uses plain Live, which is the proven default.
-const LIVE_MODEL = 'gemini-3.8-live'
+const LIVE_MODEL = AI_MODELS.liveCall // shared/aiModels.ts
 
 export type CallStatus = 'connecting' | 'live' | 'ended' | 'failed'
 
@@ -68,9 +75,7 @@ export async function startLiveCall(
   // everything else behaves the same.
   opts: { frames?: FrameSource | null } = {},
 ): Promise<LiveCallHandle> {
-  if (!GEMINI_API_KEY) throw new Error('Gemini Live is not configured')
-
-  const client = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
+  if (!geminiKeys.configured) throw new Error('Gemini Live is not configured')
   let tracker: LiveTracker | null = null
   const player: Player = createAudioPlayer()
   let muted = false
@@ -84,7 +89,7 @@ export async function startLiveCall(
   const written: number[] = []
   const writeLine = (i: number) => {
     const line = transcriptLines[i]
-    const text = line.text.trim()
+    const text = line.text.replace(/[<{[(]\s*(no speech( detected)?|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]/gi, '').trim()
     if (!text || (written[i] ?? 0) >= line.text.length) return
     written[i] = line.text.length
     const speaker = line.speaker === 'Mia' ? 'Mia' : 'Caller'
@@ -133,6 +138,10 @@ export async function startLiveCall(
   let resumptionHandle: string | undefined
   let reconnects = 0
   const MAX_RECONNECTS = 3
+  // Hard cap per session on top of the per-drop limit (which resets on each reopen): every reconnect resends the
+  // whole persona and tools, so a session that keeps dropping must not reconnect forever.
+  let totalReconnects = 0
+  const MAX_TOTAL_RECONNECTS = 8
 
   // Gemini can fire several tool calls back-to-back within one turn; two overlapping transactions on the same
   // document race and one loses with `failed-precondition`. Queuing keeps writes strictly sequential without
@@ -215,6 +224,8 @@ export async function startLiveCall(
               kind,
               detail: typeof args.detail === 'string' ? args.detail : undefined,
               confidence: typeof args.confidence === 'number' ? args.confidence : undefined,
+              category: typeof args.category === 'string' ? args.category : undefined,
+              vehicle: { type: args.vehicleType as string | undefined, colour: args.colour as string | undefined, plate: args.plate as string | undefined },
             }),
           )
         }
@@ -277,6 +288,36 @@ export async function startLiveCall(
     }
   }
 
+  // The call's mode, tracked by the app from what the caller says (Mia was drifting back to food-code questions
+  // after "I can speak freely"). Put at the front of every known-facts note, which she already receives as context.
+  let openMode = false
+  // Has Mia started speaking since the caller last spoke? Decides whether a tool result must start her reply.
+  let spokeSinceCaller = false
+  // When the caller last spoke, and whether Mia has been nudged for that turn already (reply watchdog below).
+  let callerSpokeAt = 0
+  let nudgedForTurn = false
+  // A route that arrived after its 6 s budget, waiting for Mia to be quiet.
+  let pendingRouteNote = ''
+  // Route calls Mia is still waiting on. The watchdog must not send a turn while one is open: a client turn
+  // (turnComplete) interrupts the generation that is waiting for that answer.
+  let routesPending = 0
+  // A tool response that starts Mia's reply restarts the watchdog clock, so it never nudges while that reply is
+  // being generated (generation takes 1-2 s before the first audio arrives).
+  const replyStarted = () => { if (callerSpokeAt && !spokeSinceCaller) callerSpokeAt = Date.now() }
+  let callerHeard = ''
+  const OPEN_SIGNAL = /\b(talk|speak)\b[^.?!]{0,15}\bfreely\b|\bi can (talk|speak)\b|\bi'?m alone\b|\bno one(?:'s| is) (here|around)\b|^\s*talk\b/i
+  const COVERT_SIGNAL = /\b(can'?t|cannot) (talk|speak)\b|\bsomeone(?:'s| is) coming\b|\b(he|she|they)(?:'s|'re| is| are) (here|back|close|coming)\b/i
+  const noteMode = (text: string) => {
+    callerHeard = `${callerHeard} ${text}`.slice(-160)
+    const before = openMode
+    if (OPEN_SIGNAL.test(callerHeard)) openMode = true
+    if (COVERT_SIGNAL.test(callerHeard)) openMode = false
+    if (before !== openMode) { callerHeard = ''; if (lastIncident) pendingFacts = factsWithMode(lastIncident) }
+  }
+  const factsWithMode = (data: Omit<Incident, 'id'>) =>
+    (openMode ? "(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO food words, NO menu codes, NO 'rider', 'order' or sizes. Switch back only if they say they can't talk or someone is coming.) " : '') + knownFactsNote(data)
+  let lastIncident: Omit<Incident, 'id'> | undefined
+
   const onMessage = (message: LiveServerMessage) => {
     if (__DEV__) console.debug('[QuickBite call] message:', message)
 
@@ -284,6 +325,10 @@ export async function startLiveCall(
     const callerText = message.serverContent?.inputTranscription?.text
     if (callerText) {
       appendTranscript('Caller', callerText)
+      spokeSinceCaller = false
+      callerSpokeAt = Date.now()
+      nudgedForTurn = false
+      noteMode(callerText)
       lastActivityAt = Date.now()
       silentNudges = 0
     }
@@ -293,6 +338,7 @@ export async function startLiveCall(
     const audioPart = message.serverContent?.modelTurn?.parts?.find((p) => p.inlineData?.mimeType?.startsWith('audio/'))
     if (audioPart?.inlineData?.data) {
       player.play(audioPart.inlineData.data)
+      spokeSinceCaller = true
       lastActivityAt = Date.now()
     }
 
@@ -307,18 +353,42 @@ export async function startLiveCall(
     if (calls?.length) {
       const routeCalls = calls.filter((c) => c.name === 'get_route_guidance')
       const others = calls.filter((c) => c.name !== 'get_route_guidance')
-      const outputs = others.map((call) => handleToolCall(call) ?? 'ok')
-      if (others.length) {
-        void session.sendToolResponse({
-          functionResponses: others.map((call, i) => ({ id: call.id, name: call.name, response: { output: outputs[i] } })),
-        })
+      const facts = takeFacts()
+      const outputs = others.map((call, i) => (handleToolCall(call) ?? 'ok') + (i === 0 ? facts : ''))
+      const responses = batchResponses(others, outputs, spokeSinceCaller)
+      const replyQueued = responses.some((r) => r.scheduling !== FunctionResponseScheduling.SILENT)
+      if (responses.length) {
+        console.info('[QuickBite call] tools:', responses.map((r) => `${r.name}:${r.scheduling === FunctionResponseScheduling.SILENT ? 'silent' : 'reply'}`).join(', '))
+        void session.sendToolResponse({ functionResponses: responses })
+        if (replyQueued) replyStarted()
       }
       // Route guidance needs a real answer (live GPS + routing), so it's answered once the tracker resolves.
       for (const call of routeCalls) {
         const args = (call.args ?? {}) as { situation?: string; landmark?: string }
+        // Mia often waits for the directions before she speaks, so the route must always answer quickly: within
+        // ROUTE_BUDGET_MS she gets either the route or a holding instruction. A route that arrives later is relayed by
+        // the reply guard timer as soon as she is quiet (never interrupting her). A route lookup that never finished left her
+        // silent until the watchdog fired (INC-MUW73RZ6).
+        const ROUTE_BUDGET_MS = 6_000
+        let answered = false
+        routesPending++
+        const answer = (output: string) => {
+          if (answered) return
+          answered = true
+          routesPending = Math.max(0, routesPending - 1)
+          if (finished) return
+          console.info('[QuickBite call] route answered:', output.slice(0, 90))
+          void session.sendToolResponse({ functionResponses: [toolResponse(call, output, false)] })
+          replyStarted()
+        }
+        const budget = setTimeout(() => answer('Route still being worked out (a few seconds). Right now: tell them to keep moving towards a busy, well-lit place (a shop, petrol pump, crowd) and ask ONCE for a landmark or road name they can see. The directions will follow as a system note: relay them when they come.'), ROUTE_BUDGET_MS)
         void (tracker ? tracker.guidance(args.situation, args.landmark) : Promise.resolve('No GPS yet — ask for the nearest landmark.'))
           .catch(() => 'Routing is unavailable right now — ask for the nearest landmark and keep them moving somewhere busy and lit.')
-          .then((output) => session.sendToolResponse({ functionResponses: [{ id: call.id, name: call.name, response: { output } }] }))
+          .then((output) => {
+            clearTimeout(budget)
+            if (!answered) answer(output)
+            else pendingRouteNote = output
+          })
       }
     }
   }
@@ -327,7 +397,7 @@ export async function startLiveCall(
   callbacks.onStatusChange('connecting')
 
   const openSession = (resume?: string) =>
-    client.live.connect({
+    liveConnectWithFallback({
       model: LIVE_MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
@@ -365,6 +435,13 @@ export async function startLiveCall(
         // Lets a dropped connection (bad signal, a backgrounded app, a network blip) reopen transparently
         // instead of silently ending the call.
         sessionResumption: resume ? { handle: resume } : {},
+        // Sliding-window compression on every call (as on web): otherwise the whole conversation, audio and frames
+        // are re-read on each turn, so cost and latency grow with the call.
+        // Keep the session lean: compress from ~48K tokens down to ~28K (the default only starts at 80% of the 131K
+        // window, so it never ran and every re-read kept growing). System instructions are always kept.
+        contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } },
+        // Camera frames at low media resolution (~70 tokens per frame on Gemini 3 instead of ~280).
+        mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
       },
       callbacks: {
         // onopen can fire before connect()'s own promise resolves and assigns `session`, so only flip status
@@ -385,7 +462,8 @@ export async function startLiveCall(
           // Reconnect even without a resumption handle: a quiet stretch can hit Gemini's idle timeout (a clean
           // 1000 close) before the server ever sends one, and requiring a handle would strand a caller who is
           // still there. `finished` is what distinguishes a real hangup from a drop.
-          if (!finished && reconnects < MAX_RECONNECTS) {
+          if (!finished && reconnects < MAX_RECONNECTS && totalReconnects < MAX_TOTAL_RECONNECTS) {
+            totalReconnects += 1
             reconnects += 1
             callbacks.onStatusChange('connecting')
             void openSession(resumptionHandle)
@@ -428,24 +506,32 @@ export async function startLiveCall(
   const canSend = () => connected && !finished
 
   // Epic 22.2: tell Mia what is already known (from the caller, the camera and background sound) so she never
-  // asks for it again. Sent as context only (turnComplete: false), so it never makes her speak on its own, and
+  // asks for it again. Delivered on the silent tool responses (takeFacts), never as its own message, and
   // only when the summary actually changes, at most every 8 s and never while she is talking.
   let lastFacts = ''
   let pendingFacts = ''
-  let lastFactsAt = 0
   let callerMoving = false
   const unsubIncident = onSnapshot(doc(db, INCIDENTS, incidentId), (snap) => {
     const data = snap.data() as Omit<Incident, 'id'> | undefined
     if (!data) return
     callerMoving = isCallerMoving(data)
-    pendingFacts = knownFactsNote(data)
+    lastIncident = data
+    pendingFacts = factsWithMode(data)
   })
-  const factsTimer = setInterval(() => {
-    if (!canSend() || !pendingFacts || pendingFacts === lastFacts || player.isPlaying() || Date.now() - lastFactsAt < 8_000) return
-    lastFacts = pendingFacts
-    lastFactsAt = Date.now()
-    session.sendClientContent({ turns: pendingFacts, turnComplete: false })
-  }, 1_000)
+  // Known facts (and the open/covert mode) used to go out as their own sendClientContent with turnComplete false.
+  // That leaves the conversation turn OPEN, and Gemini then ignored the caller's voice until the next
+  // turn-completing message (the 25 s stress nudge): replies came 20-25 s late (INC-MUVHTZYU). Now the facts ride
+  // along with things Mia already gets: every tool result and the stress nudge. No extra message, no open turn.
+  let stressDue = false
+  let estimateDue = false
+  const takeFacts = () => {
+    const parts: string[] = []
+    if (pendingFacts && pendingFacts !== lastFacts) { lastFacts = pendingFacts; parts.push(pendingFacts) }
+    if (stressDue) { stressDue = false; lastStressAt = Date.now(); parts.push("(Also call report_stress_level silently with your current 0-100 estimate of the caller's vocal stress.)") }
+    if (estimateDue) { estimateDue = false; parts.push("(Also call report_caller_estimate silently with your best guess of the caller's age group and gender.)") }
+    return parts.length ? ` ${parts.join(' ')}` : ''
+  }
+  const factsTimer = setInterval(() => { /* kept for the cleanup list; facts are delivered by takeFacts() */ }, 60_000)
 
   // Epic 22.4: a real order call is one to three minutes. At 2:30 Mia is nudged to wrap up, unless the caller is
   // moving or chased (then the call is a lifeline and stays open). Never an automatic hang-up.
@@ -508,7 +594,8 @@ export async function startLiveCall(
     }
   })
 
-  // Gemini Live takes video as periodic stills, not a stream, so a still a second is exactly its own cadence.
+  // Gemini Live takes video as periodic stills, not a stream. One every 2 s, same as web: each frame is ~258 tokens
+  // that stay in the context, so 1 fps made video the biggest cost of a call.
   // A session carrying video hits a shorter cap than an audio-only one; the reconnect path above already covers
   // that, and its counter resets on every successful reopen, so a long call still survives.
   const frameTimer = opts.frames
@@ -516,7 +603,7 @@ export async function startLiveCall(
         if (finished) return
         const jpeg = opts.frames?.grab()
         if (jpeg && canSend()) session.sendRealtimeInput({ video: { data: jpeg, mimeType: 'image/jpeg' } })
-      }, 1_000)
+      }, FRAME_INTERVAL_MS)
     : null
 
   // A speaker switch already flushes the previous line, but one speaker talking for a long stretch would
@@ -530,27 +617,43 @@ export async function startLiveCall(
   // a while. Sent only while Mia isn't talking, so it doesn't interrupt her.
   // Voice stress is only as regular as the model remembers to report it, and in testing a 2-minute call produced
   // none. If 25 s pass with no reading while the caller is talking, nudge for one, during a pause only.
+  // Voice stress is only as regular as the model remembers to report it. Every 25 s (once the caller has spoken) a
+  // request rides on the next silent tool response. It used to be its own turnComplete=true message, and per the
+  // Live API docs that unconditionally interrupts the model: it cut Mia off mid-sentence. (Same as web.)
+  // Reply watchdog: whatever the cause (a turn of only tool calls, a lost response), the caller is never left waiting
+  // more than ~6 s after they finish speaking. One nudge per caller turn, only while Mia is quiet.
+  const REPLY_WAIT_MS = 6_000
+  const replyGuardTimer = setInterval(() => {
+    if (!canSend()) return
+    if (pendingRouteNote && !player.isPlaying()) {
+      const note = pendingRouteNote
+      pendingRouteNote = ''
+      console.info('[QuickBite call] relaying late route')
+      session.sendClientContent({ turns: `(System note, not the caller — live navigation, the route is ready: ${note} Relay the first direction now, phrased for the situation.)` })
+      return
+    }
+    if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return
+    if (Date.now() - callerSpokeAt < REPLY_WAIT_MS) return
+    nudgedForTurn = true
+    console.info('[QuickBite call] reply watchdog: caller waiting, nudging Mia')
+    session.sendClientContent({ turns: '(System note, not the caller: the caller finished speaking and is waiting. Answer them now, briefly, following your instructions.)' })
+  }, 1_000)
+
   const stressTimer = setInterval(() => {
-    if (!canSend() || player.isPlaying()) return
     if (!transcriptLines.some((l) => l.speaker === 'Caller')) return
-    if (Date.now() - Math.max(lastStressAt, callStartedAt) < 25_000) return
-    lastStressAt = Date.now()
-    session.sendClientContent({
-      turns: '(System note, not the caller: call report_stress_level NOW with your current 0-100 estimate of the vocal stress of the caller — silently. Do not say anything about it and do not change what you were doing; if you were mid-conversation, just continue exactly where you were.)',
-    })
+    if (Date.now() - Math.max(lastStressAt, callStartedAt) >= 25_000) stressDue = true
   }, 5_000)
 
   const estimateTimer = setInterval(() => {
-    if (finished || estimateReported) {
+    // Paused for the prototype (shared/aiFeatures.ts): no estimate nudge, Mia may still report it herself.
+    if (finished || estimateReported || !AI_FEATURES.callerEstimateNudge) {
       clearInterval(estimateTimer)
       return
     }
     const callerLines = transcriptLines.filter((l) => l.speaker === 'Caller').length
     if (callerLines < 2 || player.isPlaying()) return
     clearInterval(estimateTimer)
-    session.sendClientContent({
-      turns: "(System note, not the caller: you have heard the caller's voice. Call report_caller_estimate NOW with your best guess of their age group and gender — silently, do not say anything about it and do not change what you were doing. If you were mid-conversation, just continue exactly where you were.)",
-    })
+    estimateDue = true // rides on the next silent tool response, like the stress request
   }, 5_000)
 
   const silenceTimer = setInterval(() => {
@@ -619,6 +722,7 @@ export async function startLiveCall(
       opts.frames?.stop()
       clearInterval(factsTimer)
       clearInterval(stressTimer)
+      clearInterval(replyGuardTimer)
       clearInterval(budgetTimer)
       clearInterval(messageTimer)
       unsubIncident()

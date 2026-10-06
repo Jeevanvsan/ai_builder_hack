@@ -92,7 +92,7 @@ export function SilentTapScreen() {
       return
     }
 
-    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.6, exif: false })
+    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.4, exif: false })
     if (result.canceled) return
     const asset = result.assets[0]
     if (!asset?.base64) {

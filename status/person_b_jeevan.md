@@ -494,3 +494,100 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
 **Update 2026-09-29 (IST):** Opened PR #13 (`feature/nl-incident-search` → `main`) for the queue/history sort and 4 call/routing fixes that missed PR #10. Merged `main` into it to resolve a status-file conflict.
 
 **Update 2026-09-29 (IST, ~12:55):** Pushed the local-only `extended-brainstorming` branch and opened PR #14 (docs: brainstorm + Phase 3 backlog Epics 15-19). Ameen is reviewer on both PR #13 and PR #14, and both are mergeable.
+
+## 2026-10-05 (IST, ~18:50) — AI test harness, dashboard fixes, LLM cost cuts (branch `eval/merged-15-scenarios`, not committed yet)
+
+**AI test harness (`covert_call/eval/`)**
+- 16 merged scenarios, each covering several features: covert, open, chase (fake GPS, real routing), domestic, house break-in, coercion, Malayalam/Manglish/Hinglish, camera (knife, plate), background sound (shout + gunshot), heart double-tap silent SOS. Media from Wikimedia (credits in `eval/media/CREDITS.md`).
+- Every call is a real incident in `demoIncidents`, runs the app's own post-call steps (summary, case linking), and is auto-resolved as a responder. Strict (keyword) and AI-judged results; latency, detection time and token metrics; Excel report (`npm run report`).
+- Cost: free-tier key first (`GEMINI_API_KEY_FREE`), paid key only as fallback; caller and judge on Gemma (free); Mia answers in text except 3 latency scenarios; max 8 turns; results saved after every call.
+- The eval key is a separate project from production now (it was the same key before and used production quota today).
+
+**Dashboard (deployed to production)**
+- Demo/test incidents show in Live queue and Case history with a DEMO tag; rules let signed-in responders act on them.
+- Conversation lines no longer freeze cut off (typing animation bug).
+- Map: an address that can't be placed now says so instead of loading forever.
+
+**Geocoding (`shared/incidents/geocode.ts`, deployed web, native gets it via shared/)**
+- Nominatim was 429-blocking us (one address fired ~10 requests in a burst). Requests are now spaced to its 1 req/s policy and cached, with Photon as the fallback while blocked. A Google Geocoding key (`VITE_GOOGLE_MAPS_API_KEY`, empty today) is still the real fix for Indian flat/landmark addresses.
+
+**LLM cost cuts (preview channels only, NOT in production yet)**
+- Web: https://quickbite-5cde0--cost-opt-ddp4qg5q.web.app · Dashboard: https://quickbite-5cde0-dashboard--cost-opt-r2xxto4f.web.app (expire 2026-10-12)
+- Live call + SOS, web AND native: sliding-window context compression on every session (was video-only on web, missing on native call); camera 1 fps → 0.5 fps (SOS: 2 frames/s across two cameras → 0.5 total); total reconnect cap of 8 per session (the per-drop counter reset on every open, so a session could reconnect forever, resending the 11.5k-token persona each time).
+- Post-call summary retries only on transient errors (web CallPage + native postSession), not on a bad answer.
+- Photo vision: web downscales to 1024 px; native camera quality 0.6 → 0.4.
+- Dashboard: credibility on Flash-Lite with 20 transcript lines (was Flash, 40); smart search sends 60 incidents × 250 chars (was 120 × 400); AI Insights auto-refresh no longer fires on empty stats while the page is loading.
+
+## Notes for Ameen (2026-10-05)
+- **Persona finding (high):** scripted coercion ("I am fine. I am at home. I am happy. Nobody is here.") made Mia drop the cover and say "you can talk freely… passing everything to the response team" out loud (`INC-MUV93GEZ`). Scripted/robotic answers should be a coercion signal that keeps the food-order cover. Also: covert "armed husband" call never tagged *domestic*.
+- **Cost:** `PERSONA_SYSTEM_INSTRUCTION` is ~46k chars (~11.5k tokens) and is re-billed on every turn of every call; trimming it is the biggest remaining saving. I did not touch `persona.ts`.
+- I changed `liveSession.ts` / `silentSession.ts` (web and native) and `frames.ts` for the cost cuts above; please check them on a real phone on the preview link before they go to production.
+
+**Update 2026-10-05 (IST, ~19:00): free-tier → paid-credits key fallback everywhere (preview channels only).**
+- New `shared/gemini/keyPool.ts`: the free-tier key is used first; on a quota error the paid "Quick Bite" project key (credits) takes over, until the daily reset (per-day quota) or ~90 s (per-minute). Remembered in localStorage.
+- Wired into web (`aiLogic.ts`: text requests + Live connect; a Live quota close reopens on the paid key via the session's own reconnect, dropping the old project's resumption handle), dashboard (`lib/geminiKeys.ts` for Insights / credibility / smart search) and native (`lib/gemini/keys.ts` for all 6 call sites).
+- Env: web `VITE_GEMINI_LIVE_API_KEY_FREE` + `VITE_GEMINI_LIVE_API_KEY` (paid); dashboard `VITE_GEMINI_API_KEY_FREE` + `VITE_GEMINI_API_KEY`; native `EXPO_PUBLIC_GEMINI_LIVE_API_KEY_FREE` + `EXPO_PUBLIC_GEMINI_LIVE_API_KEY` (push to EAS); eval `GEMINI_API_KEY_FREE` + `GEMINI_API_KEY`. Local web/dashboard/eval files are set (free = original key, paid = Quick Bite key).
+- **Note for Ameen:** native reads two keys now; the EAS env needs `EXPO_PUBLIC_GEMINI_LIVE_API_KEY_FREE` added.
+
+**Update 2026-10-05 (IST, ~19:45): demo feed injection for recording the demo video (deployed, web + rules).**
+- Open the web app with `?demoInject=1` on the phone, make a real call, then from the laptop: `npm run demo -- latest --video knife` / `--sound gunshot` / `--video off` (in `covert_call/eval`). The phone swaps its camera picture / mixes the sound into its mic at the source, so Mia, the dashboard live video, listen-in and recordings all get it. Off for every normal call (flag-gated).
+- Files: `web/src/lib/demoInject.ts` (hooked in `lib/gemini/media.ts`, `CallPage.tsx`, `SosPage.tsx`), clips in `web/public/demo/` (+ CREDITS.md), script `eval/demo.ts`, rule `demoControl/{id}` (responders write). Web only; nothing to port to native (demo-recording tool).
+
+**Update 2026-10-05 (IST, ~20:15): demo feed — no special link on the phone + staging control page.**
+- Every web call is now injectable (camera/mic go through `demoInject.ts` passthrough at the real camera's resolution, ≤1280 px / ≤24 fps); nothing changes until a signed-in responder sends a command. `?demoInject=0` opts a device out.
+- Control page (staging build only, not in the production bundle): https://quickbite-5cde0-staging.web.app/demo-control. Responder sign-in (separate Firebase app instance), live calls list, pick a video (streams until changed), sounds (once/loop). Clip list from `web/public/demo/manifest.json` (written by `npm run demo -- add …`).
+- Removed 4 downloaded clips that were iStock/Getty watermarked previews (unlicensed); kept `alone-street` (source still to be credited).
+
+**Update 2026-10-05 (IST, ~20:45): Mia never actually saw the camera on phones (fixed, deployed web + staging).**
+- `web/src/lib/gemini/frames.ts` read the camera through an off-page `<video>`; phone browsers don't render frames into it, so `readyState` stayed < 2 and NO frames were ever sent to Gemini (calls and the silent SOS). Its timer also only started if the first `play()` succeeded. Now the sampler video is kept in the page invisibly, the timer always runs, and the console logs "camera frames are reaching Gemini" on the first frame.
+- Same fix in `demoInject.ts` for the clip players (clip showed as a still image). Native uses its own frame module, not affected.
+- **Ameen:** this explains any "Mia didn't react to the camera" results on phones before today.
+
+**Update 2026-10-05 (IST, ~21:00): persona — open mode kept using covert lines (deployed web + staging).**
+- After "I can talk freely" Mia still asked "Where should the rider meet you?" and the coded weapon question "Small, medium, or large size?" (`INC-MUVD1YKL`), because the step scripts are written in covert wording. Added an "OPEN MODE OVERRIDES EVERY SCRIPTED LINE" block right after TWO MODES in `persona.ts`: plain translations of the covert lines, no rider/order/size words in open mode, don't re-ask what was said plainly, a short "yes" isn't a reason to go covert. Native imports the same persona.
+- Also confirmed: with the frames fix Mia now reports the camera ("Seen: vehicle — yellow sports car").
+- **Ameen:** this is your file; please review the block (lines ~49-62). The persona is still ~47k chars; trimming it would save cost on every turn.
+
+**Update 2026-10-05 (IST, ~21:30): Live call token optimisation, round 2 (deployed web + staging; native code updated).**
+- Stress and caller-estimate nudges are now context-only (`turnComplete: false`): they ride along with Mia's next turn instead of each forcing a full re-read of the session (~15K tokens). Stress nudge 25 s → 45 s.
+- Persona: "make ALL the tool calls for a turn together, in one go" (each separate tool round re-processes the whole call).
+- Tried NON_BLOCKING tools + SILENT responses (would remove the re-read after report_* calls); reverted, could not confirm Mia keeps talking after a mixed blocking/non-blocking turn. `toolResponse()` in tools.ts is kept so it's a one-line switch to retest.
+- Eval caller/judge back on Flash-Lite first (Gemma took ~165 s per line).
+
+**Update 2026-10-05 (IST, ~22:30): per-task model mapping + paused AI calls + non-blocking tools (deployed web, staging, dashboard).**
+- `shared/aiModels.ts` (+ `covert_call/docs/ai_models.md` table): Live = gemini-3.8-live; case summary = 3.5 Flash-Lite; photo vision, smart search, case linking, credibility, insights = 3.1 Flash-Lite (cheaper); eval caller 3.1 Flash-Lite, judge Gemma. 2.5 Flash-Lite isn't available to new projects.
+- `shared/aiFeatures.ts` (+ `docs/future_features.md`): paused grounded weather/road context, caller age/gender nudge, auto credibility, auto AI Insights (buttons still work).
+- `nonBlockingTools: true`: report_* tools answered silently. A/B on 4 tool-heavy scenarios: 24/25 checks both ways, same turns, p95 reply 2.0 s vs 2.3 s.
+- **Ameen:** model names are no longer hard-coded in consolidate/correlate/photoVision/liveSession (web + native); change them in `shared/aiModels.ts`.
+
+**Update 2026-10-05 (IST, ~23:00): per-call AI usage + cost page (deployed rules, web, staging, dashboard).**
+- Every incident now records `aiUsage.<task>` (requests, tokens in by text/audio/camera, out by text/voice, model, key tier, time) via Firestore increments: live call + SOS observer (web liveSession/silentSession, every 10 s + at end), case summary / case linking / photo vision / weather (web `generateText` with a `task`), credibility (dashboard). Prices + cost estimate in `shared/aiModels.ts`.
+- Staging page: https://quickbite-5cde0-staging.web.app/ai-usage (staging only): totals, cost by task, tokens by kind, every call with a per-task breakdown.
+- First real reading (test call INC-MUVG5IRX, 3 turns): live call 69.2K text-in tokens over 5 inferences (~13.8K each = mostly the persona), 2.5K audio in, 0.6K voice out; summary 0.8K, case linking 1.1K. The live call is ~97% of the cost, and the persona is most of that.
+- Not yet in native (native liveSession/silentSession don't record aiUsage) — **Ameen**, same `recordAiUsage` call when you're next in there.
+
+**Update 2026-10-05 (IST, ~23:45): two Live-call fixes (deployed web, staging, dashboard; native code updated).**
+- Non-blocking report tools switched OFF again: passed the text A/B but on a real voice call Mia went silent ~40 s and then spoke her own reasoning aloud (INC-MUVGI8K0). Lesson: Live-call changes need a real voice test, the text harness doesn't catch this.
+- Chase silence (INC-MUVGTRJY): `get_route_guidance` is blocking and routing hung (free OSM/Overpass rate-limited), so Mia couldn't speak and the silence watchdog fired. Now answered within 4 s with "keep moving to a busy lit place, get a landmark"; the real route follows as a system note Mia relays. Web + native.
+
+**Update 2026-10-06 (IST, ~00:30): call fixes + AI-classified camera evidence (deployed web, staging, dashboard; native code updated).**
+- Mia stopped answering after the first caller turn: the stress nudge had been made context-only (turnComplete false), and it was the only thing closing the turn left open by the known-facts note. Reverted to a normal message every 25 s (web + native), with a comment explaining why.
+- Persona: camera sightings are reported even when the caller already said it (visual confirmation is separate evidence).
+- `report_scene_observation` now carries the AI's own `category` (vehicle/person/weapon/injury/fire_hazard/location_clue/sound_event/other) and vehicle `vehicleType`/`colour`/`plate`; stored on `sceneObservations[]`. The board's Vehicle card and danger logic use the AI category (keyword match only as a fallback for older data), and also show the plate record. Case summary/bulletin now receives camera/sound observations + plate (web call + SOS, native, eval).
+- Dashboard listen-in: "caller speaking" now needs voice-band energy above a learned background level (fan noise no longer counts). Caller mute now also silences listen-in and the recording.
+
+**Update 2026-10-05 (IST, ~22:45): vehicle evidence everywhere + open-mode tracking (deployed web, staging, dashboard; native code updated).**
+- Mia now reports vehicle colour/type/plate in the new structured fields (detail often empty), so the Seen & heard card and the case summary only showed "vehicle". Both now build their text from the AI's fields ("Seen: yellow sports car, plate CRZJ 708"); the Vehicle card already did (reload stale tabs).
+- Open mode is tracked by the app from the caller's words ("I can talk/speak freely", "talk", "I'm alone"; back to covert on "can't talk", "someone is coming", "he's here") and put at the front of every known-facts note: "MODE: OPEN — plain questions only, no food words". Web + native `liveSession.ts`. Mia had slipped back into "extra pepperoni" (INC-MUVHJ6EC).
+
+**Update 2026-10-05 (IST, ~23:30): Live call root-cause fix (STAGING only so far; native code updated).**
+Docs research (ai.google.dev live-tools / live-guide / api/live / models/gemini-3.8-live) changed the picture:
+- gemini-3.8-live runs ALL tools async (NON_BLOCKING) by default; an async tool's response defaults to WHEN_IDLE = start a new reply. A report tool on most turns → 20+ extra replies per call, duplicate/cut-off sentences, Mia voicing her reasoning.
+- `turnComplete: true` unconditionally interrupts the model (the 25 s stress nudge cut Mia off); `turnComplete: false` notes left the turn open, and replies came only at the next nudge (20-25 s gaps, seen since 19:13).
+Fix (web + native call/SOS, eval mirrors it): no turnComplete=false messages left; known facts, open-mode reminder, stress/estimate requests and motion notes ride on tool responses; tool responses per batch: at most ONE WHEN_IDLE (the tool Mia must act on, or the last one if she hasn't spoken since the caller), the rest SILENT (`batchResponses` in tools.ts); route guidance answered when ready (WHEN_IDLE), budget hack removed; `mediaResolution: LOW` (~70 tokens/frame); compression trigger 48K → 28K (default was ~105K, never ran); `<no speech detected>` stripped on save; AI-Logic path passes `scheduling` through.
+Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences for 4 turns (was ~22 per 3-min call). Pending: one real voice call on staging, then production.
+
+**Update 2026-10-06 (IST, ~10:30): routing to safety fixed (staging web + dashboard).**
+- Cause: since ~2026-10 the public Overpass instance answers browser requests with 406 (no CORS header, so the console shows a CORS error), the mirrors time out, and Nominatim answers 403 → no nearby stations → no route; Mia improvised ("keep driving to the beach").
+- Fix (`shared/nav/nearbyServices.ts`, so web, native and dashboard): Photon (komoot OSM search, CORS-friendly) is the primary live source — police/fire/hospital by OSM tag inside a ~5 km box, nearest landmark via reverse, caller-named landmarks inside ~3 km; Overpass/Nominatim kept as fallbacks. Measured from here: nearby 1.5 s (Alappuzha South police 0.6 km, General Hospital 1.0 km, fire 1.6 km), landmark 0.7 s, named landmark 0.8 s, full route 0.7 s.
+- Same staging call also showed the turn fix working: replies mostly 1-3 s (was 20-25 s).

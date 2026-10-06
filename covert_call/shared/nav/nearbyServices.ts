@@ -1,5 +1,6 @@
 // Epic 16.6: once an incident's location is confirmed, look up nearby police, fire and hospital services so a
-// responder doesn't have to search for who to actually dispatch. Free OpenStreetMap Overpass API — no billing,
+// responder doesn't have to search for who to actually dispatch. Free OpenStreetMap data (Photon first, then
+// Overpass / Nominatim) — no billing,
 // consistent with the project's existing free-tier-first pattern (Nominatim geocoding, free map tiles).
 import { affirmed } from '../incidents/severity.ts'
 
@@ -40,7 +41,19 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
 
 type OverpassElement = { tags?: Record<string, string>; lat: number; lon: number }
 
+// A mirror that just failed (overloaded: 429/504, shown in the browser as a CORS error) is skipped for a few minutes
+// instead of being hit, and failing, on every incident view.
+const MIRROR_BACKOFF_MS = 3 * 60_000
+const mirrorDownUntil = new Map<string, number>()
+
 async function queryOverpass(url: string, query: string): Promise<{ elements: OverpassElement[] } | null> {
+  if (Date.now() < (mirrorDownUntil.get(url) ?? 0)) return null
+  const r = await queryOverpassOnce(url, query)
+  if (!r) mirrorDownUntil.set(url, Date.now() + MIRROR_BACKOFF_MS)
+  return r
+}
+
+async function queryOverpassOnce(url: string, query: string): Promise<{ elements: OverpassElement[] } | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
@@ -61,6 +74,41 @@ async function queryOverpass(url: string, query: string): Promise<{ elements: Ov
   } finally {
     clearTimeout(timer)
   }
+}
+
+// ---- Photon (komoot's OpenStreetMap search): the PRIMARY live source. Since 2026-10 the public Overpass instance
+// answers browser requests with 406 (no CORS header, so the browser reports a CORS error) and the mirrors time out;
+// Nominatim answers 403 under load. Photon allows CORS, filters by OSM tag inside a bounding box, and answers in ~1 s.
+const PHOTON = 'https://photon.komoot.io'
+const PHOTON_TIMEOUT_MS = 6_000
+type PhotonFeature = { geometry?: { coordinates?: [number, number] }; properties?: Record<string, string | undefined> }
+async function photon(path: string): Promise<PhotonFeature[] | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), PHOTON_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${PHOTON}${path}`, { signal: controller.signal })
+    if (!res.ok) return null
+    return ((await res.json()) as { features?: PhotonFeature[] }).features ?? []
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+const bbox = (p: { lat: number; lng: number }, d: number) => [p.lng - d, p.lat - d, p.lng + d, p.lat + d].map((v) => v.toFixed(5)).join(',')
+const PHOTON_TAGS: Record<ServiceKind, [string, string]> = { police: ['police', 'amenity:police'], fire: ['fire station', 'amenity:fire_station'], hospital: ['hospital', 'amenity:hospital'] }
+
+// Police, fire and hospitals within ~5 km, one request per kind in parallel. Null only if Photon is unreachable.
+async function viaPhoton(near: { lat: number; lng: number }): Promise<{ elements: OverpassElement[] } | null> {
+  const box = bbox(near, 0.045)
+  const lists = await Promise.all(
+    (Object.entries(PHOTON_TAGS) as [ServiceKind, [string, string]][]).map(async ([kind, [q, tag]]) => {
+      const feats = await photon(`/api/?q=${encodeURIComponent(q)}&bbox=${box}&osm_tag=${tag}&limit=8`)
+      return feats?.map((f) => ({ lat: f.geometry?.coordinates?.[1] ?? NaN, lon: f.geometry?.coordinates?.[0] ?? NaN, tags: { amenity: tag.split(':')[1], name: f.properties?.name ?? '', phone: '', kind } }))
+    }),
+  )
+  if (lists.every((l) => l === undefined)) return null
+  return { elements: lists.flatMap((l) => l ?? []).filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lon)) }
 }
 
 const NOMINATIM_TYPES: Record<ServiceKind, string> = { police: 'police', fire: 'fire_station', hospital: 'hospital' }
@@ -121,7 +169,7 @@ async function fetchNearbyServices(near: { lat: number; lng: number }): Promise<
   // settle even if it fails, so this races each mirror's promise chained with "if null, wait forever" — the
   // overall race then only resolves early on an actual hit, and still finishes (with null) once every mirror has
   // failed, via the plain Promise.all fallback below.
-  const firstHit = new Promise<{ elements: OverpassElement[] } | null>((resolve) => {
+  const overpassRace = () => new Promise<{ elements: OverpassElement[] } | null>((resolve) => {
     let remaining = OVERPASS_URLS.length
     for (const url of OVERPASS_URLS) {
       void queryOverpass(url, query).then((d) => {
@@ -130,9 +178,9 @@ async function fetchNearbyServices(near: { lat: number; lng: number }): Promise<
       })
     }
   })
-  let data = await firstHit
-  // The free Overpass instances time out (504) under load — fall back to Nominatim's amenity search, which is
-  // separate infrastructure and far more reliable, rather than reporting "no stations" that do exist.
+  // Photon first (works from browsers today); Overpass and Nominatim stay as fallbacks.
+  let data = await viaPhoton(near)
+  if (!data?.elements.length) data = await overpassRace()
   if (!data) data = await viaNominatim(near)
   if (!data) throw new Error('No station lookup service reachable')
 
@@ -181,6 +229,16 @@ export function suggestedServiceKind(dangerIndicators: string[]): ServiceKind {
 // The most recognisable named place within ~60 m of a point (a shop, temple, bank, bus stop, petrol pump...), so a
 // spoken turn can say "turn right at the Federal Bank" instead of a bare "turn right". Null if none or unreachable.
 export async function landmarkNear(p: { lat: number; lng: number }): Promise<string | null> {
+  // Photon reverse: named places within ~150 m; prefer a shop/amenity/junction a caller can actually see.
+  const feats = await photon(`/reverse?lat=${p.lat}&lon=${p.lng}&limit=8&radius=0.15`)
+  if (feats?.length) {
+    const rank = (k?: string, v?: string) => (k === 'amenity' || k === 'shop' || k === 'tourism' || v === 'junction' || k === 'junction' ? 0 : k === 'highway' ? 1 : 2)
+    const best = feats.filter((f) => f.properties?.name && f.properties?.osm_key !== 'place').sort((a, b) => rank(a.properties?.osm_key, a.properties?.osm_value) - rank(b.properties?.osm_key, b.properties?.osm_value))[0]
+    if (best) {
+      const kind = best.properties?.osm_key === 'highway' ? '' : (best.properties?.osm_value ?? '')
+      return `${best.properties?.name}${kind && kind !== 'yes' ? ` (${kind.replace(/_/g, ' ')})` : ''}`
+    }
+  }
   const q = `[out:json][timeout:8];(nwr(around:60,${p.lat},${p.lng})[name][~"^(amenity|shop|tourism|leisure|highway|railway|building|office|historic)$"~"."];);out center 15;`
   for (const url of OVERPASS_URLS) {
     const data = await queryOverpass(url, q)
@@ -215,6 +273,13 @@ export async function locateLandmark(text: string, near: { lat: number; lng: num
     .slice(0, 3)
   if (!words.length) return null
   const weakMatch = words.length < 2
+  // Photon search inside ~3 km of where they were last known.
+  const pfeats = await photon(`/api/?q=${encodeURIComponent(words.join(' '))}&bbox=${bbox(near, 0.03)}&limit=5`)
+  const phits = (pfeats ?? [])
+    .map((f) => ({ name: f.properties?.name ?? '', lat: f.geometry?.coordinates?.[1], lng: f.geometry?.coordinates?.[0] }))
+    .filter((h): h is { name: string; lat: number; lng: number } => !!h.name && h.lat != null && h.lng != null)
+    .sort((a, b) => haversineKm(near, a) - haversineKm(near, b))
+  if (phits[0]) return { ...phits[0], confidence: weakMatch || haversineKm(near, phits[0]) > 1.5 ? 'low' : 'high' }
   const pattern = words.map((w) => w.replace(/[.*+?^${}()|[\]\\"]/g, '')).join('.*')
   const q = `[out:json][timeout:10];nwr(around:3000,${near.lat},${near.lng})[name~"${pattern}",i];out center 10;`
   for (const url of OVERPASS_URLS) {

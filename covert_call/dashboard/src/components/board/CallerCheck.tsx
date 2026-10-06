@@ -1,3 +1,4 @@
+import { AI_FEATURES } from '../../../../shared/aiFeatures.ts'
 import { useEffect, useRef, useState } from 'react'
 import type { Incident } from '../../../../shared/incidents/types'
 import { assessCredibility, credibilityAvailable, loadCallerHistory, saveCredibility, saveOutcome, type CallerHistory } from '../../lib/credibility'
@@ -32,7 +33,8 @@ export default function CallerCheck({ incident, live }: { incident: Incident; li
 
   // Run once automatically when the call has ended and there is no check yet.
   useEffect(() => {
-    if (live || incident.credibility || ran.current || !credibilityAvailable || incident.callState !== 'ended') return
+    // Paused for the prototype (shared/aiFeatures.ts): the check runs only from the Check button.
+    if (!AI_FEATURES.credibilityAutoRun || live || incident.credibility || ran.current || !credibilityAvailable || incident.callState !== 'ended') return
     ran.current = true
     void check()
   }, [live, incident.callState, incident.credibility, history]) // eslint-disable-line react-hooks/exhaustive-deps

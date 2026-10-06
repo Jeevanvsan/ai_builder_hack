@@ -1,3 +1,4 @@
+import { setUsageIncident } from '../lib/gemini/aiLogic'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
@@ -17,6 +18,7 @@ import { acquireCallMedia, videoOnly } from '../lib/gemini/media'
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
+import { stopDemoInject, watchDemoControl } from '../lib/demoInject'
 import { watchMotion, type MotionWatch } from '../lib/motion'
 import { watchForTrustedAlert } from '../lib/trustedAlert'
 import { demoCallsLeft, minutesUntilNextDemo, recordDemoCall } from '../lib/demo'
@@ -82,6 +84,8 @@ export function CallPage() {
     void (async () => {
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
+      setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
+      watchDemoControl(db, id) // demo recording only (?demoInject=1); no-op otherwise
       // Epic 32: email trusted contacts once if this call turns high severity.
       alertStopRef.current = watchForTrustedAlert(db, id)
 
@@ -203,9 +207,11 @@ export function CallPage() {
           // summary) before giving up and flagging it for the dashboard. One request now covers both the case
           // summary/bulletin and the privacy (leakage) check — was two separate model calls on the same
           // transcript, which needlessly doubled how often a single call could hit the shared free-tier rate limit.
-          const withRetry = <T,>(fn: () => Promise<T>) => fn().catch(() => fn())
+          // Retry only a transient failure (network, overload, rate limit): retrying a bad or unparseable answer just
+          // pays for the same request twice.
+          const withRetry = <T,>(fn: () => Promise<T>) => fn().catch((e) => (/fetch|network|503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded/i.test(String(e)) ? fn() : Promise.reject(e)))
           try {
-            const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address))
+            const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address, { scene: incident?.sceneObservations, plate: incident?.vehicle?.number ?? null }))
             await Promise.all([
               consolidateIncident(db, id, consolidation),
               recordLeakageCheck(db, id, consolidation.redactions),
@@ -312,6 +318,7 @@ export function CallPage() {
       zeroTraceExit(db, id, navigate)
     } else {
       setDemoMode(false)
+      stopDemoInject()
       navigate('/', { replace: true })
     }
   }
@@ -322,6 +329,9 @@ export function CallPage() {
 
   const toggleMute = () => {
     const nowMuted = callRef.current?.toggleMute() ?? !muted
+    // Mute means quiet everywhere: also silence the mic for the responder's listen-in and the recording (the call
+    // itself already stops sending audio to Mia). Disabling the track sends silence; unmute turns it back on.
+    mediaRef.current?.getAudioTracks().forEach((t) => { t.enabled = !nowMuted })
     setMuted(nowMuted)
   }
 

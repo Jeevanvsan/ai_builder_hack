@@ -1,6 +1,6 @@
-import { arrayUnion, doc, runTransaction, updateDoc } from 'firebase/firestore'
+import { arrayUnion, runTransaction, updateDoc } from 'firebase/firestore'
 import { db } from './firebase'
-import { INCIDENTS } from '../../../shared/incidents/client.ts'
+import { incidentDoc } from './incidentsStore'
 
 export class AlreadyClaimedError extends Error {
   by: string | null
@@ -10,7 +10,7 @@ export class AlreadyClaimedError extends Error {
   }
 }
 
-const ref = (id: string) => doc(db, INCIDENTS, id)
+const ref = (id: string) => incidentDoc(id)
 const now = () => new Date().toISOString()
 
 // Transaction so two responders clicking at once can't both claim the same incident.

@@ -161,6 +161,8 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 .chip-live { --tone: var(--live); }
 .chip-new { --tone: var(--accent); }
 .chip-neutral { --tone: var(--muted); }
+/* Demo / AI-test incidents mixed into the queue (demoIncidents collection). */
+.demo-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: .06em; color: #fff; background: #7c3aed; vertical-align: middle; }
 .chip-filled { background: var(--tone); color: #fff; text-transform: uppercase; letter-spacing: 0.04em; box-shadow: 0 0 16px -2px color-mix(in srgb, var(--tone) 65%, transparent); }
 .chip-high.chip-filled, .chip-danger.chip-filled { animation: hologlow 2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .chip-high.chip-filled, .chip-danger.chip-filled { animation: none; } }

@@ -1,4 +1,5 @@
-import { addDoc, arrayUnion, collection, doc, getDoc, onSnapshot, orderBy, query, runTransaction, setDoc, updateDoc, type Firestore, type Transaction } from 'firebase/firestore'
+import { addDoc, arrayUnion, collection, doc, getDoc, increment, onSnapshot, orderBy, query, runTransaction, setDoc, updateDoc, type Firestore, type Transaction } from 'firebase/firestore'
+import { AI_USAGE_FIELDS, type AiTaskUsage } from '../aiModels.ts'
 import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
 import { deriveSeverity, deriveRecommendation, describeSeverityChange, maxSeverity } from './severity.ts'
@@ -269,17 +270,19 @@ const DANGEROUS_OBSERVATION = /weapon|gun|firearm|knife|gunshot|shot|scream|expl
 export function reportSceneObservation(
   db: Firestore,
   id: string,
-  obs: { source: 'camera' | 'sound'; kind: string; detail?: string; confidence?: number },
+  obs: { source: 'camera' | 'sound'; kind: string; detail?: string; confidence?: number; category?: string; vehicle?: { type?: string; colour?: string; plate?: string } },
 ): Promise<void> {
   return runTransactionWithRetry(db, async (tx) => {
     const current = (await tx.get(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
     if (!current) throw new Error(`Incident ${id} not found`)
     const detail = obs.detail?.trim() ?? ''
-    const entry = { source: obs.source, kind: obs.kind, detail, confidence: obs.confidence ?? null, at: now() }
+    const vehicle = obs.vehicle && Object.fromEntries(Object.entries(obs.vehicle).filter(([, v]) => typeof v === 'string' && v.trim()))
+    const entry = { source: obs.source, kind: obs.kind, detail, confidence: obs.confidence ?? null, at: now(), ...(obs.category ? { category: obs.category } : {}), ...(vehicle && Object.keys(vehicle).length ? { vehicle } : {}) }
     const update: Record<string, unknown> = {
       sceneObservations: [...(current.sceneObservations ?? []), entry],
     }
-    if (DANGEROUS_OBSERVATION.test(`${obs.kind} ${detail}`)) {
+    // The AI's category decides first; the keyword check stays for observations without one.
+    if (obs.category === 'weapon' || obs.category === 'injury' || obs.category === 'fire_hazard' || DANGEROUS_OBSERVATION.test(`${obs.kind} ${detail}`)) {
       const indicator = detail ? `${obs.kind}: ${detail}` : obs.kind
       const di = [...new Set([...current.extractedFieldsLive.dangerIndicators, indicator])]
       update['extractedFieldsLive.dangerIndicators'] = di
@@ -438,4 +441,13 @@ export function subscribeResponderMessages(db: Firestore, id: string, onChange: 
 
 export function markMessageDelivered(db: Firestore, id: string, messageId: string, spokenAs: string): Promise<void> {
   return updateDoc(doc(db, INCIDENTS, id, 'messages', messageId), { status: 'delivered', spokenAs: spokenAs.trim(), deliveredAt: now() })
+}
+
+// Adds one task's AI usage to the incident (aiUsage.<task>): numbers are atomic increments, so concurrent writers
+// (the call, the post-call steps, a responder's credibility check) never overwrite each other.
+export function recordAiUsage(db: Firestore, id: string, task: string, delta: Partial<AiTaskUsage> & { model: string }): Promise<void> {
+  const patch: Record<string, unknown> = { [`aiUsage.${task}.model`]: delta.model }
+  if (delta.tier) patch[`aiUsage.${task}.tier`] = delta.tier
+  for (const f of AI_USAGE_FIELDS) if (delta[f]) patch[`aiUsage.${task}.${f}`] = increment(delta[f] as number)
+  return updateDoc(ref(db, id), patch).catch(() => {})
 }

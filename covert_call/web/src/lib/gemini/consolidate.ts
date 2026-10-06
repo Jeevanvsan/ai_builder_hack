@@ -1,9 +1,10 @@
+import { AI_MODELS } from '../../../../shared/aiModels.ts'
 import { geminiConfigured, generateText } from './aiLogic.ts'
 import type { FieldConfidence, Incident } from '../../../../shared/incidents/types.ts'
 
 // Same lite text model as the dashboard's own Gemini feature (dashboard/src/lib/aiInsights.ts) — this is a
 // short one-shot summarization task, not a conversation, so the lightest model is enough.
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.consolidation // shared/aiModels.ts
 
 export type ConsolidationResult = {
   consolidatedSummary: string
@@ -61,6 +62,9 @@ export async function consolidateCall(
   fields: Incident['extractedFieldsLive'],
   voiceStressTrend: Incident['voiceStressTrend'],
   address?: string | null,
+  // What the camera and background-sound analysis observed, and any plate. Without this the bulletin only knew what
+  // was SAID ("unknown vehicle chasing caller" while the camera had shown a yellow sports car).
+  evidence?: { scene?: { source?: string; kind?: string; detail?: string; vehicle?: { type?: string; colour?: string; plate?: string } }[]; plate?: string | null },
 ): Promise<ConsolidationResult> {
   if (!geminiConfigured) throw new Error('Gemini is not configured')
 
@@ -73,6 +77,8 @@ export async function consolidateCall(
 Transcript: ${transcript || '(no transcript captured)'}
 Extracted so far: peopleCount=${fields.peopleCount ?? '-'} dangerIndicators=${fields.dangerIndicators.join(',') || '-'} urgency=${fields.urgency ?? '-'} notes=${fields.notes ?? '-'}
 Confirmed address: ${address ?? '-'}
+Seen/heard (camera + background sound): ${(evidence?.scene ?? []).slice(-8).map((o) => `${o.source === 'camera' ? 'seen' : 'heard'}: ${[o.vehicle?.colour, o.vehicle?.type].filter(Boolean).join(' ') || o.detail || o.kind}${o.vehicle?.plate ? `, plate ${o.vehicle.plate}` : ''}`).join('; ') || '-'}
+Vehicle plate: ${evidence?.plate ?? '-'}
 Avg voice stress: ${avgStress ?? '-'}/100
 
 Write consolidatedSummary: 2-4 sentences, dispatcher case-note style, stating what's known and any uncertainty.
@@ -92,6 +98,7 @@ caller themselves or clearly necessary details (like "my neighbor" without a nam
 
   const response = await generateText({
     model: MODEL,
+    task: 'consolidation',
     contents: prompt,
     config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
   })

@@ -1,4 +1,5 @@
 import { MIC_CONSTRAINTS } from './audio.ts'
+import { injectable, injectableCamera, injectableMic } from '../demoInject.ts'
 
 // Same blind spot as the camera check below: a mic track can report readyState 'live' and enabled: true while
 // genuinely producing silence — OS-level mute, a routing issue, or (on some phones) a second simultaneous
@@ -44,12 +45,13 @@ export async function acquireCallMedia(): Promise<CallMedia | null> {
       audio: MIC_CONSTRAINTS,
       video: { facingMode: { ideal: 'environment' } },
     })
-    return { stream, hasVideo: stream.getVideoTracks().length > 0 }
+    // Demo recording only (?demoInject=1): camera and mic become injectable; otherwise returned as-is.
+    return { stream: injectable(stream), hasVideo: stream.getVideoTracks().length > 0 }
   } catch {
     // Camera denied/unavailable — retry audio-only so the call still connects.
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS })
-      return { stream, hasVideo: false }
+      return { stream: injectable(stream), hasVideo: false }
     } catch {
       return null
     }
@@ -169,5 +171,7 @@ export async function acquireSosMedia(): Promise<SosMedia> {
     else { console.warn('[QuickBite SOS] front camera opened but produced no frames — dropping it'); front.getTracks().forEach((t) => t.stop()) }
   }
 
-  return { mic, cameras, mode: cameras.length >= 2 ? 'dual' : 'back-only' }
+  // Demo recording only (?demoInject=1): the back camera and the mic become injectable.
+  if (cameras[0]) cameras[0] = { ...cameras[0], stream: injectableCamera(cameras[0].stream) }
+  return { mic: mic ? injectableMic(mic) : mic, cameras, mode: cameras.length >= 2 ? 'dual' : 'back-only' }
 }

@@ -94,7 +94,7 @@ service cloud.firestore {
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
           'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven',
-          'videoControl', 'vehicle', 'coercionSignals', 'motionEvents', 'isDemo', 'callerUid', 'credibility'
+          'videoControl', 'vehicle', 'coercionSignals', 'motionEvents', 'isDemo', 'callerUid', 'credibility', 'aiUsage'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -196,20 +196,28 @@ service cloud.firestore {
       allow write: if isResponder() && request.resource.data.falseCount is int && request.resource.data.falseCount >= 0;
     }
 
-    // Epic 25: hidden demo calls. Same shape as a real incident so the call code is identical, but in its own
-    // collection that the dashboard never reads. No responder fields are ever written here, and nothing is deleted.
+    // Epic 25: hidden demo calls (and the AI test harness). Same shape as a real incident so the call code is
+    // identical, but in its own collection. The dashboard shows them in the queue/history tagged DEMO, so a
+    // signed-in responder can handle them like real ones; callers still can't touch responder fields. Nothing is deleted.
     match /demoIncidents/{incidentId} {
       allow read: if true;
       allow create: if incidentId.matches('INC-[A-Za-z0-9-]{2,32}') && validIncident(request.resource.data)
         && (!('callerUid' in request.resource.data) || (isSignedIn() && request.resource.data.callerUid == request.auth.uid));
       allow update: if validIncident(request.resource.data) && validChange(resource.data, request.resource.data)
-        && !changesResponderFields(resource.data, request.resource.data);
+        && (!changesResponderFields(resource.data, request.resource.data) || isResponder());
       allow delete: if false;
       // A demo call listens for responder messages like a real one; nobody can send any here.
       match /messages/{messageId} {
         allow read: if true;
         allow write: if false;
       }
+    }
+
+    // Demo recording only: which clip/sound the caller's phone (opened with ?demoInject=1) should inject into its
+    // live call. Sent from the laptop demo script as a signed-in responder.
+    match /demoControl/{incidentId} {
+      allow read: if true;
+      allow write: if isResponder();
     }
 
     match /incidents/{incidentId} {

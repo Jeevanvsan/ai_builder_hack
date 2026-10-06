@@ -1,4 +1,36 @@
-import { Type, type FunctionDeclaration, type Tool } from '@google/genai'
+import { AI_FEATURES } from '../../../../shared/aiFeatures.ts'
+import { Behavior, FunctionResponseScheduling, Type, type FunctionDeclaration, type FunctionResponse, type Tool } from '@google/genai'
+
+// Record-only tools: Mia never needs their result, so their responses are SILENT (see toolResponse below).
+// Behind a switch until proven (shared/aiFeatures.ts nonBlockingTools).
+// No import.meta.env here: native imports this file too.
+export const NONBLOCKING_TOOLS = ((globalThis as { QB_NONBLOCKING_TOOLS?: boolean }).QB_NONBLOCKING_TOOLS ?? AI_FEATURES.nonBlockingTools) === true
+const nonBlocking = NONBLOCKING_TOOLS ? { behavior: Behavior.NON_BLOCKING } : {}
+
+export const SILENT_TOOL_NAMES = new Set([
+  'report_situation', 'report_stress_level', 'report_caller_estimate', 'report_scene_observation', 'report_advice',
+  'report_vehicle_number', 'report_coercion_signal', 'confirm_message_delivered',
+])
+
+// gemini-3.8-live runs every tool asynchronously by default (NON_BLOCKING), and an async tool's response is
+// scheduled WHEN_IDLE unless told otherwise: Gemini starts a NEW reply as soon as Mia is idle. With a report tool
+// on almost every turn that meant 20+ extra replies per call, repeated/cut-off sentences and Mia voicing her own
+// reasoning. Record-only tools are therefore answered SILENT (the result, including any known-facts text riding
+// along, is used later without starting a reply); only tools whose answer Mia must act on start one (WHEN_IDLE).
+// Scheduling for one batch of tool calls. Tested on gemini-3.8-live (2026-10-05): when Mia's turn so far is ONLY
+// tool calls, answering them all SILENT left her silent (she never went on to answer the caller); answering them
+// all WHEN_IDLE gave a new reply per tool (duplicate, cut-off sentences). So exactly one response may start a
+// reply: the tool whose answer she must act on, or, if she hasn't spoken since the caller did, the last one.
+export function batchResponses(calls: { id?: string; name?: string }[], outputs: string[], spokeSinceCaller: boolean): FunctionResponse[] {
+  const isRecord = (c: { name?: string }) => !!c.name && (SILENT_TOOL_NAMES.has(c.name) || c.name === 'end_call')
+  let replyAt = calls.findIndex((c) => !isRecord(c))
+  if (replyAt < 0 && !spokeSinceCaller) replyAt = calls.length - 1
+  return calls.map((c, i) => toolResponse(c, outputs[i], i !== replyAt))
+}
+
+export function toolResponse(call: { id?: string; name?: string }, output = 'ok', silent = !!call.name && (SILENT_TOOL_NAMES.has(call.name) || call.name === 'end_call')): FunctionResponse {
+  return { id: call.id, name: call.name, response: { output }, scheduling: silent ? FunctionResponseScheduling.SILENT : FunctionResponseScheduling.WHEN_IDLE }
+}
 
 // Gemini Live function declarations (Story 1.5). The model calls these mid-conversation as it extracts
 // information from the coded questions in persona.ts — each call is handled immediately (Epic 3.2/3.3), not
@@ -6,6 +38,7 @@ import { Type, type FunctionDeclaration, type Tool } from '@google/genai'
 
 export const REPORT_SITUATION: FunctionDeclaration = {
   name: 'report_situation',
+  ...nonBlocking,
   description: 'Report any newly learned or updated details about the caller\'s situation. Call this as soon as you learn something, even partial — do not wait for the full picture.',
   parameters: {
     type: Type.OBJECT,
@@ -36,6 +69,7 @@ export const CONFIRM_ADDRESS: FunctionDeclaration = {
 
 export const REPORT_STRESS_LEVEL: FunctionDeclaration = {
   name: 'report_stress_level',
+  ...nonBlocking,
   description: 'Report your current estimate of the caller\'s vocal stress/duress from tone, pace and pitch. Call periodically through the call, roughly every 15-20 seconds, independent of what is being said.',
   parameters: {
     type: Type.OBJECT,
@@ -48,6 +82,7 @@ export const REPORT_STRESS_LEVEL: FunctionDeclaration = {
 
 export const REPORT_CALLER_ESTIMATE: FunctionDeclaration = {
   name: 'report_caller_estimate',
+  ...nonBlocking,
   description:
     "Report your best rough guess of the caller's approximate age group and gender, from their voice (and camera " +
     'image if visible) — NOT something the caller stated. This is only ever a rough estimate a responder should ' +
@@ -66,6 +101,7 @@ export const REPORT_CALLER_ESTIMATE: FunctionDeclaration = {
 
 export const REPORT_SCENE_OBSERVATION: FunctionDeclaration = {
   name: 'report_scene_observation',
+  ...nonBlocking,
   description:
     "Report something you SEE in the caller's camera or HEAR in the background (not something the caller told you). " +
     'Examples to see: a person visible, a weapon-like object, an injury, smoke or fire, a vehicle. Examples to hear: ' +
@@ -78,13 +114,23 @@ export const REPORT_SCENE_OBSERVATION: FunctionDeclaration = {
       kind: { type: Type.STRING, description: 'Short tag, e.g. "gunshot", "raised voices", "weapon", "injury", "fire", "vehicle"' },
       detail: { type: Type.STRING, description: 'A short plain-language description for a responder, e.g. "two other male voices, angry" or "handgun on the table"' },
       confidence: { type: Type.NUMBER, description: '0-100 how sure you are' },
+      // The AI classifies what it saw, so the dashboard and the case summary don't have to guess from keywords.
+      category: {
+        type: Type.STRING,
+        enum: ['vehicle', 'person', 'weapon', 'injury', 'fire_hazard', 'location_clue', 'sound_event', 'other'],
+        description: 'What kind of thing this is',
+      },
+      vehicleType: { type: Type.STRING, description: 'Vehicles only: e.g. "car", "sports car", "scooter", "auto-rickshaw", "van"' },
+      colour: { type: Type.STRING, description: 'Vehicles (or clothing): the main colour you see, e.g. "yellow"' },
+      plate: { type: Type.STRING, description: 'Vehicles only: the number plate if readable (also call report_vehicle_number)' },
     },
-    required: ['source', 'kind'],
+    required: ['source', 'kind', 'category'],
   },
 }
 
 export const REPORT_ADVICE: FunctionDeclaration = {
   name: 'report_advice',
+  ...nonBlocking,
   description:
     'Log a piece of short safety advice you just gave the caller out loud (e.g. move away from windows, lock the ' +
     'door, apply pressure to a wound). Call this right after you say it, so a responder knows what the caller was told.',
@@ -115,6 +161,7 @@ export const GET_ROUTE_GUIDANCE: FunctionDeclaration = {
 
 export const REPORT_VEHICLE_NUMBER: FunctionDeclaration = {
   name: 'report_vehicle_number',
+  ...nonBlocking,
   description:
     "Report a suspect vehicle's number plate (Epic 22.3), full or partial, the moment you learn it: from the caller " +
     '(source "caller") or read off a camera frame (source "camera"). Even part of a plate ("KL 04") helps. Never ' +
@@ -132,6 +179,7 @@ export const REPORT_VEHICLE_NUMBER: FunctionDeclaration = {
 
 export const REPORT_COERCION_SIGNAL: FunctionDeclaration = {
   name: 'report_coercion_signal',
+  ...nonBlocking,
   description:
     "Report a sign the caller may be speaking under someone else's control (Epic 24): a different voice takes over " +
     'the call, the caller suddenly turns flat, calm or scripted after sounding scared, someone whispers instructions ' +
@@ -153,6 +201,7 @@ export const REPORT_COERCION_SIGNAL: FunctionDeclaration = {
 
 export const CONFIRM_MESSAGE_DELIVERED: FunctionDeclaration = {
   name: 'confirm_message_delivered',
+  ...nonBlocking,
   description:
     'Call this right after you pass a responder message on to the caller (Epic 23), with the exact words you said, ' +
     'so the responder sees it was delivered and how it was phrased.',

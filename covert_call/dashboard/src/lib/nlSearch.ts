@@ -1,3 +1,5 @@
+import { AI_MODELS } from '../../../shared/aiModels.ts'
+import { geminiFetch, geminiKeys } from './geminiKeys'
 import type { Incident } from '../../../shared/incidents/types'
 import { channelLabel } from './format'
 
@@ -8,10 +10,9 @@ import { channelLabel } from './format'
 // 2. AI (on Enter / "Ask AI"): Gemini reads a short digest of each case and returns the ones that match the
 //    described situation, with a one-line reason each. Falls back to the local result if it fails (quota etc).
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.smartSearch // shared/aiModels.ts
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
-export const aiSearchAvailable = Boolean(API_KEY)
+export const aiSearchAvailable = geminiKeys.configured
 
 const STOPWORDS = new Set(
   'a an the of in on at to for with and or is are was were be been being someone somebody person people case cases incident incidents call calls where who which that this those these there their them they it its from by near about any all show find me my i we our some has have had being what when how into over just like'.split(' '),
@@ -94,13 +95,13 @@ function digest(i: Incident): string {
     (i.sceneObservations ?? []).slice(0, 4).map((o) => o.detail || o.kind).join('; '),
     !i.consolidatedSummary && (i.transcriptLines ?? []).slice(0, 6).map((l) => l.text).join(' '),
   ]
-  return parts.filter(Boolean).join(' | ').slice(0, 400)
+  return parts.filter(Boolean).join(' | ').slice(0, 250)
 }
 
 export async function aiSearch(incidents: Incident[], q: string): Promise<AiMatch[]> {
-  if (!API_KEY) throw new Error('Gemini API key not configured')
+  if (!geminiKeys.configured) throw new Error('Gemini API key not configured')
   // Newest first, capped so the request stays small on the free tier.
-  const pool = [...incidents].sort((a, b) => Date.parse(b.sessionStartedAt) - Date.parse(a.sessionStartedAt)).slice(0, 120)
+  const pool = [...incidents].sort((a, b) => Date.parse(b.sessionStartedAt) - Date.parse(a.sessionStartedAt)).slice(0, 60)
   const prompt =
     `You search emergency incident records for a responder. Query: "${q}"\n` +
     `Return the records that match the described situation (meaning, not just words: "woman attacked with a ` +
@@ -108,7 +109,7 @@ export async function aiSearch(incidents: Incident[], q: string): Promise<AiMatc
     `why it matches. Return an empty list if nothing fits — don't pad.\n\nRecords:\n` +
     pool.map(digest).join('\n')
 
-  const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
+  const res = await geminiFetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

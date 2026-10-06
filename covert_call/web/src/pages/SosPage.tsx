@@ -1,3 +1,4 @@
+import { setUsageIncident } from '../lib/gemini/aiLogic'
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../lib/firebase'
@@ -23,6 +24,7 @@ import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { findCorrelatedIncidents } from '../lib/gemini/correlate'
 import { zeroTraceExit } from '../lib/gemini/exit'
+import { stopDemoInject, watchDemoControl } from '../lib/demoInject'
 import { watchMotion, type MotionWatch } from '../lib/motion'
 import { watchForTrustedAlert } from '../lib/trustedAlert'
 
@@ -70,6 +72,8 @@ export function SosPage() {
         severity: 'high',
       })
       incidentIdRef.current = id
+      setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
+      watchDemoControl(db, id) // demo recording only (?demoInject=1); no-op otherwise
 
       // Keep the screen awake so the OS doesn't lock and pause the camera/mic. Best-effort.
       try {
@@ -152,6 +156,7 @@ export function SosPage() {
   }, [])
 
   const endSos = async () => {
+    stopDemoInject()
     if (endingRef.current) return
     endingRef.current = true
     const id = incidentIdRef.current
@@ -189,7 +194,7 @@ export function SosPage() {
             const fields = incident?.extractedFieldsLive ?? { peopleCount: null, dangerIndicators: [], urgency: null, notes: null }
             const stressTrend = incident?.voiceStressTrend ?? []
             const address = incident?.location.confirmed?.address ?? null
-            const consolidation = await consolidateCall(transcript, fields, stressTrend, address)
+            const consolidation = await consolidateCall(transcript, fields, stressTrend, address, { scene: incident?.sceneObservations, plate: incident?.vehicle?.number ?? null })
             await Promise.all([consolidateIncident(db, id, consolidation), recordLeakageCheck(db, id, consolidation.redactions)])
 
             if (address) {
