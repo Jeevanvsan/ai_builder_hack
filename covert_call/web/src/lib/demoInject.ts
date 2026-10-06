@@ -81,6 +81,7 @@ function wrapVideo(stream: MediaStream): MediaStreamTrack | null {
     mountHidden(real)
     void real.play().catch(() => {})
   }
+  let drewOnce = false
   const draw = () => {
     // Keep both players running: a browser can still pause a hidden one (e.g. after the tab was backgrounded).
     const clipNow = videoState?.clip
@@ -93,7 +94,9 @@ function wrapVideo(stream: MediaStream): MediaStreamTrack | null {
       const w = src.videoWidth * s
       const h = src.videoHeight * s
       ctx.drawImage(src, (WIDTH - w) / 2, (HEIGHT - h) / 2, w, h)
-    } else {
+      drewOnce = true
+    } else if (!drewOnce) {
+      // While a clip buffers (start, loop) the last frame stays up instead of flashing black.
       ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, WIDTH, HEIGHT)
     }
@@ -199,7 +202,11 @@ export function watchDemoControl(db: Firestore, incidentId: string): void {
   unwatch?.()
   let lastSoundAt = 0
   let lastVideoKey: string | undefined
-  unwatch = onSnapshot(doc(db, DEMO_CONTROL, incidentId), (snap) => {
+  unwatch = onSnapshot(doc(db, DEMO_CONTROL, incidentId), { includeMetadataChanges: false }, (snap) => {
+    // Only real server state may change the clip. When Firestore's connection drops and recovers (the "Listen
+    // stream transport errored" warnings), the listener can get a cached or missing document: read as "no video",
+    // that switched the call to the real camera for a moment and then restarted the clip.
+    if (snap.metadata.fromCache || !snap.exists()) return
     const c = (snap.data() ?? {}) as DemoControl
     const videoKey = `${c.video ?? ''}|${c.videoAt ?? 0}`
     if (videoKey !== lastVideoKey) { lastVideoKey = videoKey; setVideo(c.video, c.loopVideo ?? true) }
