@@ -210,6 +210,17 @@ export async function startLiveCall(
     return words.length < 2 ? !/[A-Z]/.test(a) || GENERIC_PLACE.test(a) : !a.includes(',') && words.length <= 3 && GENERIC_PLACE.test(a)
   }
 
+  // An email address in spoken text: "jeevan dot v at gmail dot com", "J e e v a n v s a n at gmail.com",
+  // "jeevanvsan@gmail.com". Spelled-out letters are joined back together. Null if there is no complete address.
+  const emailIn = (raw: string): string | null => {
+    const t = raw.toLowerCase()
+      .replace(/\b([a-z0-9])\s+(?=[a-z0-9]\b)/g, '$1')
+      .replace(/\s+(at|@)\s+/g, '@').replace(/\s*@\s*/g, '@')
+      .replace(/\s+(dot|period)\s+/g, '.').replace(/\s+underscore\s+/g, '_').replace(/\s+(dash|hyphen)\s+/g, '-')
+    const m = t.match(/[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}/)
+    return m ? m[0].replace(/\.+$/, '') : null
+  }
+
   // Returns the tool response text for calls whose answer matters to the model; undefined means plain "ok".
   const handleToolCall = (call: FunctionCall): string | undefined => {
     const args = (call.args ?? {}) as Record<string, unknown>
@@ -230,13 +241,14 @@ export async function startLiveCall(
       }
       case 'send_case_report': {
         emailAsked = true
-        // Spoken emails arrive as words ("jeevan dot v at gmail dot com"): rebuild the address before checking it.
-        const email = String(args.email ?? '').toLowerCase()
-          .replace(/\s+(at|@)\s+/g, '@').replace(/\s+(dot|period)\s+/g, '.').replace(/\s+(underscore)\s+/g, '_')
-          .replace(/\s+(dash|hyphen)\s+/g, '-').replace(/\s+/g, '').replace(/[.,]+$/, '')
-        if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email)) return `"${args.email}" is not a complete email address. Ask them to spell it once more (name, then the part after the at sign), read it back, and call send_case_report again.`
+        // The caller's own words (speech-to-text) are more reliable for an address than the model's copy of it:
+        // "jeevanvsan@gmail.com" was transcribed right but passed to this tool as "jeevanvsn gmail com". Use an
+        // address found in the last few caller lines; the model's argument is the fallback.
+        const spoken = transcriptLines.filter((l) => l.speaker === 'Caller').slice(-3).reverse().map((l) => l.text)
+        const email = [...spoken, String(args.email ?? '')].map(emailIn).find(Boolean)
+        if (!email) return `"${args.email}" is not a complete email address. Ask them to spell it once more (name, then the part after the at sign), read it back, and call send_case_report again.`
         enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { reportEmail: email }))
-        return `Saved: ${email}. Tell the caller, in one short line, that the full case report with the reference number will be emailed to ${email} shortly after the call.`
+        return `Saved: ${email}. Read exactly this address back to the caller, letter by letter for the part before the @, and say the full case report with a reference number will be emailed there after the call. If they correct it, call send_case_report again with the corrected address.`
       }
       case 'confirm_address': {
         const address = args.address

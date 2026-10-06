@@ -665,3 +665,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Email still not asked: the backup prompt fired only after Mia's "take care", and the call ended first. Now, once danger is reported, the known-facts note tells her in advance to ask for the email in the same reply where the caller says they're safe. The safe statement also adds a note to her next tool response, and the backup prompt fires 0.6 s after she stops talking.
 - Directions: the first step now names the compass direction and the next road ("Head south on Fr. Monsignor Reynolds Purackal Road, towards CCSB Road") instead of "Head forward". The guidance tells her how to answer "left or right?" (compass + a visible road or landmark, never the same sentence again). The landmark lookup inside guidance is capped at 2.5 s (it once missed the 6 s budget).
 - Deployed web staging.
+
+### 2026-10-06 ~21:50 IST: wrong report email fixed
+- The transcript had "jeevanvsan@gmail.com" but Mia passed "jeevanvsn gmail com" to `send_case_report`. The tool now takes the address from the caller's last 3 transcript lines (spelled-out letters joined, "at"/"dot" converted); Mia's argument is only the fallback. She's told to read back exactly the saved address and to re-call the tool if corrected.
+- Deployed web staging.
