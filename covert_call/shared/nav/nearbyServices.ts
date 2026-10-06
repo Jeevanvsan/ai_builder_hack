@@ -81,7 +81,9 @@ async function queryOverpassOnce(url: string, query: string): Promise<{ elements
 // answers browser requests with 406 (no CORS header, so the browser reports a CORS error) and the mirrors time out;
 // Nominatim answers 403 under load. Photon allows CORS, filters by OSM tag inside a bounding box, and answers in ~1 s.
 const PHOTON = 'https://photon.komoot.io'
-const PHOTON_TIMEOUT_MS = 6_000
+// Photon's free server answered in 5-6.5 s on 2026-10-06 evening: a 6 s timeout dropped the police list
+// (INC-MUWPBPUX: hospitals only, no route). Callers that need speed cap it themselves (landmarks: 1.5-2.5 s).
+const PHOTON_TIMEOUT_MS = 10_000
 type PhotonFeature = { geometry?: { coordinates?: [number, number] }; properties?: Record<string, string | undefined> }
 async function photon(path: string): Promise<PhotonFeature[] | null> {
   const controller = new AbortController()
@@ -100,7 +102,7 @@ const bbox = (p: { lat: number; lng: number }, d: number) => [p.lng - d, p.lat -
 const PHOTON_TAGS: Record<ServiceKind, [string, string]> = { police: ['police', 'amenity:police'], fire: ['fire station', 'amenity:fire_station'], hospital: ['hospital', 'amenity:hospital'] }
 
 // Police, fire and hospitals within ~5 km, one request per kind in parallel. Null only if Photon is unreachable.
-async function viaPhoton(near: { lat: number; lng: number }): Promise<{ elements: OverpassElement[] } | null> {
+async function viaPhoton(near: { lat: number; lng: number }): Promise<{ elements: OverpassElement[]; partial?: boolean } | null> {
   const box = bbox(near, 0.045)
   const lists = await Promise.all(
     (Object.entries(PHOTON_TAGS) as [ServiceKind, [string, string]][]).map(async ([kind, [q, tag]]) => {
@@ -109,7 +111,8 @@ async function viaPhoton(near: { lat: number; lng: number }): Promise<{ elements
     }),
   )
   if (lists.every((l) => l === undefined)) return null
-  return { elements: lists.flatMap((l) => l ?? []).filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lon)) }
+  // partial: some kind's request failed (not "none nearby"), so the answer must not be cached for long.
+  return { partial: lists.some((l) => l === undefined), elements: lists.flatMap((l) => l ?? []).filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lon)) }
 }
 
 const NOMINATIM_TYPES: Record<ServiceKind, string> = { police: 'police', fire: 'fire_station', hospital: 'hospital' }
@@ -144,14 +147,41 @@ const CACHE_MS = 5 * 60_000
 const cache = new Map<string, { at: number; promise: Promise<NearbyService[]> }>()
 const cacheKey = (near: { lat: number; lng: number }) => `${near.lat.toFixed(3)},${near.lng.toFixed(3)}`
 
+// The last complete answer for an area is also kept in the browser. If a later live lookup fails or comes back with
+// a kind missing (the free servers are sometimes slow), the missing kinds are filled from it, so a slow server
+// can't leave a chased caller without a police station. Always fetched live first; this is only the fallback.
+const LAST_GOOD = 'qb-nearby-last-good:'
+const lastGood = (key: string): NearbyService[] => {
+  try { return JSON.parse(localStorage.getItem(LAST_GOOD + key) ?? '[]') as NearbyService[] } catch { return [] }
+}
+const keepGood = (key: string, list: NearbyService[]) => {
+  try { localStorage.setItem(LAST_GOOD + key, JSON.stringify(list)) } catch { /* private mode, Node */ }
+}
+
 export function nearbyServices(near: { lat: number; lng: number }): Promise<NearbyService[]> {
   const key = cacheKey(near)
   const hit = cache.get(key)
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.promise
-  const promise = fetchNearbyServices(near)
+  const area = `${near.lat.toFixed(2)},${near.lng.toFixed(2)}`
+  const promise = fetchNearbyServices(near).then(
+    (list) => {
+      const kinds = new Set(list.map((s) => s.kind))
+      const partial = !!(list as NearbyService[] & { partial?: boolean }).partial
+      if (!partial) keepGood(area, list)
+      if (!partial) return list
+      // Something was missing: re-ask soon instead of caching the gap for 5 minutes, and fill it meanwhile.
+      setTimeout(() => cache.delete(key), 15_000)
+      const filled = [...list, ...lastGood(area).filter((s) => !kinds.has(s.kind))]
+      return filled.sort((a, b) => a.distanceKm - b.distanceKm)
+    },
+    (err) => {
+      cache.delete(key)
+      const saved = lastGood(area)
+      if (saved.length) return saved
+      throw err
+    },
+  )
   cache.set(key, { at: Date.now(), promise })
-  // A failed lookup shouldn't be cached as if it succeeded — the next call gets a fresh attempt.
-  promise.catch(() => cache.delete(key))
   return promise
 }
 
@@ -216,7 +246,7 @@ async function fetchNearbyServices(near: { lat: number; lng: number }): Promise<
       rest.push(r)
     }
   }
-  return [...leading, ...rest].slice(0, 9)
+  return Object.assign([...leading, ...rest].slice(0, 9), { partial: !!(data as { partial?: boolean }).partial })
 }
 
 // Epic 16.6: which service type to lead with, based on what's already known about the incident — a highlight/

@@ -40,8 +40,10 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
   // as both are true, and is handed to Mia as a navigation note.
   let wantRoute: string | null = null
   let waitLogged = false
+  // After a failed attempt, wait before asking the map servers again (it retried on every incident update).
+  let lastFailAt = 0
   const routeIfWanted = () => {
-    if (!wantRoute || route || inflight) return
+    if (!wantRoute || route || inflight || Date.now() - lastFailAt < 15_000) return
     if (!pos || !(gpsFix || latestIncident?.location.confirmed)) {
       if (!waitLogged) console.info('[QuickBite call] route waiting for a position (GPS fix or confirmed address)')
       waitLogged = true
@@ -49,7 +51,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     }
     console.info('[QuickBite call] working out the route from', pos)
     void reroute(wantRoute).then((r) => {
-      if (!r) console.warn('[QuickBite call] no route found')
+      if (!r) { lastFailAt = Date.now(); console.warn('[QuickBite call] no route found (retrying in 15 s)') }
       if (r) onTurnNote(`Route to safety is ready: ${r.destination.name} (${r.destination.kind}), ${fmtM(r.distanceM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min. First: ${r.steps[0]?.instruction ?? 'continue ahead'}${r.steps[1] ? `, then ${r.steps[1].instruction}` : ''}. Tell the caller where you are taking them, the first direction and the distance.`)
     })
   }
@@ -199,7 +201,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       }
       if (!pos) return `No reliable location yet — you MUST ask the caller now where exactly they are (road/area AND town), read it back, and call confirm_address; then call get_route_guidance again. Do not give any directions until then. ${landmark ? `The caller already said: "${landmark}" — do NOT ask for a landmark again; call confirm_address with it.` : 'Ask ONCE for a landmark or junction name.'} Meanwhile tell them to keep moving towards a busy, well-lit place (a shop, petrol pump, crowd).`
       if (!route) await reroute(situation ?? 'caller needs to reach safety')
-      if (!route) return 'Could not find a route right now — ask for the nearest landmark and keep them moving somewhere busy and lit.'
+      if (!route) return 'No route yet (the map servers are slow). Do NOT name a destination, a distance or a turn: you do not have one. Tell them to keep moving towards a busy, well-lit place, ask for a landmark they can see, and say you will guide them in a moment. The route will follow as a system note.'
       const r: SafeRoute = route
       const prog = progressOnRoute(pos, r)
       const after = r.steps[prog.stepIndex + 1]

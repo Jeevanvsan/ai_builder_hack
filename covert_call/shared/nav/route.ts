@@ -95,7 +95,11 @@ export function kindForSituation(indicators: string[]): ServiceKind {
 // candidate routes are requested IN PARALLEL, not one after another — this was the main cause of routing feeling
 // slow (up to 3 sequential OSRM round-trips, on top of the Overpass lookup, could add up to several seconds).
 export async function bestSafeRoute(from: LatLng, kind: ServiceKind, reason: string, requestedBy: 'ai' | 'responder', target?: NearbyService): Promise<SafeRoute | null> {
-  const candidates = target ? [target] : (await nearbyServices(from)).filter((s) => s.kind === kind).slice(0, 3)
+  const all = target ? [target] : await nearbyServices(from)
+  // The right kind first; if none was found, the nearest other help (a hospital or fire station is a safe, staffed,
+  // lit place) rather than no route at all.
+  const ofKind = all.filter((s) => s.kind === kind)
+  const candidates = (ofKind.length ? ofKind : all).slice(0, 3)
   const results = await Promise.all(candidates.map(async (c) => ({ c, r: await drivingRoute(from, c) })))
   let best: SafeRoute | null = null
   for (const { c, r } of results) {

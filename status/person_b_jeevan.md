@@ -685,3 +685,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Deployed web staging + production.
 - (~23:20) INC-MUWOZNEF: Mia read the address back as "J, E, E, V, A, N, V, S, A, N at gmail dot com" (comma-separated), which parsed as "n@gmail.com". Comma-separated spelled letters are now joined, and an address with a 1-2 letter name is rejected as a misparse (falls back to the next source). Deployed staging + production.
 - (~23:35) Demo injection: the injected clip sometimes switched to the real camera mid-call. When Firestore's listen stream dropped and recovered, the demoControl listener got a cached/missing snapshot, read it as "no video" (real camera), then restarted the clip. Cached and missing snapshots are now ignored (Stop still works: it writes video:null). A buffering clip keeps its last frame instead of flashing black. Deployed staging + production.
+
+### 2026-10-06 ~23:55 IST: "no route found" (INC-MUWPBPUX)
+- Photon's free server answered in 5-6.5 s this evening; the 6 s timeout dropped the police list (dashboard showed hospitals only), and that partial answer was cached for 5 min, so every retry failed and Mia invented "police station about 2 km ahead".
+- Fixes: Photon timeout 10 s for nearby services (routing runs in the background; landmark lookups keep their 1.5-2.5 s caps); a partial answer is cached only 15 s; the last complete answer per area is kept in the browser and fills any kind a slow lookup misses (still fetched live first); if no police station is found the route goes to the nearest other help; failed route attempts retry every 15 s instead of on every update; with no route Mia is told not to name any destination, distance or turn.
+- Deployed web staging + production, dashboard.
