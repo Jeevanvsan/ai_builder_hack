@@ -20,7 +20,7 @@ import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
 import { stopDemoInject, watchDemoControl } from '../lib/demoInject'
 import { watchMotion, type MotionWatch } from '../lib/motion'
-import { watchForTrustedAlert } from '../lib/trustedAlert'
+import { sendCaseReport, watchForTrustedAlert } from '../lib/trustedAlert'
 import { demoCallsLeft, minutesUntilNextDemo, recordDemoCall } from '../lib/demo'
 
 // Caps a slow/hung best-effort step (an AI call with no timeout of its own) so it can never block the rest of
@@ -220,6 +220,8 @@ export function CallPage() {
             console.error('[QuickBite call] consolidation failed after retry:', e)
             await updateDoc(doc(db, INCIDENTS, id), { consolidationFailed: true }).catch(() => {})
           }
+          // The summary is in (or failed): email the case report if the caller asked for one during the call.
+          void getDoc(doc(db, INCIDENTS, id)).then((snap) => sendCaseReport(id, (snap.data() as Incident | undefined)?.reportEmail)).catch(() => {})
 
           if (address) {
             void groundedLocationContext(address).then((context) => {

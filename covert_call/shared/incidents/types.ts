@@ -45,6 +45,8 @@ export interface Incident {
   // Route to the best-fit station (police/hospital/fire), kept current as the caller moves. Set by the AI during the
   // call or by a responder picking a station on the dashboard.
   safeRoute?: import('../nav/route.ts').SafeRoute
+  // Where the caller asked their case report to be emailed (send_case_report), sent after the call.
+  reportEmail?: string
   extractedFieldsLive: {
     peopleCount: number | null
     dangerIndicators: string[]

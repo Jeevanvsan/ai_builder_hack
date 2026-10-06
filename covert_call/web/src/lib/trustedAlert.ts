@@ -28,3 +28,16 @@ export function watchForTrustedAlert(db: Firestore, incidentId: string): () => v
   }, () => {})
   return stop
 }
+
+// After a call: if the caller gave an email (send_case_report), ask the Apps Script to email them the case report.
+// The script reads the address from the incident itself, never from this request, so the open script URL can't be
+// used to mail anyone else. Best effort, and only once the summary has been written (or has failed).
+export function sendCaseReport(incidentId: string, reportEmail: string | undefined): void {
+  if (!ALERT_URL || !reportEmail || isDemoMode()) return
+  void fetch(ALERT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ type: 'case_report', incidentId }),
+  }).catch(() => {})
+}

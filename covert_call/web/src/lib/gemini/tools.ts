@@ -55,6 +55,18 @@ export const REPORT_SITUATION: FunctionDeclaration = {
   },
 }
 
+export const SEND_CASE_REPORT: FunctionDeclaration = {
+  name: 'send_case_report',
+  description: 'Call this once the caller has given (and you have read back) an email address for their case report. The full report (reference number, location, route, what was seen and heard) is emailed to it after the call.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      email: { type: Type.STRING, description: 'The email address as the caller spelled it, e.g. "jeevan.v at gmail dot com"' },
+    },
+    required: ['email'],
+  },
+}
+
 export const CONFIRM_ADDRESS: FunctionDeclaration = {
   name: 'confirm_address',
   description: 'Call this the moment the caller states their delivery address.',
@@ -222,7 +234,7 @@ export const END_CALL: FunctionDeclaration = {
 }
 
 export const LIVE_CALL_TOOLS: Tool[] = [
-  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_ADVICE, GET_ROUTE_GUIDANCE, REPORT_VEHICLE_NUMBER, REPORT_COERCION_SIGNAL, CONFIRM_MESSAGE_DELIVERED, END_CALL] },
+  { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_ADVICE, GET_ROUTE_GUIDANCE, REPORT_VEHICLE_NUMBER, REPORT_COERCION_SIGNAL, CONFIRM_MESSAGE_DELIVERED, SEND_CASE_REPORT, END_CALL] },
 ]
 
 // Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools

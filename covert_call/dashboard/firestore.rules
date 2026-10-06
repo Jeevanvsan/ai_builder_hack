@@ -94,7 +94,7 @@ service cloud.firestore {
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
           'voiceStressScore', 'voiceStressTrend', 'callerEstimate', 'leakageCheckStatus', 'severity', 'response', 'video', 'videoFront',
           'audioListen', 'hasRecording', 'videoRecording', 'audioRecording', 'sceneObservations', 'adviceGiven',
-          'videoControl', 'vehicle', 'coercionSignals', 'motionEvents', 'isDemo', 'callerUid', 'credibility', 'aiUsage'
+          'videoControl', 'vehicle', 'coercionSignals', 'motionEvents', 'isDemo', 'callerUid', 'credibility', 'aiUsage', 'reportEmail'
         ])
         && d.sessionStartedAt is string
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
@@ -106,6 +106,7 @@ service cloud.firestore {
         && d.location is map
         && (!('track' in d.location) || (d.location.track is list && d.location.track.size() <= 2000))
         && (!('safeRoute' in d) || d.safeRoute is map)
+        && optionalString(d, 'reportEmail', 120)
         && d.extractedFieldsLive is map
         && d.response is map
         && d.response.status in ['new', 'acknowledged', 'in_progress', 'resolved']

@@ -52,7 +52,11 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
   const threat: string[] = []
   for (const d of f.dangerIndicators) {
     if (PEOPLE.test(d)) people.push(d)
-    else if (VEHICLE.test(d)) vehicle.push(d)
+    else if (VEHICLE.test(d)) {
+      vehicle.push(d)
+      // "Being chased by a car" is the threat as well: the Threat card used to show only the urgency.
+      if (/chas|follow|stalk|ram|hit|attack|block/i.test(d)) threat.push(d)
+    }
     else if (APPEARANCE.test(d)) appearance.push(d)
     else threat.push(d)
   }

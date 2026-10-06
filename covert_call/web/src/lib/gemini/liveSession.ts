@@ -11,7 +11,7 @@ import { ALL_CODES } from '../../../../shared/codes.ts'
 import { startCallRecording, type CallRecorder } from './recorder.ts'
 import { isCallerMoving, knownFactsNote } from '../../../../shared/incidents/knownFacts.ts'
 import type { Incident } from '../../../../shared/incidents/types.ts'
-import { LIVE_CALL_TOOLS, batchResponses, toolResponse } from './tools.ts'
+import { LIVE_CALL_TOOLS, SILENT_TOOL_NAMES, batchResponses, toolResponse } from './tools.ts'
 import { currentLiveTier, geminiConfigured, liveConnect } from './aiLogic.ts'
 import type { MotionKind } from '../../../../shared/incidents/types.ts'
 import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
@@ -211,6 +211,15 @@ export async function startLiveCall(
         enqueueWrite(() => updateLiveFields(db, incidentId, patch))
         break
       }
+      case 'send_case_report': {
+        // Spoken emails arrive as words ("jeevan dot v at gmail dot com"): rebuild the address before checking it.
+        const email = String(args.email ?? '').toLowerCase()
+          .replace(/\s+(at|@)\s+/g, '@').replace(/\s+(dot|period)\s+/g, '.').replace(/\s+(underscore)\s+/g, '_')
+          .replace(/\s+(dash|hyphen)\s+/g, '-').replace(/\s+/g, '').replace(/[.,]+$/, '')
+        if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/.test(email)) return `"${args.email}" is not a complete email address. Ask them to spell it once more (name, then the part after the at sign), read it back, and call send_case_report again.`
+        enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { reportEmail: email }))
+        return `Saved: ${email}. Tell the caller, in one short line, that the full case report with the reference number will be emailed to ${email} shortly after the call.`
+      }
       case 'confirm_address': {
         const address = args.address
         if (typeof address !== 'string') break
@@ -323,6 +332,8 @@ export async function startLiveCall(
   let spokeSinceCaller = false
   // When the caller last spoke, and whether Mia has been nudged for that turn already (reply watchdog below).
   let callerSpokeAt = 0
+  // Last time the model did anything (tool call, speech, transcript): it is working on a reply, not stuck.
+  let modelActiveAt = 0
   let nudgedForTurn = false
   // A route that arrived after its 6 s budget, waiting for Mia to be quiet.
   let pendingRouteNote = ''
@@ -366,6 +377,7 @@ export async function startLiveCall(
 
   const onMessage = (message: LiveServerMessage) => {
     noteLiveUsage(message)
+    if (message.toolCall || message.serverContent?.modelTurn || message.serverContent?.outputTranscription) modelActiveAt = Date.now()
     if (import.meta.env.DEV) console.debug('[QuickBite call] message:', message)
 
     // Speech-to-text for both sides arrives in word-sized fragments (AUDIO-only responses never set message.text).
@@ -409,12 +421,22 @@ export async function startLiveCall(
       const others = calls.filter((c) => c.name !== 'get_route_guidance')
       const facts = takeFacts()
       const outputs = others.map((call, i) => (handleToolCall(call) ?? 'ok') + (i === 0 ? facts : ''))
-      const responses = batchResponses(others, outputs, spokeSinceCaller)
-      const replyQueued = responses.some((r) => r.scheduling !== FunctionResponseScheduling.SILENT)
-      if (responses.length) {
+      // Tools run asynchronously on gemini-3.8-live, so a tool call usually arrives just BEFORE the audio of the
+      // same turn. Answering a record-only batch "reply" at that moment made her say the sentence she was already
+      // saying a second time (INC-MUWLCO49). Such a batch is answered 1.5 s later instead: silent if her voice has
+      // started by then, a reply only if she is still quiet (the tool-only turn the reply exists for).
+      const send = () => {
+        if (finished) return
+        const responses = batchResponses(others, outputs, spokeSinceCaller)
         console.info('[QuickBite call] tools:', responses.map((r) => `${r.name}:${r.scheduling === FunctionResponseScheduling.SILENT ? 'silent' : 'reply'}`).join(', '))
         void session.sendToolResponse({ functionResponses: responses })
-        if (replyQueued) replyStarted()
+        if (responses.some((r) => r.scheduling !== FunctionResponseScheduling.SILENT)) replyStarted()
+      }
+      const recordOnly = others.every((c) => !!c.name && (SILENT_TOOL_NAMES.has(c.name) || c.name === 'end_call'))
+      const replyQueued = others.length > 0 && !recordOnly
+      if (others.length) {
+        if (recordOnly && !spokeSinceCaller) setTimeout(send, 1_500)
+        else send()
       }
       // Route guidance needs a real answer (live GPS + routing), so it's answered once the tracker resolves.
       for (const call of routeCalls) {
@@ -689,7 +711,7 @@ export async function startLiveCall(
   // Live API docs that unconditionally interrupts the model: it cut Mia off mid-sentence.
   // Reply watchdog: whatever the cause (a turn of only tool calls, a lost response), the caller is never left waiting
   // more than ~6 s after they finish speaking. One nudge per caller turn, only while Mia is quiet.
-  const REPLY_WAIT_MS = 6_000
+  const REPLY_WAIT_MS = 8_000
   const replyGuardTimer = setInterval(() => {
     if (!canSend()) return
     if (pendingRouteNote && !player.isPlaying() && routesPending === 0) {
@@ -700,7 +722,7 @@ export async function startLiveCall(
       return
     }
     if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return
-    if (Date.now() - callerSpokeAt < REPLY_WAIT_MS) return
+    if (Date.now() - Math.max(callerSpokeAt, modelActiveAt) < REPLY_WAIT_MS) return
     nudgedForTurn = true
     console.info('[QuickBite call] reply watchdog: caller waiting, nudging Mia')
     session.sendClientContent({ turns: '(System note, not the caller: the caller finished speaking and is waiting. Reply to what they just said, briefly. Say only the words meant for the caller.)' })

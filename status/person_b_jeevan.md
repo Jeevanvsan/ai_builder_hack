@@ -629,3 +629,10 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Camera reporting works (yellow sports car, plate CRZJ-708, read on camera; route 262 m → 529 m once the address was confirmed). But Mia still asked the caller to describe the vehicle: the known-facts note now names the camera-identified vehicle (colour/type/plate) and says not to ask for it.
 - Voice stress: the first reading is requested ~5 s after the call starts and the caller has spoken (was 25 s), then every 25 s.
 - Deployed web staging.
+
+### 2026-10-06 ~19:00 IST: case report email, duplicate replies, Threat card (INC-MUWLCO49)
+- **Case report by email (new)**: in danger calls Mia asks once, before the end, for an email to send the case report to (covert mode: "email you the order receipt?"), reads it back, calls the new `send_case_report` tool. The address is saved as `incidents/{id}.reportEmail` (rules updated + deployed). After the summary is written, the app posts `{type:'case_report', incidentId}` to the trusted-alert Apps Script, which reads the address from the incident and emails reference number, summary, location + map, route destination, reported danger, and camera/sound evidence + plate. **Jeevan: paste the `caseReport` code from `covert_call/docs/setup/trusted-alert.md` §4 into the Apps Script and deploy a new version**; until then nothing is sent.
+- **Duplicate sentences** ("…Are you safe right now? Okay, I'm here with you… Are you safe right now?"): with async tools, a record-only tool batch was answered "reply" just before her audio started, so she said it twice. Such a batch is now answered 1.5 s later: silent if she has started speaking, a reply only if she is still quiet. The reply watchdog now measures 8 s from the model's last activity, not only from the caller's last words.
+- **Threat card** showed only "Urgency: high": chase/follow/ram tags now appear on the Threat card as well as the Vehicle card.
+- Ameen: persona gained a "CASE REPORT BY EMAIL" section; tools.ts gained `send_case_report`.
+- Deployed: Firestore rules, dashboard, web staging.
