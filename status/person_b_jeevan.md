@@ -655,3 +655,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Mia asked for the email after the caller was safe, read it back, and the report arrived with the sketch, the camera snap (yellow sports car) and the PDF.
 - Sketch fix: the laptop's start position (~40 km away) zoomed the map out to the whole district. Points more than 3 km from the address/route are now left off, with a note at the bottom; the sketch zooms to the incident (address pin, route, police station).
 - Deployed web staging.
+
+### 2026-10-06 ~21:10 IST: report includes the dashboard's Scene sketch
+- The case report now contains the dashboard's own Scene sketch (the same `SceneSketch` component, rendered in the caller's browser at call end, animations at their final state, with its fact list), followed by the OSM map (address, trail, route) and the camera snaps. Snap kinds: `sketch`, `map`, `camera` (rules updated + deployed).
+- **Jeevan: paste the updated `trusted-alert-Code.gs` and deploy a new version** (image order and captions).
+- Deployed: rules, web staging.

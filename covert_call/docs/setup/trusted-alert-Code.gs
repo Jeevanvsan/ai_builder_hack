@@ -225,13 +225,14 @@ function buildReport(id, f, snaps) {
 
   // Images: the scene sketch first, then camera snaps.
   const images = {}
-  const pics = snaps.filter((s) => str(s.base64)).sort((a, b) => (str(a.kind) === 'sketch' ? -1 : str(b.kind) === 'sketch' ? 1 : 0))
+  const rank = { sketch: 0, map: 1, camera: 2 }
+  const pics = snaps.filter((s) => str(s.base64)).sort((a, b) => (rank[str(a.kind)] ?? 3) - (rank[str(b.kind)] ?? 3))
   const picHtml = (inline) => pics.map((s, k) => {
     const cid = 'pic' + k
     if (inline) images[cid] = Utilities.newBlob(Utilities.base64Decode(str(s.base64)), str(s.mimeType) || 'image/jpeg', cid + '.jpg')
     const src = inline ? 'cid:' + cid : 'data:' + (str(s.mimeType) || 'image/jpeg') + ';base64,' + str(s.base64)
-    const cap = (str(s.kind) === 'sketch' ? '' : 'Camera, ' + time(str(s.at)) + ': ') + str(s.caption)
-    return '<div style="margin:10px 0"><img src="' + src + '" style="max-width:100%;width:' + (str(s.kind) === 'sketch' ? '640' : '420') + 'px;border:1px solid #ddd;border-radius:6px"><div style="color:#555;font-size:12px">' + esc(cap) + '</div></div>'
+    const cap = (str(s.kind) === 'camera' ? 'Camera, ' + time(str(s.at)) + ': ' : '') + str(s.caption)
+    return '<div style="margin:10px 0"><img src="' + src + '" style="max-width:100%;width:' + (str(s.kind) === 'camera' ? '420' : '640') + 'px;border:1px solid #ddd;border-radius:6px"><div style="color:#555;font-size:12px">' + esc(cap) + '</div></div>'
   }).join('')
 
   const footer = 'The call recording and camera evidence are held by the response team under reference ' + id + '. In an emergency, call 112.'
@@ -241,7 +242,7 @@ function buildReport(id, f, snaps) {
   const page = (imgs) => '<div style="font-family:Arial,sans-serif;font-size:13px;color:#222;max-width:700px">'
     + '<h2 style="color:#d9480f;margin:0 0 4px">QuickBite Safety: case report</h2>'
     + '<p style="margin:0 0 12px;color:#555">Reference number <b>' + esc(id) + '</b>. Show this report to the police.</p>'
-    + (imgs ? '<h3 style="margin:14px 0 6px">Scene sketch and camera snaps</h3>' + imgs : '')
+    + (imgs ? '<h3 style="margin:14px 0 6px">Scene sketch, map and camera snaps</h3>' + imgs : '')
     + sectionsHtml + convoHtml
     + '<p style="margin-top:20px;color:#555">' + esc(footer) + '</p></div>'
 

@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { buildCaseSketch } from './caseSketch'
+import { buildSceneSketchImage } from './sceneSketchImage'
 import { INCIDENTS, isDemoMode } from '../../../shared/incidents/client.ts'
 import { loadProfile } from './caller'
 
@@ -39,10 +40,17 @@ export async function startCaseReport(db: Firestore, incidentId: string, inciden
   if (!ALERT_URL || !incident?.reportEmail || isDemoMode()) return
   const now = () => new Date().toISOString()
   await updateDoc(doc(db, INCIDENTS, incidentId), { reportEmailStatus: { status: 'sending', to: incident.reportEmail, at: now() } }).catch(() => {})
-  const sketch = await buildCaseSketch(incidentId, incident).catch(() => null)
-  if (sketch) {
-    await addDoc(collection(db, INCIDENTS, incidentId, 'snaps'), { kind: 'sketch', base64: sketch, mimeType: 'image/jpeg', at: now(), caption: 'Scene sketch: where the call started, the address given, the movement trail and the route to safety' }).catch(() => {})
-  }
+  // The dashboard's scene sketch (who, what, where, the route) and the map of locations and route.
+  const [scene, map] = await Promise.all([
+    buildSceneSketchImage(incidentId, incident).catch(() => null),
+    buildCaseSketch(incidentId, incident).catch(() => null),
+  ])
+  const save = (kind: 'sketch' | 'map', base64: string, caption: string) =>
+    addDoc(collection(db, INCIDENTS, incidentId, 'snaps'), { kind, base64, mimeType: 'image/jpeg', at: now(), caption }).catch(() => {})
+  await Promise.all([
+    scene && save('sketch', scene, 'Scene sketch, as drawn on the responder dashboard'),
+    map && save('map', map, 'Map: the address given, the movement trail and the route to safety'),
+  ])
   await fetch(ALERT_URL, {
     method: 'POST',
     mode: 'no-cors',

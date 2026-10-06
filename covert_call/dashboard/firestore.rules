@@ -213,7 +213,7 @@ service cloud.firestore {
       match /snaps/{snapId} {
         allow read: if true;
         allow create: if request.resource.data.keys().hasOnly(['kind', 'base64', 'mimeType', 'at', 'caption'])
-          && request.resource.data.kind in ['camera', 'sketch']
+          && request.resource.data.kind in ['camera', 'sketch', 'map']
           && request.resource.data.base64 is string && request.resource.data.base64.size() < 900000
           && request.resource.data.caption is string && request.resource.data.caption.size() <= 300;
         allow update, delete: if false;
@@ -261,7 +261,7 @@ service cloud.firestore {
       match /snaps/{snapId} {
         allow read: if true;
         allow create: if request.resource.data.keys().hasOnly(['kind', 'base64', 'mimeType', 'at', 'caption'])
-          && request.resource.data.kind in ['camera', 'sketch']
+          && request.resource.data.kind in ['camera', 'sketch', 'map']
           && request.resource.data.base64 is string && request.resource.data.base64.size() < 900000
           && request.resource.data.caption is string && request.resource.data.caption.size() <= 300;
         allow update, delete: if false;

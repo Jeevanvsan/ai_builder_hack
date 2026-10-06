@@ -143,7 +143,7 @@ export async function buildCaseSketch(id: string, i: Omit<Incident, 'id'>): Prom
   ctx.fillRect(0, 0, W, 38)
   ctx.fillStyle = '#fff'
   ctx.font = 'bold 16px Arial'
-  ctx.fillText(`QuickBite case ${id}: scene sketch`, 12, 25)
+  ctx.fillText(`QuickBite case ${id}: map`, 12, 25)
   ctx.font = '12px Arial'
   const legend = `${route ? `Route ${Math.round(route.distanceM)} m to ${route.destination.kind}` : 'No route'}${track.length ? ` · trail ${track.length} points` : ''}`
   ctx.fillText(legend, W - ctx.measureText(legend).width - 12, 24)
