@@ -670,3 +670,6 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - The transcript had "jeevanvsan@gmail.com" but Mia passed "jeevanvsn gmail com" to `send_case_report`. The tool now takes the address from the caller's last 3 transcript lines (spelled-out letters joined, "at"/"dot" converted); Mia's argument is only the fallback. She's told to read back exactly the saved address and to re-call the tool if corrected.
 - Deployed web staging.
 - (~22:05) Email is now saved only after the caller confirms: the first `send_case_report` keeps it pending and tells Mia to read it back and ask "Is that right?". It's saved when she calls again with `confirmed=true`, or when the caller answers yes right after her read-back. A correction restarts the check. Deployed web staging.
+
+### 2026-10-06 ~22:15 IST: production web deployed
+- `https://quickbite-5cde0.web.app` now has everything verified on staging today: reply guard + route budget, routing started from the moving state, Photon/geocode fixes, map pin, transcript leak cleanup, camera reminder, duplicate-reply fix, case report email (confirmed address, sent at call end with PDF, scene sketch, map, camera snaps). Production uses the free Gemini key first with the paid key as fallback; staging stays free-only. `/demo-control` and `/ai-usage` remain staging-only.
