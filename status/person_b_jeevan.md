@@ -673,3 +673,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-06 ~22:15 IST: production web deployed
 - `https://quickbite-5cde0.web.app` now has everything verified on staging today: reply guard + route budget, routing started from the moving state, Photon/geocode fixes, map pin, transcript leak cleanup, camera reminder, duplicate-reply fix, case report email (confirmed address, sent at call end with PDF, scene sketch, map, camera snaps). Production uses the free Gemini key first with the paid key as fallback; staging stays free-only. `/demo-control` and `/ai-usage` remain staging-only.
+
+### 2026-10-06 ~22:40 IST: Mia went silent after the email prompt (INC-MUWNW8I9), fixed on staging + production
+- After "I think I have reached the police station" the email prompt went out while a record-only tool batch was still unanswered (the 1.5 s deferral window). From then on Mia never replied (two watchdog nudges unanswered), and the dashboard flagged "caller silent after danger".
+- Now no app message to Mia (watchdog, navigation note, email prompt, silence/time-budget prompts, responder messages) goes out while any tool batch or route call is open. If she shows no activity 10 s after an app message, the session is closed and reopened with the resumption handle ("sorry, I lost you for a second").
+- Deployed web staging AND production (production had the same window).

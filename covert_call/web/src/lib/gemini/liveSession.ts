@@ -396,6 +396,16 @@ export async function startLiveCall(
   // Route calls Mia is still waiting on. The watchdog must not send a turn while one is open: a client turn
   // (turnComplete) interrupts the generation that is waiting for that answer.
   let routesPending = 0
+  // Tool batches Mia is still waiting on (record-only batches are answered 1.5 s later). No app message may go out
+  // while one is open: a client turn sent then left her session stuck, silent for the rest of the call
+  // (INC-MUWNW8I9: the email prompt went out in that window, two later nudges got no reply at all).
+  let toolsPending = 0
+  // Last app message sent to Mia. If she shows no sign of life 10 s after it, the session is stuck and is reopened.
+  let nudgeAt = 0
+  const nudge = (turns: string) => {
+    nudgeAt = Date.now()
+    session.sendClientContent({ turns })
+  }
   // A tool response that starts Mia's reply restarts the watchdog clock, so it never nudges while that reply is
   // being generated (generation takes 1-2 s before the first audio arrives).
   const replyStarted = () => { if (callerSpokeAt && !spokeSinceCaller) callerSpokeAt = Date.now() }
@@ -494,6 +504,7 @@ export async function startLiveCall(
       // saying a second time (INC-MUWLCO49). Such a batch is answered 1.5 s later instead: silent if her voice has
       // started by then, a reply only if she is still quiet (the tool-only turn the reply exists for).
       const send = () => {
+        toolsPending = Math.max(0, toolsPending - 1)
         if (finished) return
         const responses = batchResponses(others, outputs, spokeSinceCaller)
         console.info('[QuickBite call] tools:', responses.map((r) => `${r.name}:${r.scheduling === FunctionResponseScheduling.SILENT ? 'silent' : 'reply'}`).join(', '))
@@ -503,6 +514,7 @@ export async function startLiveCall(
       const recordOnly = others.every((c) => !!c.name && (SILENT_TOOL_NAMES.has(c.name) || c.name === 'end_call'))
       const replyQueued = others.length > 0 && !recordOnly
       if (others.length) {
+        toolsPending += 1
         if (recordOnly && !spokeSinceCaller) setTimeout(send, 1_500)
         else send()
       }
@@ -718,7 +730,7 @@ export async function startLiveCall(
   const callStartedAt = Date.now()
   let budgetNoted = false
   const budgetTimer = setInterval(() => {
-    if (budgetNoted || !canSend() || Date.now() - callStartedAt < CALL_BUDGET_MS || player.isPlaying()) return
+    if (budgetNoted || !canSend() || toolsPending > 0 || routesPending > 0 || Date.now() - callStartedAt < CALL_BUDGET_MS || player.isPlaying()) return
     budgetNoted = true
     clearInterval(budgetTimer)
     if (callerMoving) return
@@ -735,7 +747,7 @@ export async function startLiveCall(
     queuedMessages = messages.filter((m) => m.status === 'pending' && !injectedMessages.has(m.id)).map((m) => ({ id: m.id, text: m.text }))
   })
   const messageTimer = setInterval(() => {
-    if (!canSend() || player.isPlaying()) return
+    if (!canSend() || toolsPending > 0 || routesPending > 0 || player.isPlaying()) return
     const next = queuedMessages.shift()
     if (!next || injectedMessages.has(next.id)) return
     injectedMessages.add(next.id)
@@ -783,24 +795,32 @@ export async function startLiveCall(
   const REPLY_WAIT_MS = 8_000
   const replyGuardTimer = setInterval(() => {
     if (!canSend()) return
+    if (nudgeAt && modelActiveAt < nudgeAt && Date.now() - nudgeAt > 10_000) {
+      nudgeAt = 0
+      console.warn('[QuickBite call] Mia has not responded for 10 s: reopening the session')
+      session.close() // onclose reconnects with the resumption handle and tells her to carry on
+      return
+    }
+    if (nudgeAt && modelActiveAt >= nudgeAt) nudgeAt = 0
+    if (toolsPending > 0) return
     if (pendingRouteNote && !player.isPlaying() && routesPending === 0) {
       const note = pendingRouteNote
       pendingRouteNote = ''
       console.info('[QuickBite call] navigation note:', note.slice(0, 90))
-      session.sendClientContent({ turns: `(System note, not the caller — live navigation: ${note} Relay it now, phrased for the situation. Say only the words meant for the caller.)` })
+      nudge(`(System note, not the caller — live navigation: ${note} Relay it now, phrased for the situation. Say only the words meant for the caller.)`)
       return
     }
     if (callerSafe && !emailAsked && spokeSinceCaller && routesPending === 0 && !player.isPlaying() && Date.now() - modelActiveAt > 600) {
       emailAsked = true
       console.info('[QuickBite call] caller safe: asking for the case report email')
-      session.sendClientContent({ turns: "(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address to send their full case report to, with a reference number they can show the police (covert mode: offer to email the order receipt). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)" })
+      nudge("(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address to send their full case report to, with a reference number they can show the police (covert mode: offer to email the order receipt). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)")
       return
     }
     if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return
     if (Date.now() - Math.max(callerSpokeAt, modelActiveAt) < REPLY_WAIT_MS) return
     nudgedForTurn = true
     console.info('[QuickBite call] reply watchdog: caller waiting, nudging Mia')
-    session.sendClientContent({ turns: '(System note, not the caller: the caller finished speaking and is waiting. Reply to what they just said, briefly. Say only the words meant for the caller.)' })
+    nudge('(System note, not the caller: the caller finished speaking and is waiting. Reply to what they just said, briefly. Say only the words meant for the caller.)')
   }, 1_000)
 
   const stressTimer = setInterval(() => {
@@ -825,7 +845,7 @@ export async function startLiveCall(
       lastActivityAt = Date.now()
       return
     }
-    if (Date.now() - lastActivityAt < SILENCE_MS) return
+    if (Date.now() - lastActivityAt < SILENCE_MS || toolsPending > 0 || routesPending > 0) return
     lastActivityAt = Date.now()
     silentNudges += 1
     // After danger, silence usually means the caller is hiding or the attacker is right there. Nudging Mia to
