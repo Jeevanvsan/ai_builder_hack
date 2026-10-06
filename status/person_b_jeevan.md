@@ -660,3 +660,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - The case report now contains the dashboard's own Scene sketch (the same `SceneSketch` component, rendered in the caller's browser at call end, animations at their final state, with its fact list), followed by the OSM map (address, trail, route) and the camera snaps. Snap kinds: `sketch`, `map`, `camera` (rules updated + deployed).
 - **Jeevan: paste the updated `trusted-alert-Code.gs` and deploy a new version** (image order and captions).
 - Deployed: rules, web staging.
+
+### 2026-10-06 ~21:35 IST: INC-MUWN5ZK9: email ask primed earlier, clearer directions
+- Email still not asked: the backup prompt fired only after Mia's "take care", and the call ended first. Now, once danger is reported, the known-facts note tells her in advance to ask for the email in the same reply where the caller says they're safe. The safe statement also adds a note to her next tool response, and the backup prompt fires 0.6 s after she stops talking.
+- Directions: the first step now names the compass direction and the next road ("Head south on Fr. Monsignor Reynolds Purackal Road, towards CCSB Road") instead of "Head forward". The guidance tells her how to answer "left or right?" (compass + a visible road or landmark, never the same sentence again). The landmark lookup inside guidance is capped at 2.5 s (it once missed the 6 s budget).
+- Deployed web staging.

@@ -374,8 +374,11 @@ export async function startLiveCall(
     if (COVERT_SIGNAL.test(callerHeard)) openMode = false
     if (before !== openMode) { callerHeard = ''; if (lastIncident) pendingFacts = factsWithMode(lastIncident) }
   }
+  // After danger, Mia is told in advance to ask for the report email in the same reply where the caller says they
+  // are safe: a prompt sent after that reply came too late (INC-MUWN5ZK9 ended on "take care").
+  const EMAIL_NOTE = " (When the caller says they are safe or have arrived, in that same reply ask once for an email address to send their case report to, with a reference number for the police; covert mode: offer to email the order receipt. Read it back, then call send_case_report.)"
   const factsWithMode = (data: Omit<Incident, 'id'>) =>
-    (openMode ? "(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO food words, NO menu codes, NO 'rider', 'order' or sizes. Switch back only if they say they can't talk or someone is coming.) " : '') + knownFactsNote(data)
+    (dangerReported && !emailAsked ? EMAIL_NOTE : '') + (openMode ? "(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO food words, NO menu codes, NO 'rider', 'order' or sizes. Switch back only if they say they can't talk or someone is coming.) " : '') + knownFactsNote(data)
   let lastIncident: Omit<Incident, 'id'> | undefined
 
   // AI usage for the staging /ai-usage page: every Live message reports the tokens of the inference that produced
@@ -409,7 +412,10 @@ export async function startLiveCall(
       callerSpokeAt = Date.now()
       nudgedForTurn = false
       noteMode(callerText)
-      if (dangerReported && SAFE_NOW.test(transcriptLines.at(-1)?.text ?? callerText)) callerSafe = true
+      if (dangerReported && !callerSafe && SAFE_NOW.test(transcriptLines.at(-1)?.text ?? callerText)) {
+        callerSafe = true
+        if (!emailAsked) extraNotes.push('(The caller just said they are safe: in this reply, ask once for their email for the case report.)')
+      }
       lastActivityAt = Date.now()
       silentNudges = 0
       // They spoke again, so "silent after danger" is no longer true: take the tag off the dashboard.
@@ -747,7 +753,7 @@ export async function startLiveCall(
       session.sendClientContent({ turns: `(System note, not the caller — live navigation: ${note} Relay it now, phrased for the situation. Say only the words meant for the caller.)` })
       return
     }
-    if (callerSafe && !emailAsked && spokeSinceCaller && routesPending === 0 && !player.isPlaying() && Date.now() - modelActiveAt > 1_500) {
+    if (callerSafe && !emailAsked && spokeSinceCaller && routesPending === 0 && !player.isPlaying() && Date.now() - modelActiveAt > 600) {
       emailAsked = true
       console.info('[QuickBite call] caller safe: asking for the case report email')
       session.sendClientContent({ turns: "(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address to send their full case report to, with a reference number they can show the police (covert mode: offer to email the order receipt). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)" })

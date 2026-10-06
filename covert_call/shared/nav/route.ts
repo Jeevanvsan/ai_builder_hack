@@ -21,15 +21,21 @@ export type SafeRoute = {
 type OsrmStep = {
   distance: number
   name: string
-  maneuver: { type: string; modifier?: string; location: [number, number] }
+  maneuver: { type: string; modifier?: string; location: [number, number]; bearing_after?: number }
 }
 
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
+const compass = (deg: number) => COMPASS[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
+
 // OSRM gives structured maneuvers; turn them into short spoken-style instructions.
-function instructionOf(s: OsrmStep): string {
+function instructionOf(s: OsrmStep, next?: OsrmStep): string {
   const road = s.name ? ` onto ${s.name}` : ''
   const mod = s.maneuver.modifier ?? ''
   switch (s.maneuver.type) {
-    case 'depart': return `Head ${mod || 'forward'}${s.name ? ` on ${s.name}` : ''}`
+    case 'depart': {
+      const dir = s.maneuver.bearing_after != null ? compass(s.maneuver.bearing_after) : mod || 'forward'
+      return `Head ${dir}${s.name ? ` on ${s.name}` : ''}${next?.name && next.name !== s.name ? `, towards ${next.name}` : ''}`
+    }
     case 'arrive': return 'Arrive at the destination'
     case 'roundabout':
     case 'rotary': return `At the roundabout, take the exit${road}`
@@ -55,8 +61,9 @@ export async function drivingRoute(from: LatLng, to: LatLng) {
     const data = await res.json()
     const r = data.routes?.[0]
     if (!r) return null
-    const steps: RouteStep[] = (r.legs?.[0]?.steps ?? []).map((s: OsrmStep) => ({
-      instruction: instructionOf(s),
+    const raw: OsrmStep[] = r.legs?.[0]?.steps ?? []
+    const steps: RouteStep[] = raw.map((s: OsrmStep, k: number) => ({
+      instruction: instructionOf(s, raw[k + 1]),
       distanceM: Math.round(s.distance),
       lat: s.maneuver.location[1],
       lng: s.maneuver.location[0],

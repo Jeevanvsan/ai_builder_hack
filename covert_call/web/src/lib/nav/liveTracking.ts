@@ -184,7 +184,8 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       let movedTo: string | null = null
       let uncertainMatch: string | null = null
       if (landmark && anchor) {
-        const hit = await locateLandmark(landmark, anchor).catch(() => null)
+        // Capped: a slow lookup (Photon took 7 s once) made the whole answer miss its 6 s budget.
+        const hit = await Promise.race([locateLandmark(landmark, anchor).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2_500))])
         if (hit && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
           // The dashboard follows a trail of 2+ points, so the first reported landmark also records where they
           // started — from the anchor (what the caller confirmed), not a possibly-wrong GPS/rough fix.
@@ -216,6 +217,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
             : `Caller's position updated to ${movedTo} (from what they reported); directions above are from there.`)
           : `Caller reports being at: "${landmark}" — could not find that near their confirmed area, so directions above are still from their last known position. If it still doesn't match what they see, ask for a different nearby landmark or road name (once), rather than assuming they've moved.`) : '',
         "Say it in the caller's language, with the landmark, the direction and the distance; if they ask what is there, describe the landmark and how far the destination is.",
+        "If they ask whether to go left, right or straight: you can't see which way they face, so answer with the compass direction and a road or landmark they can see on that side (e.g. 'go south, towards the canal and CCSB Road'), and ask them to tell you when they reach the next road. Never repeat the same sentence.",
       ].filter(Boolean).join(' ')
     },
     prefetch: (situation) => {
