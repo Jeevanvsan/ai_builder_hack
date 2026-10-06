@@ -636,3 +636,9 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - **Threat card** showed only "Urgency: high": chase/follow/ram tags now appear on the Threat card as well as the Vehicle card.
 - Ameen: persona gained a "CASE REPORT BY EMAIL" section; tools.ts gained `send_case_report`.
 - Deployed: Firestore rules, dashboard, web staging.
+
+### 2026-10-06 ~19:30 IST: case report email ask made deterministic (INC-MUWM64RK)
+- Apps Script with `caseReport` deployed by Jeevan; verified live (it refuses incidents with no `reportEmail`, and bad ids).
+- Mia didn't ask for the email: the call ended on "take care" after "I have reached the police station, the car is gone". Now, once danger was reported and the caller says they're safe (reached / safe now / car gone / at the station), the app prompts her once, when she's quiet, to ask for the email (skipped if she already mentioned email).
+- The `failed-precondition` 400 in the console is a voice-stress transaction conflict that the SDK retries (the score was written); harmless.
+- Deployed web staging.

@@ -143,6 +143,11 @@ export async function startLiveCall(
   // tool response asks her to look at the latest frame (she sometimes never mentioned a yellow car that was in
   // every frame, INC-MUWKW3B7).
   let lastSceneAt = 0
+  // Case report email: asked once the caller is safe after a danger call. The persona alone didn't make her ask
+  // (INC-MUWM64RK ended on "take care"), so the app prompts her once she is quiet.
+  let callerSafe = false
+  let emailAsked = false
+  const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
   const markMoving = () => {
@@ -212,6 +217,7 @@ export async function startLiveCall(
         break
       }
       case 'send_case_report': {
+        emailAsked = true
         // Spoken emails arrive as words ("jeevan dot v at gmail dot com"): rebuild the address before checking it.
         const email = String(args.email ?? '').toLowerCase()
           .replace(/\s+(at|@)\s+/g, '@').replace(/\s+(dot|period)\s+/g, '.').replace(/\s+(underscore)\s+/g, '_')
@@ -388,6 +394,7 @@ export async function startLiveCall(
       callerSpokeAt = Date.now()
       nudgedForTurn = false
       noteMode(callerText)
+      if (dangerReported && SAFE_NOW.test(transcriptLines.at(-1)?.text ?? callerText)) callerSafe = true
       lastActivityAt = Date.now()
       silentNudges = 0
       // They spoke again, so "silent after danger" is no longer true: take the tag off the dashboard.
@@ -397,7 +404,10 @@ export async function startLiveCall(
       }
     }
     const miaText = message.serverContent?.outputTranscription?.text
-    if (miaText) appendTranscript('Mia', miaText)
+    if (miaText) {
+      appendTranscript('Mia', miaText)
+      if (/e-?mail/i.test(miaText)) emailAsked = true
+    }
 
     const audioPart = message.serverContent?.modelTurn?.parts?.find((p) => p.inlineData?.mimeType?.startsWith('audio/'))
     if (audioPart?.inlineData?.data) {
@@ -719,6 +729,12 @@ export async function startLiveCall(
       pendingRouteNote = ''
       console.info('[QuickBite call] navigation note:', note.slice(0, 90))
       session.sendClientContent({ turns: `(System note, not the caller — live navigation: ${note} Relay it now, phrased for the situation. Say only the words meant for the caller.)` })
+      return
+    }
+    if (callerSafe && !emailAsked && spokeSinceCaller && routesPending === 0 && !player.isPlaying() && Date.now() - modelActiveAt > 1_500) {
+      emailAsked = true
+      console.info('[QuickBite call] caller safe: asking for the case report email')
+      session.sendClientContent({ turns: "(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address to send their full case report to, with a reference number they can show the police (covert mode: offer to email the order receipt). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)" })
       return
     }
     if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return
