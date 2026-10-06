@@ -708,7 +708,8 @@ export async function startLiveCall(
 
   const stressTimer = setInterval(() => {
     if (!transcriptLines.some((l) => l.speaker === 'Caller')) return
-    if (Date.now() - Math.max(lastStressAt, callStartedAt) >= 25_000) stressDue = true
+    // First reading soon after the caller first speaks (the dashboard card was empty for the first ~30 s), then every 25 s.
+    if (lastStressAt ? Date.now() - lastStressAt >= 25_000 : Date.now() - callStartedAt >= 5_000) stressDue = true
     if (opts.videoStream && Date.now() - Math.max(lastSceneAt, callStartedAt) >= 20_000) sceneDue = true
   }, 5_000)
 

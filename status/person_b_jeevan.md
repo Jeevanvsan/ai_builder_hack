@@ -624,3 +624,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Overpass removed from the browser path (always 406 from browsers; Node/eval only). It was hit when Photon reverse took 6.9 s. Guarded the empty-list case so the nearby-services lookup can't hang.
 - Dashboard: "Checking local conditions…" no longer shows while the local-conditions feature is paused.
 - Deployed web staging + dashboard.
+
+### 2026-10-06 ~18:25 IST: INC-MUWL4J6Q follow-up
+- Camera reporting works (yellow sports car, plate CRZJ-708, read on camera; route 262 m → 529 m once the address was confirmed). But Mia still asked the caller to describe the vehicle: the known-facts note now names the camera-identified vehicle (colour/type/plate) and says not to ask for it.
+- Voice stress: the first reading is requested ~5 s after the call starts and the caller has spoken (was 25 s), then every 25 s.
+- Deployed web staging.
