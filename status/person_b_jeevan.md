@@ -690,3 +690,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Photon's free server answered in 5-6.5 s this evening; the 6 s timeout dropped the police list (dashboard showed hospitals only), and that partial answer was cached for 5 min, so every retry failed and Mia invented "police station about 2 km ahead".
 - Fixes: Photon timeout 10 s for nearby services (routing runs in the background; landmark lookups keep their 1.5-2.5 s caps); a partial answer is cached only 15 s; the last complete answer per area is kept in the browser and fills any kind a slow lookup misses (still fetched live first); if no police station is found the route goes to the nearest other help; failed route attempts retry every 15 s instead of on every update; with no route Mia is told not to name any destination, distance or turn.
 - Deployed web staging + production, dashboard.
+
+### 2026-10-07 10:05 IST: demo clips + preview on /demo-control
+- Added `person-in-shadow` clip and re-encoded `alone-street` from the team's Downloads copy (web/public/demo/video, manifest updated, CREDITS line added: source TBD).
+- /demo-control: new 👁 Preview button for videos and sounds (plays on the laptop only, works before a call is picked); Start/Stop stay disabled until a live call is selected. Deployed to staging.

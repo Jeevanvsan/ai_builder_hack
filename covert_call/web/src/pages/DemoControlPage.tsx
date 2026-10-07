@@ -42,6 +42,8 @@ export default function DemoControlPage() {
   const [soundPick, setSoundPick] = useState<string | null>(null)
   const [soundLoop, setSoundLoop] = useState(false)
   const [sent, setSent] = useState('')
+  // Preview plays here on the laptop only; nothing reaches the call.
+  const [preview, setPreview] = useState<{ kind: 'video' | 'sound'; name: string } | null>(null)
 
   useEffect(() => onAuthStateChanged(auth, setUser), [])
   useEffect(() => { void fetch(`/demo/manifest.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => r.json()).then(setManifest).catch(() => {}) }, [])
@@ -102,7 +104,7 @@ export default function DemoControlPage() {
         <h1 style={{ fontSize: 22 }}>Demo feed control</h1>
         <button style={btn()} onClick={() => void signOut(auth)}>Sign out ({user.email})</button>
       </div>
-      <p style={{ color: '#6b7280', marginTop: 0 }}>For recording the demo video. Pick a live call, then a clip: from then on that call streams it as its camera.</p>
+      <p style={{ color: '#6b7280', marginTop: 0 }}>For recording the demo video. Pick a live call, then a clip: from then on that call streams it as its camera. Preview plays a clip here only (no call needed).</p>
 
       <section style={box}>
         <h2 style={{ fontSize: 16, marginTop: 0 }}>1. Live call</h2>
@@ -115,20 +117,24 @@ export default function DemoControlPage() {
         ))}
       </section>
 
-      <section style={{ ...box, opacity: selected ? 1 : 0.5, pointerEvents: selected ? 'auto' : 'none' }}>
+      <section style={box}>
         <h2 style={{ fontSize: 16, marginTop: 0 }}>2. Camera {selectedCall && <span style={{ fontWeight: 400, color: '#6b7280' }}>· now streaming: <b>{control.video ? `${control.video}${control.loopVideo === false ? ' (once)' : ' (loop)'}` : 'real camera'}</b></span>}</h2>
         <div>{manifest.videos.map((v) => <button key={v} style={btn(videoPick === v)} onClick={() => setVideoPick(v)}>{v}</button>)}</div>
         <label style={{ display: 'block', margin: '4px 0 10px' }}><input type="checkbox" checked={videoLoop} onChange={(e) => setVideoLoop(e.target.checked)} /> Loop (off = play once, then back to the real camera)</label>
-        <button style={{ ...btn(true), opacity: videoPick ? 1 : 0.5 }} disabled={!videoPick} onClick={() => videoPick && void send({ video: videoPick, videoAt: Date.now(), loopVideo: videoLoop }, `Start ${videoPick}${videoLoop ? ' (loop)' : ' (once)'}`)}>▶ Start video</button>
-        <button style={btn()} onClick={() => void send({ video: null, videoAt: Date.now() }, 'Real camera')}>■ Stop (real camera)</button>
+        <button style={{ ...btn(), opacity: videoPick ? 1 : 0.5 }} disabled={!videoPick} onClick={() => videoPick && setPreview(preview?.kind === 'video' && preview.name === videoPick ? null : { kind: 'video', name: videoPick })}>{preview?.kind === 'video' && preview.name === videoPick ? '✕ Close preview' : '👁 Preview'}</button>
+        <button style={{ ...btn(true), opacity: videoPick && selected ? 1 : 0.5 }} disabled={!videoPick || !selected} onClick={() => videoPick && void send({ video: videoPick, videoAt: Date.now(), loopVideo: videoLoop }, `Start ${videoPick}${videoLoop ? ' (loop)' : ' (once)'}`)}>▶ Start video</button>
+        <button style={{ ...btn(), opacity: selected ? 1 : 0.5 }} disabled={!selected} onClick={() => void send({ video: null, videoAt: Date.now() }, 'Real camera')}>■ Stop (real camera)</button>
+        {preview?.kind === 'video' && <video key={preview.name} src={`/demo/video/${preview.name}.mp4`} controls autoPlay loop muted playsInline style={{ display: 'block', width: '100%', maxWidth: 480, borderRadius: 10, background: '#000', marginTop: 8 }} />}
       </section>
 
-      <section style={{ ...box, opacity: selected ? 1 : 0.5, pointerEvents: selected ? 'auto' : 'none' }}>
+      <section style={box}>
         <h2 style={{ fontSize: 16, marginTop: 0 }}>3. Background sound {selectedCall && control.sound && <span style={{ fontWeight: 400, color: '#6b7280' }}>· last: <b>{control.sound}{control.loopSound ? ' (loop)' : ''}</b></span>}</h2>
         <div>{manifest.sounds.map((x) => <button key={x} style={btn(soundPick === x)} onClick={() => setSoundPick(x)}>{x}</button>)}</div>
         <label style={{ display: 'block', margin: '4px 0 10px' }}><input type="checkbox" checked={soundLoop} onChange={(e) => setSoundLoop(e.target.checked)} /> Loop</label>
-        <button style={{ ...btn(true), opacity: soundPick ? 1 : 0.5 }} disabled={!soundPick} onClick={() => soundPick && void send({ sound: soundPick, soundAt: Date.now(), loopSound: soundLoop }, `Play ${soundPick}${soundLoop ? ' (loop)' : ''}`)}>▶ Play sound</button>
-        <button style={btn()} onClick={() => void send({ sound: null, soundAt: Date.now(), loopSound: false }, 'Sound off')}>■ Stop sound</button>
+        <button style={{ ...btn(), opacity: soundPick ? 1 : 0.5 }} disabled={!soundPick} onClick={() => soundPick && setPreview(preview?.kind === 'sound' && preview.name === soundPick ? null : { kind: 'sound', name: soundPick })}>{preview?.kind === 'sound' && preview.name === soundPick ? '✕ Close preview' : '👁 Preview'}</button>
+        <button style={{ ...btn(true), opacity: soundPick && selected ? 1 : 0.5 }} disabled={!soundPick || !selected} onClick={() => soundPick && void send({ sound: soundPick, soundAt: Date.now(), loopSound: soundLoop }, `Play ${soundPick}${soundLoop ? ' (loop)' : ''}`)}>▶ Play sound</button>
+        <button style={{ ...btn(), opacity: selected ? 1 : 0.5 }} disabled={!selected} onClick={() => void send({ sound: null, soundAt: Date.now(), loopSound: false }, 'Sound off')}>■ Stop sound</button>
+        {preview?.kind === 'sound' && <audio key={preview.name} src={`/demo/sound/${preview.name}.mp3`} controls autoPlay style={{ display: 'block', width: '100%', maxWidth: 480, marginTop: 8 }} />}
       </section>
 
       {sent && <p style={{ color: '#047857' }}>✓ {sent}</p>}
