@@ -734,3 +734,10 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 ### 2026-10-07 ~17:40 IST: spelling rules actually live now
 - Bug found: three regexes added via a Python edit script had "\b" written as a backspace character, so cleanSpelled/applySpelling (address spelling) and the new callerSpelled check matched nothing in prod since they were added. Fixed (\b restored), no other source files affected.
 - Spelling now mandatory in code: confirm_address / send_case_report ask once for a letter-by-letter spelling if the caller's last 3 lines have none (not when moving). New person-in-shadow clip from the team. Prod + staging deployed.
+
+### 2026-10-07 evening IST: review of today's calls + fixes
+Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
+- First answer missed in almost every call: the mic AudioContext started suspended on the phone, so no audio reached Gemini until a tap. Now resumed at once, on any touch/key, and every second (keepAudioRunning in audio.ts; also the demo mic mixer).
+- INC-MUXXR8TP: the model derailed into a full p5.js Tic-Tac-Toe program mid-call. New guard: code-like output stops playback, isn't saved, and Mia is told to repeat her last question.
+- Every long line appeared twice on the dashboard (5 s partial flush + full line appended). Partial lines are now replaced in place (transaction; the rules only allow the transcript to grow, so no arrayRemove).
+- Emails: older calls (before mandatory spelling) saved STT mishearings (jeevanvsain, geevanvsan); latest call with the spelling flow saved jeevanvsan correctly. Prod + staging deployed.

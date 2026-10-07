@@ -196,8 +196,27 @@ export function recordVoiceStress(db: Firestore, id: string, score: number): Pro
 // live-write functions above need retry hardening for for: appending each line is naturally the caller's own
 // speaker+text data, ordering is only cosmetic (display sorts by `at`), and Firestore's own write ordering per
 // client is already sufficient.
-export function appendTranscriptLine(db: Firestore, id: string, speaker: 'Caller' | 'Mia', text: string): Promise<void> {
-  return updateDoc(ref(db, id), { transcriptLines: arrayUnion({ speaker, text, at: now() }) })
+export type TranscriptEntry = { speaker: 'Caller' | 'Mia'; text: string; at: string }
+// Returns the stored entry so a line saved part-way (the 5 s safety flush) can later be replaced by its full text.
+export async function appendTranscriptLine(db: Firestore, id: string, speaker: 'Caller' | 'Mia', text: string): Promise<TranscriptEntry> {
+  const entry = { speaker, text, at: now() }
+  await updateDoc(ref(db, id), { transcriptLines: arrayUnion(entry) })
+  return entry
+}
+
+// Swaps a part-way line for its full text (same time stamp), instead of adding the full line as a second copy.
+// Done in place in a transaction: the security rules only let the caller grow the transcript, never shrink it.
+export async function replaceTranscriptLine(db: Firestore, id: string, old: TranscriptEntry, text: string): Promise<TranscriptEntry> {
+  const entry = { ...old, text }
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref(db, id))
+    const lines = ((snap.data()?.transcriptLines ?? []) as TranscriptEntry[]).slice()
+    const k = lines.findIndex((l) => l.at === old.at && l.speaker === old.speaker && l.text === old.text)
+    if (k >= 0) lines[k] = entry
+    else lines.push(entry)
+    tx.update(ref(db, id), { transcriptLines: lines })
+  })
+  return entry
 }
 
 // Live GPS point while the call is open; also keeps location.rough on the latest fix so maps follow the caller.

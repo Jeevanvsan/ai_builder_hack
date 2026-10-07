@@ -3,7 +3,7 @@ import { AI_FEATURES } from '../../../../shared/aiFeatures.ts'
 import { FunctionResponseScheduling, MediaResolution, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import { addDoc, arrayRemove, collection, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
 import { usageFromMetadata } from '../../../../shared/aiModels.ts'
-import { INCIDENTS, recordAiUsage, appendTranscriptLine, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { INCIDENTS, recordAiUsage, appendTranscriptLine, replaceTranscriptLine, type TranscriptEntry, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { checkCameraFrame } from './photoVision.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
@@ -97,14 +97,23 @@ export async function startLiveCall(
     const quoted = [...text.slice(at).matchAll(/(?:spoken text|speech)\s*:?\s*\*?\s*["“]([^"”]{3,})["”]/gi)].at(-1)?.[1]
     return quoted ?? text.slice(0, at)
   }
+  // Code-like output (fences, statements, function definitions) never belongs in a phone call.
+  const CODE_LIKE = /```|\bfunction\s+\w+\s*\(|\b(let|const|var)\s+\w+\s*=|[;{}]\s*\n|\bconsole\.log\(|=>\s*\{/
+  let derailed = false
   const written: number[] = []
+  const savedEntries: (TranscriptEntry | undefined)[] = []
   const writeLine = (i: number) => {
     const line = transcriptLines[i]
     const text = (line.speaker === 'Mia' ? spokenPart(line.text) : line.text).replace(/[<{[(]\s*(no speech( detected)?|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]/gi, '').trim()
     if (!text || (written[i] ?? 0) >= line.text.length) return
     written[i] = line.text.length
     const speaker = line.speaker === 'Mia' ? 'Mia' : 'Caller'
-    enqueueWrite(() => appendTranscriptLine(db, incidentId, speaker, text))
+    // A line already saved part-way is replaced by its full text: appending showed every long line twice
+    // ("Is this order for" and then the full question) on the dashboard.
+    enqueueWrite(async () => {
+      const prev = savedEntries[i]
+      savedEntries[i] = prev ? await replaceTranscriptLine(db, incidentId, prev, text) : await appendTranscriptLine(db, incidentId, speaker, text)
+    })
   }
   const flushTranscript = (includeLast = false) => {
     const upTo = includeLast ? transcriptLines.length : transcriptLines.length - 1
@@ -609,7 +618,18 @@ export async function startLiveCall(
       }
     }
     const miaText = message.serverContent?.outputTranscription?.text
-    if (miaText) {
+    // Rarely the model derails into unrelated text (INC-MUXXR8TP read out a whole p5.js Tic-Tac-Toe program
+    // mid-call). Code-like output is cut at once: playback stopped, not saved, and Mia asked to repeat her question.
+    if (miaText && !derailed && CODE_LIKE.test(`${transcriptLines.at(-1)?.speaker === 'Mia' ? transcriptLines.at(-1)?.text.slice(-200) : ''}${miaText}`)) {
+      derailed = true
+      player.clearQueue()
+      const last = transcriptLines.at(-1)
+      if (last?.speaker === 'Mia') { const cut = last.text.search(CODE_LIKE); if (cut >= 0) last.text = last.text.slice(0, cut) }
+      console.warn('[QuickBite call] model output derailed into code: cut off')
+      setTimeout(() => { derailed = false; if (!finished) nudge('(System note, not the caller: your last reply was garbled and did not reach the caller. Say again, briefly, only your last question to the caller, as Mia. Say only the words meant for the caller.)') }, 1_500)
+    }
+    if (miaText && derailed) { /* dropped: part of the derailed output */ }
+    else if (miaText) {
       appendTranscript('Mia', miaText)
       if (/e-?mail/i.test(miaText)) emailAsked = true
     }
