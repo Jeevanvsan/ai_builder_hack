@@ -24,5 +24,5 @@ export const span = (k: keyof typeof SCENES) => ({ from: sec(SCENES[k].from), du
 
 // Voiceover: the first VOICE_TRIM_SECONDS of public/voiceover.mp3 are cut, and the rest plays from VOICE_START
 // (right after the clip, which carries its own sound for the first 20 s).
-export const VOICE_TRIM_SECONDS = 36
+export const VOICE_TRIM_SECONDS = 37
 export const VOICE_START = SCENES.reveal.from
