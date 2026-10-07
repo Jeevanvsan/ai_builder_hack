@@ -717,3 +717,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-07 12:15 IST: email confirm fix
 - INC-MUXN9EK5 emailed jeevanvsn (first guess): "Yes. No, no, no. It's wrong…" was taken as a yes, and Mia's corrected read-back never went to the tool. Now a line with no/wrong/@/at is never a yes, and a real yes no longer auto-saves: Mia is told (tool-response note + nudge after 2.5 s) to call send_case_report confirmed=true with exactly the address she just read back, which is what gets saved. Deployed to staging.
+
+### 2026-10-07 12:40 IST: address spelling cleanup + email yes guard
+- INC-MUXNKEBP: address saved as "Jeevan Niwas, J, E, E, V, A, N, N, I, V, A, S, Vazhicherry, V, A, Z…". confirm_address now strips letter-by-letter runs and applies them to the word they spell ("Jeevan Nivas, Vazhicherry, Alappuzha"); tool says normal words only.
+- Same call: Mia confirmed the email after "Can you repeat again?". send_case_report confirmed=true is now refused unless the caller's last line is a plain yes (no no/wrong/repeat/question); Mia is told to read it back again. Deployed to staging.

@@ -74,7 +74,7 @@ export const CONFIRM_ADDRESS: FunctionDeclaration = {
   parameters: {
     type: Type.OBJECT,
     properties: {
-      address: { type: Type.STRING, description: 'The full address with every name spelled exactly as the caller spelled it letter by letter (their letters are final) and every correction the caller made applied (house/building, road, area, town)' },
+      address: { type: Type.STRING, description: 'The full address with every name spelled exactly as the caller spelled it letter by letter (their letters are final) and every correction the caller made applied (house/building, road, area, town), written as normal words: never include the letter-by-letter spelling itself, e.g. "Jeevan Nivas, Vazhicherry, Alappuzha"' },
       confirmed: { type: Type.BOOLEAN, description: 'true only after the caller said yes to your read-back of this exact address' },
     },
     required: ['address'],

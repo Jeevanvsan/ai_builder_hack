@@ -253,6 +253,25 @@ export async function startLiveCall(
     return email && email.split('@')[0].length >= 3 ? email : null
   }
 
+  // Runs of 3+ single letters ("J, E, E, V" / "V A Z H") are a spelling, not part of the address. The letters are
+  // final: they replace the word(s) just before them that they spell (Niwas → Nivas), then the run is dropped.
+  const cleanSpelled = (addr: string): string =>
+    addr
+      .replace(/(?:\b[A-Za-z]\b[\s,.-]*){3,}/g, (run: string) => `\u0000${run.replace(/[^A-Za-z]/g, '')}\u0000`)
+      .replace(/([A-Za-z][A-Za-z ]*?)\s*[,\s]*\u0000([A-Za-z]+)\u0000/g, (_m: string, before: string, letters: string) => {
+        const words = before.trim().split(/\s+/)
+        for (let k = 1; k <= words.length; k++) {
+          const tail = words.slice(-k)
+          if (tail.join('').length === letters.length) {
+            let i = 0
+            const fixed = tail.map((w: string) => { const p = letters.slice(i, i + w.length); i += w.length; return p[0].toUpperCase() + p.slice(1).toLowerCase() })
+            return [...words.slice(0, -k), ...fixed].join(' ') + ', '
+          }
+        }
+        return before.trim() + ', '
+      })
+      .replace(/\u0000[A-Za-z]+\u0000/g, '').replace(/\s+,/g, ',').replace(/,(\s*,)+/g, ',').replace(/\s{2,}/g, ' ').replace(/[\s,]+$/, '').trim()
+
   // Returns the tool response text for calls whose answer matters to the model; undefined means plain "ok".
   const handleToolCall = (call: FunctionCall): string | undefined => {
     const args = (call.args ?? {}) as Record<string, unknown>
@@ -279,6 +298,14 @@ export async function startLiveCall(
         if (!email) return `"${args.email}" is not a valid email address. Pass it in standard syntax: name@domain.tld, lowercase, no spaces, "@" and "." as symbols, e.g. "jeevan.v@gmail.com". If you are unsure of any letter, ask them to spell it once more (name, then the part after the at sign), read it back, then call send_case_report again.`
         // Saved only once the caller confirms the read-back (Mia calling again with confirmed=true, or the caller's
         // own "yes" right after it, see confirmEmailIfYes).
+        // confirmed=true only counts after a real yes: INC-MUXNKEBP "confirmed" right after "Can you repeat again?".
+        const lastCaller = transcriptLines.filter((l) => l.speaker === 'Caller').at(-1)?.text.trim() ?? ''
+        const saidYes = /^\W*(yes|yeah|yep|yup|correct|right|that'?s (right|correct)|exactly|haan?|athe|sari)\b/i.test(lastCaller) && !/\b(no|not|wrong|incorrect|repeat|again)\b|\?/i.test(lastCaller)
+        if (args.confirmed === true && !saidYes) {
+          pendingEmail = email
+          pendingEmailAt = Date.now()
+          return `Not confirmed: the caller has not said yes (they said "${lastCaller}"). Read this address back once more, letter by letter for the part before the @: ${email}, and ask "Is that right?". Call send_case_report with confirmed=true only after they say yes.`
+        }
         if (args.confirmed === true && (pendingEmail || emailSavedAs)) {
           emailConfirmedAt = Date.now()
           const confirmed = email
@@ -291,8 +318,9 @@ export async function startLiveCall(
         return `Not saved yet. Read exactly this address back, letter by letter for the part before the @: ${email}. Then ask "Is that right?". If they say yes, call send_case_report again with confirmed=true and this same address. If they correct anything, FIRST call send_case_report with the corrected address (their spelled letters are final), then read that back; repeat until they say yes.`
       }
       case 'confirm_address': {
-        const address = args.address
-        if (typeof address !== 'string') break
+        if (typeof args.address !== 'string') break
+        // Mia put her letter-by-letter read-back into the address (INC-MUXNKEBP: "Jeevan Niwas, J, E, E, V…").
+        const address = cleanSpelled(args.address)
         if (tooVague(address)) {
           return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
         }
