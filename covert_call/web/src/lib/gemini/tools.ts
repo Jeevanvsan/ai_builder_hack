@@ -61,7 +61,7 @@ export const SEND_CASE_REPORT: FunctionDeclaration = {
   parameters: {
     type: Type.OBJECT,
     properties: {
-      email: { type: Type.STRING, description: 'The email address as the caller spelled it, e.g. "jeevan.v at gmail dot com"' },
+      email: { type: Type.STRING, description: 'The full, correct email address as a normal address, with every correction the caller made applied, e.g. "jeevan.v@gmail.com". This exact value is saved and the report is sent to it.' },
       confirmed: { type: Type.BOOLEAN, description: 'true only after the caller has confirmed the address you read back' },
     },
     required: ['email'],

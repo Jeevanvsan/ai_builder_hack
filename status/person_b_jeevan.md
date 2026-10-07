@@ -694,3 +694,6 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 ### 2026-10-07 10:05 IST: demo clips + preview on /demo-control
 - Added `person-in-shadow` clip and re-encoded `alone-street` from the team's Downloads copy (web/public/demo/video, manifest updated, CREDITS line added: source TBD).
 - /demo-control: new 👁 Preview button for videos and sounds (plays on the laptop only, works before a call is picked); Start/Stop stay disabled until a live call is selected. Deployed to staging.
+
+### 2026-10-07 10:30 IST: case report email = Mia's address
+- INC-MUXLVU0X sent to the wrong address (jeevanvesan instead of jeevanvsan): code parsing of read-backs/transcripts failed. Now the address Mia passes to send_case_report (full, corrected) is the one saved to `reportEmail` and emailed; only its format is checked. Deployed to staging.
