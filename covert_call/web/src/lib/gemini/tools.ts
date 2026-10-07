@@ -179,7 +179,8 @@ export const REPORT_VEHICLE_NUMBER: FunctionDeclaration = {
   description:
     "Report a suspect vehicle's number plate (Epic 22.3), full or partial, the moment you learn it: from the caller " +
     '(source "caller") or read off a camera frame (source "camera"). Even part of a plate ("KL 04") helps. Never ' +
-    'say a plate you read on camera out loud.',
+    'say a plate you read on camera out loud. A plate the CALLER tells you: read it back character by character and ' +
+    'ask if it is right; if they correct it, call this again with the corrected plate.',
   parameters: {
     type: Type.OBJECT,
     properties: {

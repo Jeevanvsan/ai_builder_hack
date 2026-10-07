@@ -697,3 +697,6 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-07 10:30 IST: case report email = Mia's address
 - INC-MUXLVU0X sent to the wrong address (jeevanvesan instead of jeevanvsan): code parsing of read-backs/transcripts failed. Now the address Mia passes to send_case_report (full, corrected) is the one saved to `reportEmail` and emailed; only its format is checked. Deployed to staging.
+
+### 2026-10-07 11:00 IST: confirm personal details
+- Email: Mia's send_case_report argument is saved (standard name@domain.tld syntax required). Address: confirm_address now has confirmed=true and a read-back loop until the caller says yes. Persona: every personal detail (address, email, phone, name, caller-given plate) is read back with spelling and repeated until confirmed (skipped if hiding/mid-escape). Deployed to staging.
