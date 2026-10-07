@@ -38,7 +38,7 @@ const C = {
 };
 
 // voiceover: an MP3 in public/ (e.g. "voiceover.mp3"). bgVideo: a clip in public/ (e.g. "intro-bg.mp4") played,
-// darkened, behind the first BG_VIDEO_SECONDS (hook + problem); the drawn door is hidden while it plays.
+// darkened, with its own sound (35% under a voiceover), behind the first BG_VIDEO_SECONDS (hook + problem).
 export type IntroProps = { voiceover: string | null; bgVideo: string | null };
 const BG_VIDEO_SECONDS = 20;
 
@@ -50,7 +50,7 @@ export const MyComposition = () => (
     fps={FPS}
     width={1920}
     height={1080}
-    defaultProps={{ voiceover: null, bgVideo: null } as IntroProps}
+    defaultProps={{ voiceover: null, bgVideo: "intro-bg.mp4" }}
   />
 );
 
@@ -58,7 +58,7 @@ export const QuickBiteIntro: React.FC<IntroProps> = ({ voiceover, bgVideo }) => 
   <AbsoluteFill style={{ backgroundColor: C.bg, fontFamily, color: C.ink }}>
     {bgVideo ? (
       <Sequence name="Background video" durationInFrames={sec(BG_VIDEO_SECONDS)}>
-        <BackgroundVideo src={bgVideo} />
+        <BackgroundVideo src={bgVideo} underVoice={Boolean(voiceover)} />
       </Sequence>
     ) : null}
     <Sequence name="Hook: someone is inside" {...span("hook")}>
@@ -142,12 +142,12 @@ const Eyebrow: React.FC<{ text: string; color: string; at?: number }> = ({ text,
   );
 };
 
-const BackgroundVideo: React.FC<{ src: string }> = ({ src }) => {
+const BackgroundVideo: React.FC<{ src: string; underVoice: boolean }> = ({ src, underVoice }) => {
   const frame = useCurrentFrame();
   const end = sec(BG_VIDEO_SECONDS);
   return (
     <AbsoluteFill style={{ opacity: interpolate(frame, [0, 12, end - 15, end], [0, 1, 1, 0], clamp) }}>
-      <Video src={staticFile(src)} muted style={{ width: "100%", height: "100%", objectFit: "cover", scale: interpolate(frame, [0, end], [1, 1.08], clamp) }} />
+      <Video src={staticFile(src)} volume={underVoice ? 0.35 : 1} style={{ width: "100%", height: "100%", objectFit: "cover", scale: interpolate(frame, [0, end], [1, 1.08], clamp) }} />
       <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(8,10,16,0.25) 0%, rgba(8,10,16,0.35) 45%, rgba(8,10,16,0.9) 100%)" }} />
     </AbsoluteFill>
   );
@@ -163,8 +163,8 @@ const Hook: React.FC<{ withVideo: boolean }> = ({ withVideo }) => {
   return (
     <SceneOut dur={dur}>
       {withVideo ? null : <Ambient tint="#3b5bdb" strength={0.16} />}
-      <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 46%, rgba(239,68,68,${0.28 * doorOpen}) 0%, transparent 45%)` }} />
-      <AbsoluteFill style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 48 }}>
+      {withVideo ? null : <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 46%, rgba(239,68,68,${0.28 * doorOpen}) 0%, transparent 45%)` }} />}
+      <AbsoluteFill style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: withVideo ? "flex-end" : "center", gap: withVideo ? 20 : 48, paddingBottom: withVideo ? 110 : 0 }}>
         <Interactive.Div
           name="Clock 10:00 PM"
           style={{
