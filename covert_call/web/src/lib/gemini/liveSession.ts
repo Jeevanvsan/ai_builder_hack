@@ -282,7 +282,11 @@ export async function startLiveCall(
         if (tooVague(address)) {
           return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
         }
+        // Saved straight away (latest version wins) so responders have a location even before the read-back.
         enqueueWrite(() => confirmAddress(db, incidentId, address))
+        if (args.confirmed !== true) {
+          return `Saved for now. Read it back to the caller in one short line, spelling any unusual name: "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
+        }
         return movementReported
           ? 'Saved. They are on the move — call get_route_guidance now and guide them to the police station/hospital it gives.'
           : 'Saved. Do NOT give directions — they have not said they are being followed or moving. Keep them safe where they are.'

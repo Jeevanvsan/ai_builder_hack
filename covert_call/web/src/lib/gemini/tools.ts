@@ -70,11 +70,12 @@ export const SEND_CASE_REPORT: FunctionDeclaration = {
 
 export const CONFIRM_ADDRESS: FunctionDeclaration = {
   name: 'confirm_address',
-  description: 'Call this the moment the caller states their delivery address.',
+  description: 'Call this the moment the caller states their delivery address (confirmed=false), then read it back clearly, spelling any unusual name, and ask if it is right. If they correct anything, call it again with the corrected address and read it back again; repeat until they say yes. Only then call it once more with confirmed=true.',
   parameters: {
     type: Type.OBJECT,
     properties: {
-      address: { type: Type.STRING, description: 'The address exactly as the caller said it' },
+      address: { type: Type.STRING, description: 'The full address with correct spelling and every correction the caller made applied (house/building, road, area, town)' },
+      confirmed: { type: Type.BOOLEAN, description: 'true only after the caller said yes to your read-back of this exact address' },
     },
     required: ['address'],
   },
