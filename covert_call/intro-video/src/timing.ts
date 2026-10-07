@@ -7,10 +7,11 @@ export const SCENES = {
   hook: { from: 0, to: 11 }, // the clip's own story (0-11 s): "Ten at night… Someone is inside."
   problem: { from: 11, to: 15.5 }, // the clip's problem line starts at 11 s
   legacy: { from: 15.5, to: 20 }, // "Legacy systems fail them… responders arrive blind."
-  reveal: { from: 20, to: 23 }, // "So we built QuickBite."
-  app: { from: 23, to: 38.5 }, // "It looks like a food delivery app… under three minutes."
-  dashboard: { from: 38.5, to: 47 }, // "The responder dashboard shows it all live…"
-  close: { from: 47, to: 53.5 }, // "QuickBite. A food order outside. A lifeline inside."
+  // 20-21.5 s: a beat of silence on a dark screen between the clip and the reveal.
+  reveal: { from: 21.5, to: 24.5 }, // "So we built QuickBite."
+  app: { from: 24.5, to: 39.5 }, // "It looks like a food delivery app… under three minutes."
+  dashboard: { from: 39.5, to: 47.5 }, // "The responder dashboard shows it all live…"
+  close: { from: 47.5, to: 54 }, // "QuickBite. A food order outside. A lifeline inside."
 } as const
 
 // The hook/problem/legacy animations were designed for these lengths (seconds); they are time-stretched to fit the
@@ -26,4 +27,4 @@ export const span = (k: keyof typeof SCENES) => ({ from: sec(SCENES[k].from), du
 // (right after the clip, which carries its own sound for the first 20 s).
 export const VOICE_TRIM_SECONDS = 37
 export const VOICE_START = SCENES.reveal.from
-export const VOICE_SPEED = 1.1 // ~36 s of voice → ~33 s, so it ends near 0:53
+export const VOICE_SPEED = 1.15 // ~36 s of voice → ~31.6 s, so it ends near 0:53
