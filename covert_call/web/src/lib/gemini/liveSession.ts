@@ -284,7 +284,7 @@ export async function startLiveCall(
   }
   const spellingSources = () => {
     const mia = [...transcriptLines].reverse().find((l) => l.speaker === 'Mia')?.text ?? ''
-    const caller = transcriptLines.filter((l) => l.speaker === 'Caller').slice(-6).map((l) => l.text).join(' | ')
+    const caller = transcriptLines.filter((l) => l.speaker === 'Caller').map((l) => l.text).join(' | ')
     return `${mia} | ${caller}`
   }
   const saveAddress = (address: string) => {
@@ -319,6 +319,24 @@ export async function startLiveCall(
         return before.trim() + ', '
       })
       .replace(/\u0000[A-Za-z]+\u0000/g, '').replace(/\s+,/g, ',').replace(/,(\s*,)+/g, ',').replace(/\s{2,}/g, ' ').replace(/[\s,]+$/, '').trim()
+
+  // An email Mia spelled out loud ("j, e, e, v, a, n at gmail com") from one of her lines, or null.
+  const spokenEmail = (text: string): string | null => {
+    const toks = text.toLowerCase().replace(/@/g, ' at ').split(/[\s,—–\-]+/).map((t: string) => t.replace(/[^a-z0-9._]/g, '')).filter(Boolean)
+    let best: string | null = null
+    for (let i = 0; i < toks.length; i++) {
+      if (toks[i] !== 'at') continue
+      let j = i - 1, local = ''
+      while (j >= 0 && (toks[j].length === 1 || toks[j] === 'dot' || toks[j] === 'underscore')) { local = (toks[j] === 'dot' ? '.' : toks[j] === 'underscore' ? '_' : toks[j]) + local; j-- }
+      if (local.replace(/[._]/g, '').length < 3) continue
+      const dom: string[] = []
+      for (let k = i + 1; k < toks.length && dom.length < 4; k++) { const t = toks[k]; if (['is', 'that', 'right', 'correct'].includes(t)) break; dom.push(t === 'dot' ? '.' : t) }
+      let domain = dom.join(' ').replace(/\s*\.\s*/g, '.').trim().replace(/\s+/g, '.')
+      if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain)) continue
+      best = `${local}@${domain}`
+    }
+    return best
+  }
 
   // Returns the tool response text for calls whose answer matters to the model; undefined means plain "ok".
   const handleToolCall = (call: FunctionCall): string | undefined => {
@@ -360,7 +378,10 @@ export async function startLiveCall(
         }
         if (args.confirmed === true && (pendingEmail || emailSavedAs)) {
           emailConfirmedAt = Date.now()
-          const confirmed = email
+          // What the caller said yes to is the address Mia SPOKE in her read-back, which can differ from her tool argument
+          // (INC-MUXX7G18: read back "j, e, e, v, a, n, v, s, a, n", passed "jeevanvsn" from the transcript).
+          const spoken = [...transcriptLines].reverse().filter((l) => l.speaker === 'Mia').slice(0, 3).map((l) => spokenEmail(l.text)).find(Boolean)
+          const confirmed = spoken ?? email
           if (confirmed !== emailSavedAs) saveReportEmail(confirmed)
           return `Confirmed and saved: ${confirmed}. Tell them in one short line that the full case report with a reference number will be emailed there after the call.`
         }
