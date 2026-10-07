@@ -721,3 +721,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 ### 2026-10-07 12:40 IST: address spelling cleanup + email yes guard
 - INC-MUXNKEBP: address saved as "Jeevan Niwas, J, E, E, V, A, N, N, I, V, A, S, Vazhicherry, V, A, Z…". confirm_address now strips letter-by-letter runs and applies them to the word they spell ("Jeevan Nivas, Vazhicherry, Alappuzha"); tool says normal words only.
 - Same call: Mia confirmed the email after "Can you repeat again?". send_case_report confirmed=true is now refused unless the caller's last line is a plain yes (no no/wrong/repeat/question); Mia is told to read it back again. Deployed to staging.
+
+### 2026-10-07 13:15 IST: Mia prompt rewrite + sketch movement
+- persona.ts rewritten (≈52 KB → 22 KB): numbered HARD RULES up front (same-breath meaning, covert = choices only, one question then wait, never re-ask, max 2 tries, tools silent/batched, never invent); one PRIORITY list; TIME BUDGET (no pin code/name/"anything else"/order read-back); CONFIRMING DETAILS (spell back, caller's letters final, correction ≠ yes, clean values to tools); route guidance merged into one section. Section names the code refers to kept (TIME BUDGET, RESPONDER MESSAGES, SILENCE, CAN THEY GET OUT). Old version saved in git history.
+- Scene sketch: "moving" now needs 80 m+ of GPS movement or walking speed (GPS jitter drew a caller at home on a road); Niwas/Nivas/Bhavan/Veedu/Villa count as indoors. Dashboard + web staging deployed.
