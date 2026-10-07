@@ -33,6 +33,23 @@ export const MIC_CONSTRAINTS: MediaTrackConstraints = {
   autoGainControl: true,
 }
 
+// Phone browsers can create an AudioContext 'suspended' when it isn't started straight from a tap. A suspended
+// mic context processes nothing: no audio reached Gemini until the caller happened to touch the screen, so the
+// first answer ("order") was never heard (INC-MUXZGQFW and others). Resume it now, on any touch or key, and every
+// second until it runs.
+export function keepAudioRunning(ctx: AudioContext): () => void {
+  const resume = () => { if (ctx.state === 'suspended') void ctx.resume().catch(() => {}) }
+  resume()
+  const events = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'] as const
+  events.forEach((e) => window.addEventListener(e, resume, { passive: true }))
+  const timer = window.setInterval(() => {
+    resume()
+    if (ctx.state === 'closed') stop()
+  }, 1_000)
+  const stop = () => { window.clearInterval(timer); events.forEach((e) => window.removeEventListener(e, resume)) }
+  return stop
+}
+
 // Captures the mic, resamples to 16kHz mono PCM16, and calls `onChunk` with base64-encoded audio ready for
 // Session.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } }).
 // If `providedStream` is passed (e.g. the caller already opened the mic alongside the camera), its audio track is
@@ -44,6 +61,7 @@ export async function startMicCapture(
   const ownsStream = !providedStream
   const stream = providedStream ?? (await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS }))
   const context = new AudioContext()
+  const stopResume = keepAudioRunning(context)
   const source = context.createMediaStreamSource(stream)
   // ScriptProcessorNode is deprecated but still the simplest cross-browser way to get raw PCM frames without
   // shipping a separate AudioWorklet module file for a hackathon-scope integration.
@@ -84,6 +102,7 @@ export async function startMicCapture(
       // Only stop the mic if we opened it. A caller-provided stream (shared with the camera/recorder) is stopped
       // by the caller once everything that uses it has finished.
       if (ownsStream) stream.getTracks().forEach((t) => t.stop())
+      stopResume()
       void context.close()
     },
   }
