@@ -714,3 +714,6 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-07 12:00 IST: address pin fallback
 - INC-MUXN9EK5: backup camera check works (man + smoke reported). Address "Jeevan Niwas, Vazhichery Market, Vazhichery, Alappuzha" still unpinned (one-r spelling unmatched, Nominatim throttled). confirmAddress now pins at the phone's GPS fix (source gps only, never the IP guess), marked uncertain, when geocoding fails. Deployed to staging.
+
+### 2026-10-07 12:15 IST: email confirm fix
+- INC-MUXN9EK5 emailed jeevanvsn (first guess): "Yes. No, no, no. It's wrong…" was taken as a yes, and Mia's corrected read-back never went to the tool. Now a line with no/wrong/@/at is never a yes, and a real yes no longer auto-saves: Mia is told (tool-response note + nudge after 2.5 s) to call send_case_report confirmed=true with exactly the address she just read back, which is what gets saved. Deployed to staging.

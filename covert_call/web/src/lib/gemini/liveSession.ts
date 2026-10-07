@@ -166,6 +166,7 @@ export async function startLiveCall(
   // Mia has spoken since the address was given (the read-back), so a "yes" now answers "is that right?".
   let emailReadBack = false
   let emailSavedAs: string | null = null
+  let emailConfirmedAt = 0
   const saveReportEmail = (email: string) => {
     pendingEmail = null
     emailSavedAs = email
@@ -175,7 +176,17 @@ export async function startLiveCall(
   // The caller's "yes" right after the read-back saves Mia's address, even if she forgets the confirming tool call.
   const confirmEmailIfYes = (callerLine: string) => {
     if (!pendingEmail || !emailReadBack || Date.now() - pendingEmailAt > 60_000) return
-    if (/^\W*(yes|yeah|yep|yup|correct|right|that'?s (right|correct)|exactly|haan?|athe|sari)\b/i.test(callerLine.trim())) saveReportEmail(pendingEmail)
+    const line = callerLine.trim()
+    // "Yes. No, no, no. It's wrong, J E E V…" is a correction, not a yes (INC-MUXN9EK5 saved the wrong address).
+    if (/\b(no|not|wrong|incorrect|nahi|alla|illa)\b|@|\bat\b/i.test(line)) return
+    // The yes is to Mia's LATEST read-back, which may already be a corrected address she never passed to the tool
+    // (INC-MUXN9EK5): she saves it herself with confirmed=true; the app doesn't guess which address that was.
+    if (/^\W*(yes|yeah|yep|yup|correct|right|that'?s (right|correct)|exactly|haan?|athe|sari)\b/i.test(line)) {
+      emailReadBack = false
+      extraNotes.push('(The caller said yes to your email read-back: call send_case_report now with confirmed=true and exactly the address you just read back, in name@domain.tld syntax.)')
+      const yesAt = Date.now()
+      setTimeout(() => { if (!finished && emailConfirmedAt < yesAt) nudge('(System note, not the caller: the caller confirmed the email you read back. Call send_case_report with confirmed=true and exactly that address in name@domain.tld syntax, then carry on.)') }, 2_500)
+    }
   }
   const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
@@ -269,6 +280,7 @@ export async function startLiveCall(
         // Saved only once the caller confirms the read-back (Mia calling again with confirmed=true, or the caller's
         // own "yes" right after it, see confirmEmailIfYes).
         if (args.confirmed === true && (pendingEmail || emailSavedAs)) {
+          emailConfirmedAt = Date.now()
           const confirmed = email
           if (confirmed !== emailSavedAs) saveReportEmail(confirmed)
           return `Confirmed and saved: ${confirmed}. Tell them in one short line that the full case report with a reference number will be emailed there after the call.`
@@ -276,7 +288,7 @@ export async function startLiveCall(
         pendingEmail = email
         pendingEmailAt = Date.now()
         emailReadBack = false
-        return `Not saved yet. Read exactly this address back, letter by letter for the part before the @: ${email}. Then ask "Is that right?". If they say yes, call send_case_report again with confirmed=true. If they correct it, call send_case_report with the corrected address.`
+        return `Not saved yet. Read exactly this address back, letter by letter for the part before the @: ${email}. Then ask "Is that right?". If they say yes, call send_case_report again with confirmed=true and this same address. If they correct anything, FIRST call send_case_report with the corrected address (their spelled letters are final), then read that back; repeat until they say yes.`
       }
       case 'confirm_address': {
         const address = args.address
