@@ -711,3 +711,6 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-07 11:45 IST: shorter calls
 - INC-MUXMUWBA ran 4+ min. Persona TIME BUDGET rewritten: only essential questions (what, how many, where with one read-back, still there), extras only when relevant, never ask the same thing more than twice. Notes at 2:00 (wrap up, at most one more question) and 3:00 (goodbye + end_call); Mia ends the call herself, exception only for a caller chased/hiding right now. Also: caller's spelling is final in read-backs. Deployed to staging.
+
+### 2026-10-07 12:00 IST: address pin fallback
+- INC-MUXN9EK5: backup camera check works (man + smoke reported). Address "Jeevan Niwas, Vazhichery Market, Vazhichery, Alappuzha" still unpinned (one-r spelling unmatched, Nominatim throttled). confirmAddress now pins at the phone's GPS fix (source gps only, never the IP guess), marked uncertain, when geocoding fails. Deployed to staging.

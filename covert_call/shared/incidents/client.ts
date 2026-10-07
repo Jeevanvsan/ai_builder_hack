@@ -232,6 +232,14 @@ export async function confirmAddress(
   // the wrong town entirely) — using it as "confirmed" coordinates silently produced a wrong pin and a wrong
   // route with no sign anything was off. Better to save the spoken address as text with NO pin than a wrong one
   // that looks identical to a real fix; the dashboard shows it as unlocated instead of confidently wrong.
+  // The phone's own GPS fix (not the IP guess) is where the caller is: a caller at home is at their address, so
+  // when the map servers can't match a house name or a misspelt area ("Vazhichery", INC-MUXN9EK5) it is pinned
+  // there, marked uncertain, instead of no pin at all.
+  if (!hit && rough?.source === 'gps') {
+    const confirmed = { address: spokenAddress, lat: rough.lat, lng: rough.lng, confidence: 'uncertain' as const, confirmedAt: now() }
+    await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
+    return confirmed
+  }
   if (!hit) {
     const confirmed = { address: spokenAddress, lat: null, lng: null, confidence: 'uncertain' as const, confirmedAt: now() }
     await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
