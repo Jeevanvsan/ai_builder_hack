@@ -795,7 +795,7 @@ export async function startLiveCall(
     if (!budgetNoted && elapsed >= WRAP_UP_MS) {
       budgetNoted = true
       session.sendClientContent({
-        turns: '(System note, not the caller — time: the call is 2 minutes long. Start wrapping up per your TIME BUDGET rule: at most one more essential question, then close. If they are being chased or hiding right now, keep helping them instead. Say only the words meant for the caller.)',
+        turns: '(System note, not the caller — time: the call is 2 minutes long. Start wrapping up per your TIME BUDGET rule: at most one more essential question, then close.' + (dangerReported && !emailAsked ? ' Before the goodbye, ask for the email for the case report (covert: the order receipt) and confirm it.' : '') + ' If they are being chased or hiding right now, keep helping them instead. Say only the words meant for the caller.)',
       })
       return
     }
