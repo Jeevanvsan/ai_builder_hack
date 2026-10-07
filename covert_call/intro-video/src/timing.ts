@@ -4,9 +4,9 @@
 export const FPS = 30
 
 export const SCENES = {
-  hook: { from: 0, to: 5.5 }, // "Ten at night… Someone is inside."
-  problem: { from: 5.5, to: 12.5 }, // "This is the problem… when it matters most."
-  legacy: { from: 12.5, to: 20 }, // "Legacy systems fail them… responders arrive blind."
+  hook: { from: 0, to: 11 }, // the clip's own story (0-11 s): "Ten at night… Someone is inside."
+  problem: { from: 11, to: 15.5 }, // the clip's problem line starts at 11 s
+  legacy: { from: 15.5, to: 20 }, // "Legacy systems fail them… responders arrive blind."
   reveal: { from: 20, to: 23 }, // "So we built QuickBite."
   app: { from: 23, to: 36.5 }, // "It looks like a food delivery app… under three minutes."
   dashboard: { from: 36.5, to: 44 }, // "The responder dashboard shows it all live…"
