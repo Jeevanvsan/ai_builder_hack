@@ -735,7 +735,7 @@ const Close = () => {
           A lifeline inside.
         </Interactive.Div>
         <div style={{ fontSize: 32, color: C.dim, marginTop: 30, opacity: interpolate(frame, [95, 110], [0, 1], clamp) }}>
-          Built with Gemini Live · Firebase · Team NexMind
+          Built with Gemini Live · Team NexMind
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
