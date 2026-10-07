@@ -9,6 +9,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type 
 import { collection, doc, getFirestore, onSnapshot, query, setDoc, where } from 'firebase/firestore'
 import { DEMO_CONTROL, type DemoControl } from '../lib/demoInject'
 
+declare const __DEMO_V__: string
 const APP_NAME = 'demo-control'
 const app = getApps().find((a) => a.name === APP_NAME) ?? initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -124,7 +125,7 @@ export default function DemoControlPage() {
         <button style={{ ...btn(), opacity: videoPick ? 1 : 0.5 }} disabled={!videoPick} onClick={() => videoPick && setPreview(preview?.kind === 'video' && preview.name === videoPick ? null : { kind: 'video', name: videoPick })}>{preview?.kind === 'video' && preview.name === videoPick ? '✕ Close preview' : '👁 Preview'}</button>
         <button style={{ ...btn(true), opacity: videoPick && selected ? 1 : 0.5 }} disabled={!videoPick || !selected} onClick={() => videoPick && void send({ video: videoPick, videoAt: Date.now(), loopVideo: videoLoop }, `Start ${videoPick}${videoLoop ? ' (loop)' : ' (once)'}`)}>▶ Start video</button>
         <button style={{ ...btn(), opacity: selected ? 1 : 0.5 }} disabled={!selected} onClick={() => void send({ video: null, videoAt: Date.now() }, 'Real camera')}>■ Stop (real camera)</button>
-        {preview?.kind === 'video' && <video key={preview.name} src={`/demo/video/${preview.name}.mp4`} controls autoPlay loop muted playsInline style={{ display: 'block', width: '100%', maxWidth: 480, borderRadius: 10, background: '#000', marginTop: 8 }} />}
+        {preview?.kind === 'video' && <video key={preview.name} src={`/demo/video/${preview.name}.mp4?v=${__DEMO_V__}`} controls autoPlay loop muted playsInline style={{ display: 'block', width: '100%', maxWidth: 480, borderRadius: 10, background: '#000', marginTop: 8 }} />}
       </section>
 
       <section style={box}>
@@ -134,7 +135,7 @@ export default function DemoControlPage() {
         <button style={{ ...btn(), opacity: soundPick ? 1 : 0.5 }} disabled={!soundPick} onClick={() => soundPick && setPreview(preview?.kind === 'sound' && preview.name === soundPick ? null : { kind: 'sound', name: soundPick })}>{preview?.kind === 'sound' && preview.name === soundPick ? '✕ Close preview' : '👁 Preview'}</button>
         <button style={{ ...btn(true), opacity: soundPick && selected ? 1 : 0.5 }} disabled={!soundPick || !selected} onClick={() => soundPick && void send({ sound: soundPick, soundAt: Date.now(), loopSound: soundLoop }, `Play ${soundPick}${soundLoop ? ' (loop)' : ''}`)}>▶ Play sound</button>
         <button style={{ ...btn(), opacity: selected ? 1 : 0.5 }} disabled={!selected} onClick={() => void send({ sound: null, soundAt: Date.now(), loopSound: false }, 'Sound off')}>■ Stop sound</button>
-        {preview?.kind === 'sound' && <audio key={preview.name} src={`/demo/sound/${preview.name}.mp3`} controls autoPlay style={{ display: 'block', width: '100%', maxWidth: 480, marginTop: 8 }} />}
+        {preview?.kind === 'sound' && <audio key={preview.name} src={`/demo/sound/${preview.name}.mp3?v=${__DEMO_V__}`} controls autoPlay style={{ display: 'block', width: '100%', maxWidth: 480, marginTop: 8 }} />}
       </section>
 
       {sent && <p style={{ color: '#047857' }}>✓ {sent}</p>}
