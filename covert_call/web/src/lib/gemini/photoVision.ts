@@ -79,3 +79,52 @@ silent help request. Describe only what is actually visible — do not invent. E
   if (!text) throw new Error('Gemini returned no content')
   return JSON.parse(text) as PhotoAnalysis
 }
+
+// Live-call camera check: Mia (Gemini Live) often missed what was on camera while busy with the order script
+// (INC-MUXLVU0X, INC-MUXMUWBA), so the latest frame is also checked here every few seconds and anything found is
+// recorded as a scene observation. Night/low light is expected: a silhouette counts as a person.
+export interface FrameFinding {
+  category: 'vehicle' | 'person' | 'weapon' | 'injury' | 'fire_hazard'
+  kind: string
+  detail: string
+  colour?: string
+  vehicleType?: string
+  plate?: string
+}
+
+const FRAME_SCHEMA = {
+  type: 'object',
+  properties: {
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', enum: ['vehicle', 'person', 'weapon', 'injury', 'fire_hazard'] },
+          kind: { type: 'string' },
+          detail: { type: 'string' },
+          colour: { type: 'string' },
+          vehicleType: { type: 'string' },
+          plate: { type: 'string' },
+        },
+        required: ['category', 'kind', 'detail'],
+      },
+    },
+  },
+  required: ['findings'],
+}
+
+export async function checkCameraFrame(base64Jpeg: string): Promise<FrameFinding[]> {
+  if (!geminiConfigured) return []
+  const prompt = `A frame from a caller's phone camera during an emergency call. List only what is actually visible:
+a person (a dark silhouette or shadow of a person counts; describe build, clothing, posture, mood if visible),
+a weapon or weapon-like object, an injury, fire or smoke, a vehicle (type, colour, plate if readable).
+kind: a short tag ("person", "knife", "car"). detail: one short line for a responder. Empty list if none.`
+  const response = await generateText({
+    model: MODEL,
+    task: 'photoVision',
+    contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: base64Jpeg } }] }],
+    config: { responseMimeType: 'application/json', responseSchema: FRAME_SCHEMA },
+  })
+  try { return (JSON.parse(response.text ?? '{}') as { findings?: FrameFinding[] }).findings ?? [] } catch { return [] }
+}

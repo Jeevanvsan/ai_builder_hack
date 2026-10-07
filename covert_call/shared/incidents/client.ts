@@ -223,6 +223,10 @@ export async function confirmAddress(
 ): Promise<Incident['location']['confirmed']> {
   const current = (await getDoc(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
   const rough = current?.location.rough ?? null
+  // The same address saved again (the caller's "yes" to the read-back) keeps its pin: a second lookup that failed
+  // (the free map server rate-limits) wiped a good pin (INC-MUXMUWBA).
+  const prev = current?.location.confirmed
+  if (prev && prev.address === spokenAddress && prev.lat != null) return prev
   const hit = await geocodeAddress(spokenAddress, { near: rough, googleMapsKey: opts.googleMapsKey })
   // If geocoding genuinely fails, the caller's IP-based rough location can be many km off (it has put callers in
   // the wrong town entirely) — using it as "confirmed" coordinates silently produced a wrong pin and a wrong

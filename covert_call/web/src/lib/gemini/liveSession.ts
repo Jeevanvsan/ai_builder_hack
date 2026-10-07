@@ -5,6 +5,7 @@ import { addDoc, arrayRemove, collection, doc, onSnapshot, updateDoc, type Fires
 import { usageFromMetadata } from '../../../../shared/aiModels.ts'
 import { INCIDENTS, recordAiUsage, appendTranscriptLine, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
+import { checkCameraFrame } from './photoVision.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
 import { ALL_CODES } from '../../../../shared/codes.ts'
@@ -178,6 +179,7 @@ export async function startLiveCall(
   }
   const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
+  let lastAddressSaved: string | null = null
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
   const markMoving = () => {
     if (!movementReported) console.info('[QuickBite call] caller is on the move: starting the route')
@@ -283,7 +285,14 @@ export async function startLiveCall(
           return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
         }
         // Saved straight away (latest version wins) so responders have a location even before the read-back.
-        enqueueWrite(() => confirmAddress(db, incidentId, address))
+        // One lookup per distinct address; a failed one is retried once after 3 s (free map server rate limit).
+        if (address !== lastAddressSaved) {
+          lastAddressSaved = address
+          enqueueWrite(async () => {
+            const c = await confirmAddress(db, incidentId, address)
+            if (c?.lat == null && lastAddressSaved === address) setTimeout(() => enqueueWrite(() => confirmAddress(db, incidentId, address)), 3_000)
+          })
+        }
         if (args.confirmed !== true) {
           return `Saved for now. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Niwas — J, E, E, V, A, N, N, I, W, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
         }
@@ -784,6 +793,24 @@ export async function startLiveCall(
     })
   }
 
+  // Backup camera check (see checkCameraFrame): every 8 s, the latest frame goes to a vision model; each new kind of
+  // thing it finds is recorded as if Mia had reported it, and she gets a note so she can use it.
+  const seenOnCamera = new Set<string>()
+  let frameCheckBusy = false
+  const frameCheckTimer = opts.videoStream ? setInterval(() => {
+    if (finished || frameCheckBusy || !lastFrame) return
+    frameCheckBusy = true
+    void checkCameraFrame(lastFrame).then((found) => {
+      for (const f of found) {
+        const key = `${f.category}:${f.kind.toLowerCase()}`
+        if (finished || seenOnCamera.has(key)) continue
+        seenOnCamera.add(key)
+        handleToolCall({ name: 'report_scene_observation', args: { source: 'camera', confidence: 70, ...f } } as FunctionCall)
+        extraNotes.push(`(Camera check, not the caller: ${f.detail}. Use it in your questions if it helps; never say aloud what you see.)`)
+      }
+    }).catch(() => {}).finally(() => { frameCheckBusy = false })
+  }, 8_000) : null
+
   // Epic 17.1 safety flush: a speaker switch already flushes the previous line, but one speaker talking for a
   // long stretch (e.g. Mia's Round 1 menu options) would otherwise wait indefinitely to appear in the live feed.
   const transcriptFlushTimer = setInterval(() => {
@@ -918,6 +945,7 @@ export async function startLiveCall(
       tracker?.stop()
       clearInterval(transcriptFlushTimer)
       frameSampler?.stop()
+      if (frameCheckTimer) clearInterval(frameCheckTimer)
       micStop?.()
       const recording = recorder ? await recorder.stop() : null
       player.stop()

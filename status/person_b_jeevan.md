@@ -704,3 +704,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 ### 2026-10-07 10:50 IST: address read-back + dark clip
 - INC-MUXMGXPK: Mia asked floor/flat after a house name and read the address back without spelling. Persona: a house name/number is a complete address (floor/flat only for flats), every house/street/place name is spelled letter by letter; confirm_address response says the same.
 - Camera: scene prompt and tool now say a dark silhouette/shadow counts as a person; person-in-shadow clip re-encoded brighter (still a blurry shadow; alone-street is detected reliably). Deployed to staging.
+
+### 2026-10-07 11:20 IST: backup camera check + pin kept
+- INC-MUXMUWBA: angry-man clip on camera, nothing reported (Mia busy with the order script). New backup: every 8 s the latest frame goes to gemini-3.1-flash-lite (`checkCameraFrame` in photoVision.ts); each new person/weapon/vehicle/injury/fire is recorded as a scene observation (+ snap) and Mia gets a note.
+- Address not pinned although geocoding "Jeevan Niwas, Vazhicherry, Alappuzha" works: the read-back loop saved it twice and a failed second lookup overwrote the pin. Now one lookup per distinct address, a failed one retried once after 3 s, and a re-save of the same address keeps its pin. Deployed to staging.
