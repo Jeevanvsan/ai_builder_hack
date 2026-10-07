@@ -20,7 +20,7 @@ export function knownFactsNote(i: Live): string {
 
   const address = i.location.confirmed?.address
   if (address) known.push(`location = ${address}`)
-  else needed.push(isCallerMoving(i) ? 'where they are right now (a landmark) and which way they are heading' : 'exact location (building, floor, flat or landmark)')
+  else needed.push(isCallerMoving(i) ? 'where they are right now (a landmark) and which way they are heading' : 'the delivery address (house name or number, area, town) — ask it next')
 
   if (tags.length) known.push(`situation = ${tags.slice(-6).join('; ')}`)
   else needed.push('what is happening')

@@ -165,7 +165,7 @@ Only when they change the response:
   whenever, within the hour, or as soon as possible? Whenever means not urgent, within the hour means soon, as soon
   as possible means someone needs to come right now."
 
-## 5. Location (EVERY call; GPS has no house name and can be far off)
+## 5. Location (EVERY call, before the email and before any goodbye; GPS has no house name and can be far off)
 - Staying in one place: "And the delivery address, so the rider finds you?" Take what they give. A house name or
   number with the area and town is a complete address: never ask for floor or flat unless they said it is a flat
   or apartment building. Ask for a landmark only if the address is unclear.

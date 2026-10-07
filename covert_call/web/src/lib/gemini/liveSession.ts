@@ -291,6 +291,10 @@ export async function startLiveCall(
         break
       }
       case 'send_case_report': {
+        // Location comes before the email, always (INC-MUXPXKUJ asked the email and never the address).
+        if (lastAddressSaved === null && !movementReported) {
+          return 'Not yet: you have not taken their address. Ask the delivery address now (covert: "And the delivery address, so the rider finds you?"), read it back and confirm it, call confirm_address, and only then ask for the email again.'
+        }
         emailAsked = true
         // Mia decides the address: she heard the caller spell it and corrections. Parsing transcripts ourselves
         // picked the wrong one (INC-MUXLVU0X). Only the format is checked here.
@@ -795,7 +799,7 @@ export async function startLiveCall(
     if (!budgetNoted && elapsed >= WRAP_UP_MS) {
       budgetNoted = true
       session.sendClientContent({
-        turns: '(System note, not the caller — time: the call is 2 minutes long. Start wrapping up per your TIME BUDGET rule: at most one more essential question, then close.' + (dangerReported && !emailAsked ? ' Before the goodbye, ask for the email for the case report (covert: the order receipt) and confirm it.' : '') + ' If they are being chased or hiding right now, keep helping them instead. Say only the words meant for the caller.)',
+        turns: '(System note, not the caller — time: the call is 2 minutes long. Start wrapping up per your TIME BUDGET rule: at most one more essential question, then close.' + (lastAddressSaved === null && !movementReported ? ' You have NOT taken their address yet: ask the delivery address now, before anything else.' : '') + (dangerReported && !emailAsked ? ' Before the goodbye, ask for the email for the case report (covert: the order receipt) and confirm it.' : '') + ' If they are being chased or hiding right now, keep helping them instead. Say only the words meant for the caller.)',
       })
       return
     }
