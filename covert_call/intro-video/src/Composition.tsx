@@ -12,7 +12,7 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { FPS, TOTAL_SECONDS, sec, span } from "./timing";
+import { FPS, TOTAL_SECONDS, sec, span, stretch } from "./timing";
 
 const { fontFamily } = loadFont("normal", { weights: ["400", "600", "800", "900"], subsets: ["latin"] });
 
@@ -40,7 +40,7 @@ const C = {
 // voiceover: an MP3 in public/ (e.g. "voiceover.mp3"). bgVideo: a clip in public/ (e.g. "intro-bg.mp4") played,
 // darkened, with its own sound at full volume, behind the first BG_VIDEO_SECONDS (hook + problem).
 export type IntroProps = { voiceover: string | null; bgVideo: string | null };
-const BG_VIDEO_SECONDS = 20;
+const BG_VIDEO_SECONDS = 20; // = the clip length; QuickBite is revealed right after
 
 export const MyComposition = () => (
   <Composition
@@ -68,7 +68,7 @@ export const QuickBiteIntro: React.FC<IntroProps> = ({ voiceover, bgVideo }) => 
       <Problem withVideo={Boolean(bgVideo)} />
     </Sequence>
     <Sequence name="Legacy systems" {...span("legacy")}>
-      <Legacy />
+      <Legacy withVideo={Boolean(bgVideo)} />
     </Sequence>
     <Sequence name="Reveal: QuickBite" {...span("reveal")}>
       <Reveal />
@@ -156,7 +156,7 @@ const BackgroundVideo: React.FC<{ src: string }> = ({ src }) => {
 /* ------------------------------------------------------------------ 1. hook */
 
 const Hook: React.FC<{ withVideo: boolean }> = ({ withVideo }) => {
-  const frame = useCurrentFrame();
+  const frame = useCurrentFrame() * stretch("hook");
   const dur = span("hook").durationInFrames;
   const doorOpen = interpolate(frame, [105, 150], [0, 1], { ...clamp, easing: GENTLE });
   const shake = frame > 175 && frame < 195 ? Math.sin(frame * 2.2) * 6 : 0;
@@ -254,7 +254,7 @@ const Hook: React.FC<{ withVideo: boolean }> = ({ withVideo }) => {
 /* ------------------------------------------------------------------ 2. problem */
 
 const Problem: React.FC<{ withVideo: boolean }> = ({ withVideo }) => {
-  const frame = useCurrentFrame();
+  const frame = useCurrentFrame() * stretch("problem");
   const dur = span("problem").durationInFrames;
   const count = Math.round(interpolate(frame, [95, 170], [0, 445256], { ...clamp, easing: IN }));
   return (
@@ -321,15 +321,15 @@ const LEGACY = [
   { at: 165, icon: "📍", title: "Panic buttons", verdict: "Location only. No context." },
 ];
 
-const Legacy = () => {
-  const frame = useCurrentFrame();
+const Legacy: React.FC<{ withVideo: boolean }> = ({ withVideo }) => {
+  const frame = useCurrentFrame() * stretch("legacy");
   const dur = span("legacy").durationInFrames;
   const blind = 265;
   const dimCards = interpolate(frame, [blind, blind + 15], [1, 0.12], { ...clamp, easing: IN });
   const blurCards = interpolate(frame, [blind, blind + 15], [0, 10], { ...clamp, easing: IN });
   return (
     <SceneOut dur={dur}>
-      <Ambient tint="#64748b" strength={0.14} />
+      {withVideo ? <AbsoluteFill style={{ background: "rgba(8,10,16,0.78)" }} /> : <Ambient tint="#64748b" strength={0.14} />}
       <AbsoluteFill style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 180px", gap: 44 }}>
         <Eyebrow text="LEGACY SYSTEMS FAIL THEM" color={C.danger} />
         <div style={{ display: "flex", flexDirection: "column", gap: 28, opacity: dimCards, filter: `blur(${blurCards}px)` }}>
