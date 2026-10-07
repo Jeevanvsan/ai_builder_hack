@@ -830,9 +830,27 @@ export async function startLiveCall(
     })
   }, 1_000)
 
+  // A short one-word answer ("order", "yes") can fall under the low start-of-speech sensitivity (kept low so Mia's
+  // own voice from the speaker doesn't count as barge-in): the mic heard the caller, Gemini never took it, and the
+  // call sat in silence (INC-MUXPDKNZ). If the caller's voice was heard after Mia finished and no transcript
+  // followed within 2.5 s, Mia asks once for it again.
+  let lastVoiceAt = 0
+  let missedNudgedFor = 0
+  let missedNudges = 0 // capped: a noisy room must not make her keep asking
+  const missedTimer = setInterval(() => {
+    if (finished || muted || missedNudges >= 3 || player.isPlaying() || !canSend() || toolsPending > 0) return
+    const now = Date.now()
+    if (lastVoiceAt <= modelActiveAt + 300 || now - lastVoiceAt < 2_500 || missedNudgedFor === lastVoiceAt) return
+    if (callerSpokeAt >= lastVoiceAt - 3_000 || modelActiveAt > lastVoiceAt) return
+    missedNudgedFor = lastVoiceAt
+    missedNudges++
+    console.info('[QuickBite call] caller voice heard but no transcript: asking Mia to check')
+    nudge('(System note, not the caller: the caller just said something short that did not come through. Ask them once, briefly and warmly, to say it again, e.g. "sorry, the line broke for a second — was that talk or order?" adapted to your last question, in their language. Say only the words meant for the caller.)')
+  }, 1_000)
+
   const mic = await startMicCapture((base64Pcm, level) => {
     // The caller is speaking (transcripts arrive late, after they finish): don't treat a long answer as silence.
-    if (level > SPEAKING_LEVEL && !player.isPlaying()) lastActivityAt = Date.now()
+    if (level > SPEAKING_LEVEL && !player.isPlaying()) { lastActivityAt = Date.now(); lastVoiceAt = Date.now() }
     // Previously gated only on !muted, with no check that the socket was actually alive — the same class of bug
     // just fixed in silentSession.ts (SOS): if the connection drops and can't reconnect, every mic frame kept
     // hitting a dead socket for the rest of the call, spamming "WebSocket is already in CLOSING or CLOSED state".
@@ -1003,6 +1021,7 @@ export async function startLiveCall(
       tracker?.stop()
       clearInterval(transcriptFlushTimer)
       frameSampler?.stop()
+      clearInterval(missedTimer)
       if (frameCheckTimer) clearInterval(frameCheckTimer)
       micStop?.()
       const recording = recorder ? await recorder.stop() : null
