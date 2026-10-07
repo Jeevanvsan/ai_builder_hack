@@ -191,6 +191,10 @@ export async function startLiveCall(
   const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
   let lastAddressSaved: string | null = null
+  let addressSpellAsked = false
+  let emailSpellAsked = false
+  // The caller spelled something letter by letter in one of their last 3 lines ("J E E V A N", "j, e, e").
+  const callerSpelled = () => transcriptLines.filter((l) => l.speaker === 'Caller').slice(-3).some((l) => /(?:[A-Za-z0-9][\s,.-]*){3,}/.test(l.text))
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
   const markMoving = () => {
     if (!movementReported) console.info('[QuickBite call] caller is on the move: starting the route')
@@ -388,6 +392,11 @@ export async function startLiveCall(
         pendingEmail = email
         pendingEmailAt = Date.now()
         emailReadBack = false
+        // Mandatory: the caller spells it. Asked once (speech-to-text sometimes joins spelled letters into a word).
+        if (!emailSpellAsked && !callerSpelled()) {
+          emailSpellAsked = true
+          return 'Not saved yet. MANDATORY: the caller has not spelled the email. Ask them now to spell it letter by letter (covert: "Can you spell that for me, letter by letter, so the receipt reaches you?"). Then call send_case_report with exactly their letters and read it back.'
+        }
         return `Not saved yet. Read exactly this address back, letter by letter for the part before the @: ${email}. Then ask "Is that right?". If they say yes, call send_case_report again with confirmed=true and this same address. If they correct anything, FIRST call send_case_report with the corrected address (their spelled letters are final), then read that back; repeat until they say yes.`
       }
       case 'confirm_address': {
@@ -400,8 +409,13 @@ export async function startLiveCall(
         // Saved straight away (latest version wins) so responders have a location even before the read-back.
         // One lookup per distinct address; a failed one is retried once after 3 s (free map server rate limit).
         if (address !== lastAddressSaved) saveAddress(address)
+        // Mandatory: the caller spells the address. Asked once; never while they are on the move.
+        if (args.confirmed !== true && !movementReported && !addressSpellAsked && !callerSpelled()) {
+          addressSpellAsked = true
+          return 'Saved for now. MANDATORY: the caller has not spelled it. Ask them now to spell the house name and the area letter by letter (covert: "Can you spell the house name and area for me, so the rider finds it?"). Then call confirm_address with exactly their spelling and read it back.'
+        }
         if (args.confirmed !== true) {
-          return `Saved for now. If the caller spelled any name letter by letter, use exactly their letters (e.g. "N I V A S" is "Nivas", not "Niwas") and call confirm_address again with that spelling first. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Niwas — J, E, E, V, A, N, N, I, W, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
+          return `Saved for now. If the caller spelled any name letter by letter, use exactly their letters (e.g. "N I V A S" is "Nivas", not "Niwas") and call confirm_address again with that spelling first. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Nivas — J, E, E, V, A, N, N, I, V, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
         }
         return movementReported
           ? 'Saved. They are on the move — call get_route_guidance now and guide them to the police station/hospital it gives.'
