@@ -730,3 +730,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Pattern noted: fixes that only told Mia what to do kept failing intermittently (live model doesn't follow every rule); fixes enforced in code held. Moving remaining critical rules into code.
 - Address spelling: letter runs in Mia's latest read-back and the caller's last lines (caller wins) are applied to the saved address (edit distance ≤2, same first letter), both when confirm_address is called and when the caller says yes to a read-back. "Jeevan Niwas" + "N I V A S" → "Jeevan Nivas"; "Vazhichery" + "V A Z H I C H E R R Y" → "Vazhicherry".
 - Earlier today in code: email tool refuses until an address is saved; 2-min note demands the address/email; missed short answer re-ask; email read-back finished before the 3-min goodbye. Prod + staging deployed.
+
+### 2026-10-07 ~17:40 IST: spelling rules actually live now
+- Bug found: three regexes added via a Python edit script had "\b" written as a backspace character, so cleanSpelled/applySpelling (address spelling) and the new callerSpelled check matched nothing in prod since they were added. Fixed (\b restored), no other source files affected.
+- Spelling now mandatory in code: confirm_address / send_case_report ask once for a letter-by-letter spelling if the caller's last 3 lines have none (not when moving). New person-in-shadow clip from the team. Prod + staging deployed.

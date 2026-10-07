@@ -188,13 +188,13 @@ export async function startLiveCall(
       setTimeout(() => { if (!finished && emailConfirmedAt < yesAt) nudge('(System note, not the caller: the caller confirmed the email you read back. Call send_case_report with confirmed=true and exactly that address in name@domain.tld syntax, then carry on.)') }, 2_500)
     }
   }
-  const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
+  const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it)\b.{0,25}\b(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
   let lastAddressSaved: string | null = null
   let addressSpellAsked = false
   let emailSpellAsked = false
   // The caller spelled something letter by letter in one of their last 3 lines ("J E E V A N", "j, e, e").
-  const callerSpelled = () => transcriptLines.filter((l) => l.speaker === 'Caller').slice(-3).some((l) => /(?:[A-Za-z0-9][\s,.-]*){3,}/.test(l.text))
+  const callerSpelled = () => transcriptLines.filter((l) => l.speaker === 'Caller').slice(-3).some((l) => /(?:\b[A-Za-z0-9]\b[\s,.-]*){3,}/.test(l.text))
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
   const markMoving = () => {
     if (!movementReported) console.info('[QuickBite call] caller is on the move: starting the route')
@@ -203,7 +203,7 @@ export async function startLiveCall(
   }
   const SILENT_TAG = 'caller silent after danger - line kept open'
   let silentTagged = false
-  const MOVEMENT = /(followed|chased|chasing|stalked|stalking|fleeing|escaping)|following (me|her|him|them|the caller)|on the move|moving around|abduct|taken somewhere|running away|in the road|leaving the (house|home|room|building)/i
+  const MOVEMENT = /\b(followed|chased|chasing|stalked|stalking|fleeing|escaping)\b|following (me|her|him|them|the caller)|on the move|moving around|abduct|taken somewhere|running away|in the road|leaving the (house|home|room|building)/i
   // True once anything dangerous has been reported this call (a weapon, a gunshot/scream heard, high urgency).
   // Silence after that point is a reason to stay connected, not the ordinary "no answer, end the call" case —
   // see the silence timer below and persona.ts's SILENCE section.
