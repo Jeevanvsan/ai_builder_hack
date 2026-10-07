@@ -12,7 +12,7 @@ import {
   staticFile,
   useCurrentFrame,
 } from "remotion";
-import { FPS, TOTAL_SECONDS, sec, span, stretch } from "./timing";
+import { FPS, TOTAL_SECONDS, VOICE_START, VOICE_TRIM_SECONDS, sec, span, stretch } from "./timing";
 
 const { fontFamily } = loadFont("normal", { weights: ["400", "600", "800", "900"], subsets: ["latin"] });
 
@@ -50,7 +50,7 @@ export const MyComposition = () => (
     fps={FPS}
     width={1920}
     height={1080}
-    defaultProps={{ voiceover: null, bgVideo: "intro-bg.mp4" }}
+    defaultProps={{ voiceover: "voiceover.mp3", bgVideo: "intro-bg.mp4" }}
   />
 );
 
@@ -82,7 +82,11 @@ export const QuickBiteIntro: React.FC<IntroProps> = ({ voiceover, bgVideo }) => 
     <Sequence name="Close" {...span("close")}>
       <Close />
     </Sequence>
-    {voiceover ? <Audio src={staticFile(voiceover)} /> : null}
+    {voiceover ? (
+      <Sequence name="Voiceover" from={sec(VOICE_START)} layout="none">
+        <Audio src={staticFile(voiceover)} trimBefore={sec(VOICE_TRIM_SECONDS)} />
+      </Sequence>
+    ) : null}
   </AbsoluteFill>
 );
 
