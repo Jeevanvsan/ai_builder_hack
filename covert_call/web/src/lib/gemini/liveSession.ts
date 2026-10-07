@@ -263,7 +263,7 @@ export async function startLiveCall(
         // Mia decides the address: she heard the caller spell it and corrections. Parsing transcripts ourselves
         // picked the wrong one (INC-MUXLVU0X). Only the format is checked here.
         const email = emailIn(String(args.email ?? '').replace(/\s+/g, ''))
-        if (!email) return `"${args.email}" is not a complete email address. Ask them to spell it once more (name, then the part after the at sign), read it back, and call send_case_report again.`
+        if (!email) return `"${args.email}" is not a valid email address. Pass it in standard syntax: name@domain.tld, lowercase, no spaces, "@" and "." as symbols, e.g. "jeevan.v@gmail.com". If you are unsure of any letter, ask them to spell it once more (name, then the part after the at sign), read it back, then call send_case_report again.`
         // Saved only once the caller confirms the read-back (Mia calling again with confirmed=true, or the caller's
         // own "yes" right after it, see confirmEmailIfYes).
         if (args.confirmed === true && (pendingEmail || emailSavedAs)) {
