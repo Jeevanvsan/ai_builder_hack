@@ -742,17 +742,30 @@ export async function startLiveCall(
 
   // Epic 22.4: a real order call is one to three minutes. At 2:30 Mia is nudged to wrap up, unless the caller is
   // moving or chased (then the call is a lifeline and stays open). Never an automatic hang-up.
-  const CALL_BUDGET_MS = 150_000
+  // Two time notes: wrap up at 2:00, say goodbye and end at 3:00 (the call should end by about 3-3.5 min). Mia ends
+  // the call herself; the app never hangs up. A caller being chased or hiding is the only exception.
+  const WRAP_UP_MS = 120_000
+  const END_NOW_MS = 180_000
   const callStartedAt = Date.now()
   let budgetNoted = false
+  let endNoted = false
   const budgetTimer = setInterval(() => {
-    if (budgetNoted || !canSend() || toolsPending > 0 || routesPending > 0 || Date.now() - callStartedAt < CALL_BUDGET_MS || player.isPlaying()) return
-    budgetNoted = true
-    clearInterval(budgetTimer)
-    if (callerMoving) return
-    session.sendClientContent({
-      turns: '(System note, not the caller — time budget: the call is about two and a half minutes long. If the minimum facts are known and you are not guiding them to safety or relaying a responder message, start wrapping up naturally now, per your TIME BUDGET rule. If the caller is still in danger or mid-answer, carry on and wrap up when it is safe. Say only the words meant for the caller.)',
-    })
+    if (!canSend() || toolsPending > 0 || routesPending > 0 || player.isPlaying()) return
+    const elapsed = Date.now() - callStartedAt
+    if (!budgetNoted && elapsed >= WRAP_UP_MS) {
+      budgetNoted = true
+      session.sendClientContent({
+        turns: '(System note, not the caller — time: the call is 2 minutes long. Start wrapping up per your TIME BUDGET rule: at most one more essential question, then close. If they are being chased or hiding right now, keep helping them instead. Say only the words meant for the caller.)',
+      })
+      return
+    }
+    if (budgetNoted && !endNoted && elapsed >= END_NOW_MS) {
+      endNoted = true
+      clearInterval(budgetTimer)
+      session.sendClientContent({
+        turns: '(System note, not the caller — time: the call is 3 minutes long. End now: one short, warm goodbye in the disguise, then call end_call. Only if they are being chased or hiding from someone right now, stay with them and end the moment they are safe. Say only the words meant for the caller.)',
+      })
+    }
   }, 5_000)
 
   // Epic 23: responder -> caller messages. Each pending message is injected once, on a pause (never while Mia is

@@ -708,3 +708,6 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 ### 2026-10-07 11:20 IST: backup camera check + pin kept
 - INC-MUXMUWBA: angry-man clip on camera, nothing reported (Mia busy with the order script). New backup: every 8 s the latest frame goes to gemini-3.1-flash-lite (`checkCameraFrame` in photoVision.ts); each new person/weapon/vehicle/injury/fire is recorded as a scene observation (+ snap) and Mia gets a note.
 - Address not pinned although geocoding "Jeevan Niwas, Vazhicherry, Alappuzha" works: the read-back loop saved it twice and a failed second lookup overwrote the pin. Now one lookup per distinct address, a failed one retried once after 3 s, and a re-save of the same address keeps its pin. Deployed to staging.
+
+### 2026-10-07 11:45 IST: shorter calls
+- INC-MUXMUWBA ran 4+ min. Persona TIME BUDGET rewritten: only essential questions (what, how many, where with one read-back, still there), extras only when relevant, never ask the same thing more than twice. Notes at 2:00 (wrap up, at most one more question) and 3:00 (goodbye + end_call); Mia ends the call herself, exception only for a caller chased/hiding right now. Also: caller's spelling is final in read-backs. Deployed to staging.
