@@ -700,3 +700,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-07 11:00 IST: confirm personal details
 - Email: Mia's send_case_report argument is saved (standard name@domain.tld syntax required). Address: confirm_address now has confirmed=true and a read-back loop until the caller says yes. Persona: every personal detail (address, email, phone, name, caller-given plate) is read back with spelling and repeated until confirmed (skipped if hiding/mid-escape). Deployed to staging.
+
+### 2026-10-07 10:50 IST: address read-back + dark clip
+- INC-MUXMGXPK: Mia asked floor/flat after a house name and read the address back without spelling. Persona: a house name/number is a complete address (floor/flat only for flats), every house/street/place name is spelled letter by letter; confirm_address response says the same.
+- Camera: scene prompt and tool now say a dark silhouette/shadow counts as a person; person-in-shadow clip re-encoded brighter (still a blurry shadow; alone-street is detected reliably). Deployed to staging.

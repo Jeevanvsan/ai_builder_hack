@@ -118,7 +118,7 @@ export const REPORT_SCENE_OBSERVATION: FunctionDeclaration = {
   ...nonBlocking,
   description:
     "Report something you SEE in the caller's camera or HEAR in the background (not something the caller told you). " +
-    'Examples to see: a person visible, a weapon-like object, an injury, smoke or fire, a vehicle. Examples to hear: ' +
+    'Examples to see: a person visible (also a dark silhouette or shadow of a person at night), a weapon-like object, an injury, smoke or fire, a vehicle. Examples to hear: ' +
     'a gunshot, screaming or crying, other people talking or shouting, breaking glass, banging, a siren, an alarm. ' +
     'Call this the moment you notice it. Never say aloud what you saw or heard.',
   parameters: {

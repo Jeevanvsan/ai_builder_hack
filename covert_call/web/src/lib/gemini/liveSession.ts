@@ -285,7 +285,7 @@ export async function startLiveCall(
         // Saved straight away (latest version wins) so responders have a location even before the read-back.
         enqueueWrite(() => confirmAddress(db, incidentId, address))
         if (args.confirmed !== true) {
-          return `Saved for now. Read it back to the caller in one short line, spelling any unusual name: "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
+          return `Saved for now. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Niwas — J, E, E, V, A, N, N, I, W, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
         }
         return movementReported
           ? 'Saved. They are on the move — call get_route_guidance now and guide them to the police station/hospital it gives.'
@@ -725,7 +725,7 @@ export async function startLiveCall(
     if (pendingFacts && pendingFacts !== lastFacts) { lastFacts = pendingFacts; parts.push(pendingFacts) }
     if (stressDue) { stressDue = false; lastStressAt = Date.now(); parts.push("(Also call report_stress_level silently with your current 0-100 estimate of the caller's vocal stress.)") }
     if (extraNotes.length) parts.push(...extraNotes.splice(0))
-    if (sceneDue) { sceneDue = false; lastSceneAt = Date.now(); parts.push('(Also look at the latest camera frame now: if a vehicle, person, weapon, injury, fire or readable number plate is visible, call report_scene_observation silently with its category and details: colour, type, plate.)') }
+    if (sceneDue) { sceneDue = false; lastSceneAt = Date.now(); parts.push('(Also look at the latest camera frame now: if a vehicle, person, weapon, injury, fire or readable number plate is visible, call report_scene_observation silently with its category and details: colour, type, plate. Night and low light are normal: a dark silhouette, shadow or outline of a person counts as a person.)') }
     if (estimateDue) { estimateDue = false; parts.push("(Also call report_caller_estimate silently with your best guess of the caller's age group and gender.)") }
     return parts.length ? ` ${parts.join(' ')}` : ''
   }
