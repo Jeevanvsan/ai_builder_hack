@@ -5,6 +5,7 @@ import {
   AbsoluteFill,
   Composition,
   Easing,
+  Img,
   Interactive,
   Sequence,
   interpolate,
@@ -440,7 +441,6 @@ const Reveal = () => {
 
 /* ------------------------------------------------------------------ 5. the app */
 
-const MENU = ["Margherita Pizza", "Garlic Bread", "Extra Spicy", "Choco Lava Cake", "Family Combo"];
 const FEATURES = [
   { at: 215, icon: "📷", text: "Reads the camera" },
   { at: 245, icon: "🗣️", text: "Speaks the caller's language" },
@@ -472,36 +472,30 @@ const AppScene = () => {
             rotate: `${Math.sin(frame / 50) * 1.2}deg`,
           }}
         >
-          <div style={{ width: "100%", height: "100%", borderRadius: 48, background: "#fff7f2", color: "#1f2937", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            <div style={{ background: C.brand, color: "#fff", padding: "54px 30px 26px", display: "flex", alignItems: "center", gap: 16 }}>
-              <Logo size={56} />
-              <div style={{ fontSize: 40, fontWeight: 900 }}>QuickBite</div>
-            </div>
-            <div style={{ padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
-              {MENU.map((m, i) => {
-                const hot = m === "Extra Spicy";
-                const lit = hot ? interpolate(frame, [pick, pick + 10], [0, 1], { ...clamp, easing: IN }) : 0;
-                return (
-                  <div
-                    key={m}
-                    style={{
-                      padding: "22px 22px",
-                      borderRadius: 18,
-                      background: hot ? `rgba(228,87,46,${0.12 + 0.88 * lit})` : "#fff",
-                      color: hot && lit > 0.5 ? "#fff" : "#1f2937",
-                      border: "1px solid #f1e3da",
-                      fontSize: 30,
-                      fontWeight: 700,
-                      scale: hot ? interpolate(frame, [pick, pick + 8, pick + 18], [1, 1.06, 1], clamp) : 1,
-                      opacity: interpolate(frame, [8 + i * 4, 20 + i * 4], [0, 1], { ...clamp, easing: IN }),
-                    }}
-                  >
-                    {hot ? "🌶️ " : ""}
-                    {m}
-                  </div>
-                );
-              })}
-            </div>
+          {/* Real app screens (landing/public/shots): the home menu scrolls, then the coded item sheet opens. */}
+          <div style={{ position: "relative", width: "100%", height: "100%", borderRadius: 48, overflow: "hidden", background: "#fff7f2" }}>
+            <Img
+              src={staticFile("screens/qb-home.png")}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: "100%",
+                translate: interpolate(frame, [20, pick], ["0px 0px", "0px -28px"], { ...clamp, easing: GENTLE }),
+                opacity: interpolate(frame, [pick, pick + 12], [1, 0], clamp),
+              }}
+            />
+            <Img
+              src={staticFile("screens/qb-item.png")}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: "100%",
+                opacity: interpolate(frame, [pick, pick + 12], [0, 1], { ...clamp, easing: IN }),
+                translate: interpolate(frame, [pick, pick + 16], ["0px 70px", "0px 0px"], { ...clamp, easing: IN }),
+              }}
+            />
           </div>
         </Interactive.Div>
 
@@ -587,20 +581,19 @@ const AppScene = () => {
 /* ------------------------------------------------------------------ 6. dashboard */
 
 const PANELS = [
-  { at: 40, label: "LOCATION", value: "Live, on the map", color: C.route },
-  { at: 70, label: "THREAT LEVEL", value: "HIGH", color: C.danger },
-  { at: 100, label: "SCENE SKETCH", value: "Who, where, what", color: C.brand2 },
-  { at: 130, label: "CASE REPORT", value: "Ready for the police ✓", color: C.ok },
+  { at: 40, label: "Live location", color: C.route },
+  { at: 70, label: "Threat level", color: C.danger },
+  { at: 100, label: "Scene sketch", color: C.brand2 },
+  { at: 130, label: "Case report for police", color: C.ok },
 ];
 
 const Dashboard = () => {
   const frame = useCurrentFrame();
   const dur = span("dashboard").durationInFrames;
-  const pulse = (frame % 40) / 40;
   return (
     <SceneOut dur={dur}>
       <Ambient tint={C.route} strength={0.18} />
-      <AbsoluteFill style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 46 }}>
+      <AbsoluteFill style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 36 }}>
         <Interactive.Div
           name="Responders see it all live"
           style={{
@@ -614,62 +607,71 @@ const Dashboard = () => {
         </Interactive.Div>
 
         <Interactive.Div
-          name="Dashboard mockup"
+          name="Dashboard screens"
           style={{
             width: 1500,
             height: 640,
-            borderRadius: 28,
-            background: "#0f141e",
+            borderRadius: 24,
+            background: "#ffffff",
             border: `1px solid ${C.line}`,
             boxShadow: "0 40px 120px rgba(0,0,0,0.55)",
-            display: "flex",
             overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
             opacity: interpolate(frame, [10, 28], [0, 1], { ...clamp, easing: IN }),
             translate: interpolate(frame, [10, 28], ["0px 50px", "0px 0px"], { ...clamp, easing: IN }),
           }}
         >
-          {/* Map */}
-          <div style={{ position: "relative", flex: 1, background: "#151c29", overflow: "hidden" }}>
-            <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-            <svg width="100%" height="100%" viewBox="0 0 900 640" style={{ position: "absolute", inset: 0 }}>
-              <path d="M0 400 C 200 380, 300 300, 900 320" stroke="rgba(255,255,255,0.18)" strokeWidth="18" fill="none" />
-              <path d="M420 0 C 430 200, 380 420, 460 640" stroke="rgba(255,255,255,0.14)" strokeWidth="14" fill="none" />
-              <path
-                d="M430 340 C 520 300, 600 260, 720 200"
-                stroke={C.route}
-                strokeWidth="10"
-                strokeLinecap="round"
-                fill="none"
-                strokeDasharray="420"
-                strokeDashoffset={interpolate(frame, [60, 120], [420, 0], { ...clamp, easing: IN })}
-              />
-              <circle cx="720" cy="200" r="16" fill={C.route} opacity={interpolate(frame, [115, 125], [0, 1], clamp)} />
-            </svg>
-            <div style={{ position: "absolute", left: 430, top: 340, translate: "-50% -50%" }}>
-              <div style={{ position: "absolute", left: "50%", top: "50%", width: 60, height: 60, borderRadius: 30, translate: "-50% -50%", border: `4px solid ${C.danger}`, scale: 1 + pulse * 2.4, opacity: 1 - pulse }} />
-              <div style={{ width: 34, height: 34, borderRadius: 17, background: C.danger, border: "5px solid #fff" }} />
-            </div>
-          </div>
-          {/* Side panel */}
-          <div style={{ width: 520, padding: 36, display: "flex", flexDirection: "column", gap: 22, borderLeft: `1px solid ${C.line}` }}>
-            {PANELS.map((p) => (
-              <div
-                key={p.label}
-                style={{
-                  padding: "22px 26px",
-                  borderRadius: 18,
-                  background: C.card,
-                  borderLeft: `6px solid ${p.color}`,
-                  opacity: interpolate(frame, [p.at, p.at + 12], [0, 1], { ...clamp, easing: IN }),
-                  translate: interpolate(frame, [p.at, p.at + 12], ["30px 0px", "0px 0px"], { ...clamp, easing: IN }),
-                }}
-              >
-                <div style={{ fontSize: 22, letterSpacing: "0.18em", color: C.dim, fontWeight: 800 }}>{p.label}</div>
-                <div style={{ fontSize: 38, fontWeight: 800, color: p.label === "THREAT LEVEL" ? C.danger : C.ink, marginTop: 6 }}>{p.value}</div>
-              </div>
+          <div style={{ height: 44, background: "#e9ecf1", display: "flex", alignItems: "center", gap: 10, padding: "0 18px" }}>
+            {["#ff5f57", "#febc2e", "#28c840"].map((c) => (
+              <div key={c} style={{ width: 14, height: 14, borderRadius: 7, background: c }} />
             ))}
+            <div style={{ marginLeft: 18, fontSize: 20, color: "#5b6472" }}>quickbite-dashboard.web.app</div>
+          </div>
+          <div style={{ position: "relative", flex: 1, overflow: "hidden" }}>
+            {/* Live queue first, then the incident view, slowly pushing in on the map and threat card. */}
+            <Img
+              src={staticFile("screens/queue.png")}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", opacity: interpolate(frame, [60, 74], [1, 0], clamp) }}
+            />
+            <Img
+              src={staticFile("screens/responder.png")}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                objectPosition: "top",
+                transformOrigin: "35% 55%",
+                opacity: interpolate(frame, [60, 74], [0, 1], { ...clamp, easing: IN }),
+                scale: interpolate(frame, [60, 210], [1, 1.14], { ...clamp, easing: GENTLE }),
+              }}
+            />
           </div>
         </Interactive.Div>
+
+        <div style={{ display: "flex", flexDirection: "row", gap: 22 }}>
+          {PANELS.map((p) => (
+            <Interactive.Div
+              key={p.label}
+              name={`Callout: ${p.label}`}
+              style={{
+                padding: "14px 28px",
+                borderRadius: 999,
+                background: C.card,
+                border: `2px solid ${p.color}`,
+                fontSize: 32,
+                fontWeight: 800,
+                color: p.color,
+                opacity: interpolate(frame, [p.at, p.at + 12], [0, 1], { ...clamp, easing: IN }),
+                translate: interpolate(frame, [p.at, p.at + 12], ["0px 20px", "0px 0px"], { ...clamp, easing: IN }),
+              }}
+            >
+              {p.label}
+            </Interactive.Div>
+          ))}
+        </div>
       </AbsoluteFill>
     </SceneOut>
   );
