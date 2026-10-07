@@ -294,7 +294,7 @@ export async function startLiveCall(
           })
         }
         if (args.confirmed !== true) {
-          return `Saved for now. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Niwas — J, E, E, V, A, N, N, I, W, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
+          return `Saved for now. If the caller spelled any name letter by letter, use exactly their letters (e.g. "N I V A S" is "Nivas", not "Niwas") and call confirm_address again with that spelling first. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Niwas — J, E, E, V, A, N, N, I, W, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
         }
         return movementReported
           ? 'Saved. They are on the move — call get_route_guidance now and guide them to the police station/hospital it gives.'
