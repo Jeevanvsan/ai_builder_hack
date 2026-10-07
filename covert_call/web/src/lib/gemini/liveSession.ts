@@ -799,11 +799,16 @@ export async function startLiveCall(
       })
       return
     }
+    // An email being taken or confirmed is finished first (up to 45 s more): the goodbye note cut off the
+    // read-back of the address the caller had just given (INC-MUXOMIEH).
+    const lastMia = [...transcriptLines].reverse().find((l) => l.speaker === 'Mia')?.text ?? ''
+    const emailOpen = (pendingEmail !== null && emailConfirmedAt < pendingEmailAt) || /e-?mail/i.test(lastMia)
+    if (emailOpen && elapsed < END_NOW_MS + 45_000) return
     if (budgetNoted && !endNoted && elapsed >= END_NOW_MS) {
       endNoted = true
       clearInterval(budgetTimer)
       session.sendClientContent({
-        turns: '(System note, not the caller — time: the call is 3 minutes long. End now: one short, warm goodbye in the disguise, then call end_call. Only if they are being chased or hiding from someone right now, stay with them and end the moment they are safe. Say only the words meant for the caller.)',
+        turns: '(System note, not the caller — time: the call is 3 minutes long. End now: if an email was just given, first read it back and get a yes (send_case_report confirmed=true); then one short, warm goodbye in the disguise, then call end_call. Only if they are being chased or hiding from someone right now, stay with them and end the moment they are safe. Say only the words meant for the caller.)',
       })
     }
   }, 5_000)
