@@ -1,5 +1,5 @@
 import React from "react";
-import { Audio } from "@remotion/media";
+import { Audio, Video } from "@remotion/media";
 import { loadFont } from "@remotion/google-fonts/Inter";
 import {
   AbsoluteFill,
@@ -37,7 +37,10 @@ const C = {
   line: "rgba(255,255,255,0.14)",
 };
 
-export type IntroProps = { voiceover: string | null };
+// voiceover: an MP3 in public/ (e.g. "voiceover.mp3"). bgVideo: a clip in public/ (e.g. "intro-bg.mp4") played,
+// darkened, behind the first BG_VIDEO_SECONDS (hook + problem); the drawn door is hidden while it plays.
+export type IntroProps = { voiceover: string | null; bgVideo: string | null };
+const BG_VIDEO_SECONDS = 20;
 
 export const MyComposition = () => (
   <Composition
@@ -47,17 +50,22 @@ export const MyComposition = () => (
     fps={FPS}
     width={1920}
     height={1080}
-    defaultProps={{ voiceover: null } as IntroProps}
+    defaultProps={{ voiceover: null, bgVideo: null } as IntroProps}
   />
 );
 
-export const QuickBiteIntro: React.FC<IntroProps> = ({ voiceover }) => (
+export const QuickBiteIntro: React.FC<IntroProps> = ({ voiceover, bgVideo }) => (
   <AbsoluteFill style={{ backgroundColor: C.bg, fontFamily, color: C.ink }}>
+    {bgVideo ? (
+      <Sequence name="Background video" durationInFrames={sec(BG_VIDEO_SECONDS)}>
+        <BackgroundVideo src={bgVideo} />
+      </Sequence>
+    ) : null}
     <Sequence name="Hook: someone is inside" {...span("hook")}>
-      <Hook />
+      <Hook withVideo={Boolean(bgVideo)} />
     </Sequence>
     <Sequence name="Problem" {...span("problem")}>
-      <Problem />
+      <Problem withVideo={Boolean(bgVideo)} />
     </Sequence>
     <Sequence name="Legacy systems" {...span("legacy")}>
       <Legacy />
@@ -134,16 +142,27 @@ const Eyebrow: React.FC<{ text: string; color: string; at?: number }> = ({ text,
   );
 };
 
+const BackgroundVideo: React.FC<{ src: string }> = ({ src }) => {
+  const frame = useCurrentFrame();
+  const end = sec(BG_VIDEO_SECONDS);
+  return (
+    <AbsoluteFill style={{ opacity: interpolate(frame, [0, 12, end - 15, end], [0, 1, 1, 0], clamp) }}>
+      <Video src={staticFile(src)} muted style={{ width: "100%", height: "100%", objectFit: "cover", scale: interpolate(frame, [0, end], [1, 1.08], clamp) }} />
+      <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(8,10,16,0.25) 0%, rgba(8,10,16,0.35) 45%, rgba(8,10,16,0.9) 100%)" }} />
+    </AbsoluteFill>
+  );
+};
+
 /* ------------------------------------------------------------------ 1. hook */
 
-const Hook = () => {
+const Hook: React.FC<{ withVideo: boolean }> = ({ withVideo }) => {
   const frame = useCurrentFrame();
   const dur = span("hook").durationInFrames;
   const doorOpen = interpolate(frame, [105, 150], [0, 1], { ...clamp, easing: GENTLE });
   const shake = frame > 175 && frame < 195 ? Math.sin(frame * 2.2) * 6 : 0;
   return (
     <SceneOut dur={dur}>
-      <Ambient tint="#3b5bdb" strength={0.16} />
+      {withVideo ? null : <Ambient tint="#3b5bdb" strength={0.16} />}
       <AbsoluteFill style={{ background: `radial-gradient(circle at 50% 46%, rgba(239,68,68,${0.28 * doorOpen}) 0%, transparent 45%)` }} />
       <AbsoluteFill style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 48 }}>
         <Interactive.Div
@@ -161,8 +180,8 @@ const Hook = () => {
           10:00 <span style={{ opacity: Math.floor(frame / 15) % 2 ? 0.3 : 1 }}>PM</span>
         </Interactive.Div>
 
-        {/* The front door: frame, light spilling in as it swings open. */}
-        <div style={{ position: "relative", width: 300, height: 420, perspective: 900, opacity: interpolate(frame, [10, 35], [0, 1], { ...clamp, easing: IN }) }}>
+        {/* The front door: frame, light spilling in as it swings open (hidden when the real clip plays). */}
+        <div style={{ display: withVideo ? "none" : "block", position: "relative", width: 300, height: 420, perspective: 900, opacity: interpolate(frame, [10, 35], [0, 1], { ...clamp, easing: IN }) }}>
           <div style={{ position: "absolute", inset: 0, border: `6px solid ${C.line}`, borderRadius: 8 }} />
           <div
             style={{
@@ -234,13 +253,13 @@ const Hook = () => {
 
 /* ------------------------------------------------------------------ 2. problem */
 
-const Problem = () => {
+const Problem: React.FC<{ withVideo: boolean }> = ({ withVideo }) => {
   const frame = useCurrentFrame();
   const dur = span("problem").durationInFrames;
   const count = Math.round(interpolate(frame, [95, 170], [0, 445256], { ...clamp, easing: IN }));
   return (
     <SceneOut dur={dur}>
-      <Ambient tint={C.danger} strength={0.14} />
+      {withVideo ? <AbsoluteFill style={{ background: "rgba(8,10,16,0.72)" }} /> : <Ambient tint={C.danger} strength={0.14} />}
       <AbsoluteFill style={{ display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 180px", gap: 40 }}>
         <Eyebrow text="THE PROBLEM" color={C.danger} />
         <Interactive.Div
