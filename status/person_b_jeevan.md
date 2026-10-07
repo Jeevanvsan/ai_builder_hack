@@ -725,3 +725,8 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 ### 2026-10-07 13:15 IST: Mia prompt rewrite + sketch movement
 - persona.ts rewritten (≈52 KB → 22 KB): numbered HARD RULES up front (same-breath meaning, covert = choices only, one question then wait, never re-ask, max 2 tries, tools silent/batched, never invent); one PRIORITY list; TIME BUDGET (no pin code/name/"anything else"/order read-back); CONFIRMING DETAILS (spell back, caller's letters final, correction ≠ yes, clean values to tools); route guidance merged into one section. Section names the code refers to kept (TIME BUDGET, RESPONDER MESSAGES, SILENCE, CAN THEY GET OUT). Old version saved in git history.
 - Scene sketch: "moving" now needs 80 m+ of GPS movement or walking speed (GPS jitter drew a caller at home on a road); Niwas/Nivas/Bhavan/Veedu/Villa count as indoors. Dashboard + web staging deployed.
+
+### 2026-10-07 12:20 IST (wall clock ~12:10): deterministic fixes over prompt-only ones
+- Pattern noted: fixes that only told Mia what to do kept failing intermittently (live model doesn't follow every rule); fixes enforced in code held. Moving remaining critical rules into code.
+- Address spelling: letter runs in Mia's latest read-back and the caller's last lines (caller wins) are applied to the saved address (edit distance ≤2, same first letter), both when confirm_address is called and when the caller says yes to a read-back. "Jeevan Niwas" + "N I V A S" → "Jeevan Nivas"; "Vazhichery" + "V A Z H I C H E R R Y" → "Vazhicherry".
+- Earlier today in code: email tool refuses until an address is saved; 2-min note demands the address/email; missed short answer re-ask; email read-back finished before the 3-min goodbye. Prod + staging deployed.

@@ -253,6 +253,54 @@ export async function startLiveCall(
     return email && email.split('@')[0].length >= 3 ? email : null
   }
 
+  // The address is saved with the caller's spelling, whatever Mia passes: letter runs from her latest read-back and
+  // then from the caller's own recent lines (the caller's letters win) replace the word(s) they spell, when close
+  // (INC-MUXNKEBP/INC-MUXQ…: spelled "N I V A S", saved "Niwas"). Done in code: the prompt alone didn't hold.
+  const lev = (a: string, b: string): number => {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)])
+    for (let j = 1; j <= b.length; j++) d[0][j] = j
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    return d[a.length][b.length]
+  }
+  const applySpelling = (address: string, text: string): string => {
+    const runs = [...text.matchAll(/(?:\b[A-Za-z]\b[\s,.—-]*){3,}/g)].map((m) => m[0].replace(/[^A-Za-z]/g, '').toLowerCase())
+    let out = address
+    for (const letters of runs) {
+      const parts = out.split(/(\s+|,\s*)/)
+      const words = parts.map((p, i) => [p, i] as const).filter(([p]) => /^[A-Za-z]+$/.test(p))
+      let done = false
+      for (let a = 0; a < words.length && !done; a++) for (let n = 1; n <= 3 && a + n <= words.length && !done; n++) {
+        const win = words.slice(a, a + n)
+        const joined = win.map(([p]) => p).join('').toLowerCase()
+        if (joined[0] !== letters[0] || joined === letters || lev(joined, letters) > 2) continue
+        if (n > 1 && joined.length !== letters.length) continue
+        let i = 0
+        for (const [p, j] of win) { const seg = n === 1 ? letters : letters.slice(i, i + p.length); i += p.length; parts[j] = seg[0].toUpperCase() + seg.slice(1) }
+        done = true
+      }
+      out = parts.join('')
+    }
+    return out
+  }
+  const spellingSources = () => {
+    const mia = [...transcriptLines].reverse().find((l) => l.speaker === 'Mia')?.text ?? ''
+    const caller = transcriptLines.filter((l) => l.speaker === 'Caller').slice(-6).map((l) => l.text).join(' | ')
+    return `${mia} | ${caller}`
+  }
+  const saveAddress = (address: string) => {
+    lastAddressSaved = address
+    enqueueWrite(async () => {
+      const c = await confirmAddress(db, incidentId, address)
+      if (c?.lat == null && lastAddressSaved === address) setTimeout(() => enqueueWrite(() => confirmAddress(db, incidentId, address)), 3_000)
+    })
+  }
+  // The caller's yes to a read-back: re-apply the spelling to the saved address in case Mia never re-sent it.
+  const fixAddressOnYes = (callerLine: string) => {
+    if (!lastAddressSaved || !/^\W*(yes|yeah|yep|correct|right|that'?s (right|correct)|exactly|haan?|athe|sari)\b/i.test(callerLine.trim())) return
+    const fixed = applySpelling(lastAddressSaved, spellingSources())
+    if (fixed !== lastAddressSaved) { console.info('[QuickBite call] address spelling applied:', fixed); saveAddress(fixed) }
+  }
+
   // Runs of 3+ single letters ("J, E, E, V" / "V A Z H") are a spelling, not part of the address. The letters are
   // final: they replace the word(s) just before them that they spell (Niwas → Nivas), then the run is dropped.
   const cleanSpelled = (addr: string): string =>
@@ -324,19 +372,13 @@ export async function startLiveCall(
       case 'confirm_address': {
         if (typeof args.address !== 'string') break
         // Mia put her letter-by-letter read-back into the address (INC-MUXNKEBP: "Jeevan Niwas, J, E, E, V…").
-        const address = cleanSpelled(args.address)
+        const address = applySpelling(cleanSpelled(args.address), `${args.address} | ${spellingSources()}`)
         if (tooVague(address)) {
           return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
         }
         // Saved straight away (latest version wins) so responders have a location even before the read-back.
         // One lookup per distinct address; a failed one is retried once after 3 s (free map server rate limit).
-        if (address !== lastAddressSaved) {
-          lastAddressSaved = address
-          enqueueWrite(async () => {
-            const c = await confirmAddress(db, incidentId, address)
-            if (c?.lat == null && lastAddressSaved === address) setTimeout(() => enqueueWrite(() => confirmAddress(db, incidentId, address)), 3_000)
-          })
-        }
+        if (address !== lastAddressSaved) saveAddress(address)
         if (args.confirmed !== true) {
           return `Saved for now. If the caller spelled any name letter by letter, use exactly their letters (e.g. "N I V A S" is "Nivas", not "Niwas") and call confirm_address again with that spelling first. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Niwas — J, E, E, V, A, N, N, I, W, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
         }
@@ -518,6 +560,7 @@ export async function startLiveCall(
       nudgedForTurn = false
       noteMode(callerText)
       confirmEmailIfYes(transcriptLines.at(-1)?.text ?? callerText)
+      fixAddressOnYes(transcriptLines.at(-1)?.text ?? callerText)
       if (dangerReported && !callerSafe && SAFE_NOW.test(transcriptLines.at(-1)?.text ?? callerText)) {
         callerSafe = true
         if (!emailAsked) extraNotes.push('(The caller just said they are safe: in this reply, ask once for their email for the case report.)')
