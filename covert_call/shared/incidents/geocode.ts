@@ -16,13 +16,71 @@ async function viaGoogle(address: string, key: string): Promise<Coordinates | nu
 // one at the precision an emergency pin needs.
 const MIN_USABLE_PLACE_RANK = 14
 
-async function nominatimSearch(query: string, near: Coordinates | null): Promise<Coordinates | null> {
+// Nominatim's usage policy is ~1 request/second per client, and one address can try ~10 queries (variants,
+// pincode, town). Those used to go out in a burst and got this client 429-blocked, so every address failed.
+// Now: requests are spaced out, results are cached, and while Nominatim is refusing us the queries go to Photon
+// (komoot's free OpenStreetMap geocoder, no key) instead.
+const NOMINATIM_GAP_MS = 1100
+const BLOCKED_FOR_MS = 120_000
+let nextNominatimAt = 0
+let nominatimBlockedUntil = 0
+const searchCache = new Map<string, Promise<Coordinates | null>>()
+
+function nominatimSearch(query: string, near: Coordinates | null): Promise<Coordinates | null> {
+  const key = `${query}|${near ? `${near.lat.toFixed(2)},${near.lng.toFixed(2)}` : ''}`
+  if (!searchCache.has(key)) {
+    const p = osmSearch(query, near)
+    // Don't cache a failed request (network/429), only real answers, so a later retry can still succeed.
+    p.then((r) => { if (r === undefined) searchCache.delete(key) }, () => searchCache.delete(key))
+    searchCache.set(key, p.then((r) => r ?? null))
+  }
+  return searchCache.get(key)!
+}
+
+// undefined = couldn't ask (blocked / network); null = asked, no usable place.
+async function osmSearch(query: string, near: Coordinates | null): Promise<Coordinates | null | undefined> {
+  if (Date.now() < nominatimBlockedUntil) return photonSearch(query, near)
+  const wait = nextNominatimAt - Date.now()
+  nextNominatimAt = Math.max(Date.now(), nextNominatimAt) + NOMINATIM_GAP_MS
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+  const hit = await nominatimFetch(query, near).catch(() => undefined)
+  if (hit === 'blocked') {
+    nominatimBlockedUntil = Date.now() + BLOCKED_FOR_MS
+    return photonSearch(query, near)
+  }
+  return hit
+}
+
+// Photon returns GeoJSON; like Nominatim's place_rank, area-sized results (a district's centroid can be tens of km
+// from anything the caller named) are not a usable pin.
+const PHOTON_TOO_COARSE = new Set(['country', 'state', 'county', 'district', 'state_district', 'region'])
+async function photonSearch(query: string, near: Coordinates | null): Promise<Coordinates | null | undefined> {
+  const params = new URLSearchParams({ q: query, limit: '1' })
+  if (near) { params.set('lat', String(near.lat)); params.set('lon', String(near.lng)) }
+  try {
+    const res = await fetch(`https://photon.komoot.io/api/?${params}`)
+    if (!res.ok) return undefined
+    const f = (await res.json())?.features?.[0]
+    if (!f) return null
+    // Judge size by the OSM tag (osm_value): Photon's own `type` calls a suburb like Kakkanad a "district".
+    if (PHOTON_TOO_COARSE.has(String(f.properties?.osm_value ?? ''))) return null
+    // Without a location hint Photon happily answers from another state ("Lake View Apartments" → Bangalore).
+    if (near && distanceKm(near, { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] }) > 150) return null
+    const [lng, lat] = f.geometry?.coordinates ?? []
+    return typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null
+  } catch {
+    return undefined
+  }
+}
+
+async function nominatimFetch(query: string, near: Coordinates | null): Promise<Coordinates | null | 'blocked'> {
   const params = new URLSearchParams({ q: query, format: 'jsonv2', limit: '1' })
   // Bias (not restrict) results toward the caller's rough location so "12th Main Road" resolves in the right city.
   if (near) params.set('viewbox', [near.lng - 0.05, near.lat + 0.05, near.lng + 0.05, near.lat - 0.05].join(','))
   // Browsers send their own User-Agent; Node's default one is rejected by Nominatim's usage policy.
   const headers: Record<string, string> = typeof window === 'undefined' ? { 'User-Agent': 'QuickBite-hackathon-prototype' } : {}
   const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, { headers })
+  if (res.status === 429 || res.status === 403) return 'blocked'
   if (!res.ok) return null
   const [hit] = await res.json()
   if (!hit) return null
@@ -129,16 +187,33 @@ async function nominatimVerified(query: string, near: Coordinates | null): Promi
   return { ...unbiased, precision: 'approximate' }
 }
 
-async function viaNominatim(address: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+// Callers (and the speech-to-text) still use the old English town names, but OpenStreetMap only knows the
+// official ones: "Convent Square Junction, Alleppey" found nothing, and the looser fallbacks then pinned a
+// different "convent" 1.2 km away (INC-MUWJYDV8). "Convent Square Junction, Alappuzha" is an exact hit.
+const TOWN_NAMES: [RegExp, string][] = [
+  [/\balleppey\b/gi, 'Alappuzha'], [/\bcochin\b/gi, 'Kochi'], [/\btrivandrum\b/gi, 'Thiruvananthapuram'],
+  [/\bcalicut\b/gi, 'Kozhikode'], [/\btrichur\b/gi, 'Thrissur'], [/\bquilon\b/gi, 'Kollam'],
+  [/\bcannanore\b/gi, 'Kannur'], [/\bpalghat\b/gi, 'Palakkad'], [/\bbangalore\b/gi, 'Bengaluru'],
+  [/\bbombay\b/gi, 'Mumbai'], [/\bmadras\b/gi, 'Chennai'],
+]
+const officialNames = (address: string) => TOWN_NAMES.reduce((a, [re, name]) => a.replace(re, name), address)
+
+// A fallback match more than this far from where the caller is known to be is a same-named place elsewhere.
+const FALLBACK_MAX_KM = 25
+
+async function viaNominatim(spoken: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+  const address = officialNames(spoken)
   const direct = await nominatimVerified(address, near)
   if (direct) return direct
 
   // Try dropping one mis-transcribed segment at a time before falling back to just the town — this can still
   // land on the exact landmark (a specific place, not just a general area) even when one part of what the
   // caller said didn't come through clearly.
+  // Shorter phrases are loose ("Convent, Alappuzha" is any convent), so they are searched near the caller and a
+  // hit far from them is ignored.
   for (const variant of [...droppingOneSegment(address), ...relaxedQueries(address)]) {
-    const hit = await nominatimSearch(variant, null)
-    if (hit) return { ...hit, precision: 'approximate' }
+    const hit = await nominatimSearch(variant, near)
+    if (hit && (!near || distanceKm(near, hit) <= FALLBACK_MAX_KM)) return { ...hit, precision: 'approximate' }
   }
 
   // These two fallbacks are deliberately unambiguous ON THEIR OWN (a 6-digit pincode; a named town/city), so

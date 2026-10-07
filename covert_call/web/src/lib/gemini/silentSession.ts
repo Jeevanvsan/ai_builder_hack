@@ -1,13 +1,15 @@
-import { Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
-import { geminiConfigured, liveConnect } from './aiLogic.ts'
+import { AI_MODELS } from '../../../../shared/aiModels.ts'
+import { MediaResolution, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { currentLiveTier, geminiConfigured, liveConnect } from './aiLogic.ts'
 import type { Firestore } from 'firebase/firestore'
-import { appendTranscriptLine, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { usageFromMetadata } from '../../../../shared/aiModels.ts'
+import { appendTranscriptLine, recordAiUsage, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { startMicCapture } from './audio.ts'
-import { startFrameSampler, type FrameSampler } from './frames.ts'
+import { FRAMES_PER_SECOND, startFrameSampler, type FrameSampler } from './frames.ts'
 import { SILENT_OBSERVER_INSTRUCTION } from './persona.ts'
-import { REPORT_SCENE_OBSERVATION_TOOLS } from './tools.ts'
+import { REPORT_SCENE_OBSERVATION_TOOLS, toolResponse } from './tools.ts'
 
-const LIVE_MODEL = 'gemini-3.8-live'
+const LIVE_MODEL = AI_MODELS.liveCall // shared/aiModels.ts
 
 export type SilentObserverHandle = {
   end: () => Promise<void>
@@ -27,6 +29,10 @@ export async function startSilentObserver(
   let resumptionHandle: string | undefined
   let reconnects = 0
   const MAX_RECONNECTS = 3
+  // Hard cap per session on top of the per-drop limit (which resets on each reopen): every reconnect resends the
+  // whole persona and tools, so a session that keeps dropping must not reconnect forever.
+  let totalReconnects = 0
+  const MAX_TOTAL_RECONNECTS = 8
 
   const transcriptLines: string[] = []
 
@@ -59,6 +65,8 @@ export async function startSilentObserver(
               kind,
               detail: typeof args.detail === 'string' ? args.detail : undefined,
               confidence: typeof args.confidence === 'number' ? args.confidence : undefined,
+              category: typeof args.category === 'string' ? args.category : undefined,
+              vehicle: { type: args.vehicleType as string | undefined, colour: args.colour as string | undefined, plate: args.plate as string | undefined },
             }),
           )
         }
@@ -97,7 +105,26 @@ export async function startSilentObserver(
     if (text) enqueueWrite(() => appendTranscriptLine(db, incidentId, 'Caller', text))
   }
 
+  // AI usage for the staging /ai-usage page: every Live message reports the tokens of the inference that produced
+  // it; summed here and written to incidents/{id}.aiUsage.sosObserver every 10 s and at the end (Firestore increments).
+  const liveUsage = { requests: 0, inText: 0, inAudio: 0, inImage: 0, outText: 0, outAudio: 0 }
+  const noteLiveUsage = (m: LiveServerMessage) => {
+    if (!m.usageMetadata) return
+    const u = usageFromMetadata(m.usageMetadata as never)
+    liveUsage.requests++
+    liveUsage.inText += u.inText; liveUsage.inAudio += u.inAudio; liveUsage.inImage += u.inImage
+    liveUsage.outText += u.outText; liveUsage.outAudio += u.outAudio
+  }
+  const flushLiveUsage = () => {
+    if (!liveUsage.requests) return
+    const d = { ...liveUsage }
+    for (const k of Object.keys(liveUsage) as (keyof typeof liveUsage)[]) liveUsage[k] = 0
+    void recordAiUsage(db, incidentId, 'sosObserver', { model: LIVE_MODEL, tier: currentLiveTier(), ...d })
+  }
+  const usageTimer = setInterval(flushLiveUsage, 10_000)
+
   const onMessage = (message: LiveServerMessage) => {
+    noteLiveUsage(message)
     const heard = message.serverContent?.inputTranscription?.text
     if (heard) {
       transcriptLines.push(heard)
@@ -112,7 +139,7 @@ export async function startSilentObserver(
     if (calls?.length) {
       for (const call of calls) handleToolCall(call)
       void session.sendToolResponse({
-        functionResponses: calls.map((call) => ({ id: call.id, name: call.name, response: { output: 'ok' } })),
+        functionResponses: calls.map((call) => toolResponse(call)),
       })
     }
   }
@@ -152,7 +179,11 @@ export async function startSilentObserver(
         tools: REPORT_SCENE_OBSERVATION_TOOLS,
         // An SOS can run long and carries video, so compress the context and keep a resumption handle to reopen on
         // a drop.
-        contextWindowCompression: { slidingWindow: {} },
+        // Keep the session lean: compress from ~48K tokens down to ~28K (the default only starts at 80% of the 131K
+        // window, so it never ran and every re-read kept growing). System instructions are always kept.
+        contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } },
+        // Camera frames at low media resolution (~70 tokens per frame on Gemini 3 instead of ~280).
+        mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
         sessionResumption: resume ? { handle: resume } : {},
       },
       callbacks: {
@@ -172,7 +203,8 @@ export async function startSilentObserver(
           // (mostly-quiet SOS, closed itself in the background, no reconnect logged). A fresh connection (even
           // without resuming prior context) is far better than a dead observer, so reconnect regardless of whether
           // a handle is available.
-          if (!finished && reconnects < MAX_RECONNECTS) {
+          if (!finished && reconnects < MAX_RECONNECTS && totalReconnects < MAX_TOTAL_RECONNECTS) {
+            totalReconnects += 1
             reconnects += 1
             void openSession(resumptionHandle).then((s) => { session = s }).catch((err) => {
               console.error('[QuickBite SOS] reconnect failed:', err)
@@ -194,11 +226,13 @@ export async function startSilentObserver(
     if (canSend()) session.sendRealtimeInput({ audio: { data: base64Pcm, mimeType: 'audio/pcm;rate=16000' } })
   }, opts.micStream)
 
-  // One frame sampler per camera (front + back). Both feed the same observer.
+  // One frame sampler per camera (front + back), sharing the same ~0.5 frames/s budget as a call: with two cameras
+  // each sends a frame every 4 s (was 1 fps each, i.e. 2 frames/s for the whole SOS, the biggest token cost).
+  const perCameraFps = FRAMES_PER_SECOND / Math.max(1, opts.videoStreams.length)
   const samplers: FrameSampler[] = opts.videoStreams.map((stream) =>
     startFrameSampler(stream, (base64Jpeg) => {
       if (canSend()) session.sendRealtimeInput({ video: { data: base64Jpeg, mimeType: 'image/jpeg' } })
-    }),
+    }, perCameraFps),
   )
 
   // Nudge it to start observing immediately.
@@ -215,6 +249,8 @@ export async function startSilentObserver(
       ended = true
       finished = true
       flushHeard()
+      clearInterval(usageTimer)
+      flushLiveUsage()
       samplers.forEach((s) => s.stop())
       mic.stop()
       session.close()

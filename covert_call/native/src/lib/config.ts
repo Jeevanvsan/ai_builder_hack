@@ -6,14 +6,19 @@
 // Cloud builds do NOT read native/.env.local — push the same values to EAS once with:
 //   npx eas-cli env:push --environment preview --path .env.local
 
+import { AI_FEATURES } from '../../../shared/aiFeatures'
+
 export const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_LIVE_API_KEY ?? ''
+// Optional free-tier key, used first; GEMINI_API_KEY (credits) takes over when it's out of quota (gemini/keys.ts).
+export const GEMINI_API_KEY_FREE = process.env.EXPO_PUBLIC_GEMINI_LIVE_API_KEY_FREE ?? ''
 
 export const DRIVE_UPLOAD_URL = process.env.EXPO_PUBLIC_DRIVE_UPLOAD_URL
 export const driveConfigured = Boolean(DRIVE_UPLOAD_URL)
 
 // Same default as the web: off unless explicitly enabled, so an ended call doesn't add a third request to the
 // shared free-tier text-model quota.
-export const GROUNDED_CONTEXT_ENABLED = process.env.EXPO_PUBLIC_ENABLE_GROUNDED_CONTEXT === 'true'
+// Paused for the prototype (shared/aiFeatures.ts), like the web.
+export const GROUNDED_CONTEXT_ENABLED = AI_FEATURES.groundedContext && process.env.EXPO_PUBLIC_ENABLE_GROUNDED_CONTEXT === 'true'
 
 // Relay used only when the phone and the dashboard cannot reach each other directly — a different network, or
 // mobile data, where carrier-grade NAT makes a direct path essentially impossible. Left unset, live video still

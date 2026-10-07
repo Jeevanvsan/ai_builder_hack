@@ -3,16 +3,28 @@ import { getAI, getGenerativeModel, getLiveGenerativeModel, GoogleAIBackend, Res
 import { getToken, initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check'
 import { setLogLevel } from 'firebase/app'
 import { app } from '../firebase'
+import type { Firestore } from 'firebase/firestore'
+import { usageFromMetadata } from '../../../../shared/aiModels.ts'
+import { recordAiUsage } from '../../../../shared/incidents/client.ts'
+import { createKeyPool, isQuotaError, withKeyFallback, type KeyTier } from '../../../../shared/gemini/keyPool.ts'
 
 // Firebase AI Logic (Epic 27): every Gemini call goes through Firebase's proxy instead of a Gemini API key shipped
 // in the browser bundle, and App Check (Fraud Defense / reCAPTCHA Enterprise) makes sure only this app can call it.
 // Opt-in per build with VITE_USE_AI_LOGIC=true (the staging site first); otherwise the old key-based path is used.
 
 export const USE_AI_LOGIC = import.meta.env.VITE_USE_AI_LOGIC === 'true'
-const LEGACY_KEY = import.meta.env.VITE_GEMINI_LIVE_API_KEY as string | undefined
+// Key path: the free-tier key first, the paid (credits) key once free is out of quota (shared/gemini/keyPool.ts).
+// Staging builds (`vite build --mode staging`) use the free-tier key ONLY, never the paid one.
+const FREE_KEY = import.meta.env.VITE_GEMINI_LIVE_API_KEY_FREE as string | undefined
+const keys = createKeyPool(
+  import.meta.env.MODE === 'staging'
+    ? { free: FREE_KEY }
+    : { free: FREE_KEY, paid: import.meta.env.VITE_GEMINI_LIVE_API_KEY as string | undefined },
+  'web',
+)
 
 // True when either path can reach Gemini (replaces the old "is the API key set" checks).
-export const geminiConfigured = USE_AI_LOGIC || Boolean(LEGACY_KEY)
+export const geminiConfigured = USE_AI_LOGIC || keys.configured
 
 let ai: AI | null = null
 let appCheck: AppCheck | null = null
@@ -58,16 +70,31 @@ async function appCheckReady(): Promise<void> {
 type Part = { text?: string; inlineData?: { mimeType: string; data: string } }
 type TextRequest = {
   model: string
+  task?: string // which job this is (shared/aiModels.ts), for the per-incident AI usage breakdown
   contents: string | { role: string; parts: Part[] }[]
   config?: { responseMimeType?: string; responseSchema?: unknown; tools?: unknown[] }
+}
+
+// ---------- AI usage per incident (staging /ai-usage page) ----------
+// The incident the current call/SOS/tap belongs to; text requests made meanwhile are counted against it.
+let usageTarget: { db: Firestore; id: string } | null = null
+export const setUsageIncident = (db: Firestore, id: string) => { usageTarget = { db, id } }
+export const currentLiveTier = (): KeyTier => lastLiveTier ?? 'free'
+function noteTextUsage(req: TextRequest, meta: Parameters<typeof usageFromMetadata>[0], tier: KeyTier, ms: number) {
+  if (!usageTarget || !req.task) return
+  void recordAiUsage(usageTarget.db, usageTarget.id, req.task, { model: req.model, tier, requests: 1, ms, ...usageFromMetadata(meta) })
 }
 
 // The one call shape the text helpers use (consolidate, correlate, photo, grounded context), with the same
 // `{ text }` result on either path, so those files only swap how they get a client.
 export async function generateText(req: TextRequest): Promise<{ text: string | undefined }> {
   if (!USE_AI_LOGIC) {
-    if (!LEGACY_KEY) throw new Error('Gemini is not configured')
-    const r = await new GoogleGenAI({ apiKey: LEGACY_KEY }).models.generateContent(req as Parameters<GoogleGenAI['models']['generateContent']>[0])
+    if (!keys.configured) throw new Error('Gemini is not configured')
+    const t0 = Date.now()
+    let usedTier: KeyTier = 'free'
+    const { task: _task, ...apiReq } = req
+    const r = await withKeyFallback(keys, (apiKey, tier) => { usedTier = tier; return new GoogleGenAI({ apiKey }).models.generateContent(apiReq as Parameters<GoogleGenAI['models']['generateContent']>[0]) }, req.model)
+    noteTextUsage(req, r.usageMetadata, usedTier, Date.now() - t0)
     return { text: r.text }
   }
   await appCheckReady()
@@ -80,7 +107,9 @@ export async function generateText(req: TextRequest): Promise<{ text: string | u
     },
     ...(req.config?.tools ? { tools: req.config.tools as never } : {}),
   })
+  const t0 = Date.now()
   const r = await model.generateContent(typeof req.contents === 'string' ? req.contents : { contents: req.contents as never })
+  noteTextUsage(req, r.response.usageMetadata as never, 'paid', Date.now() - t0)
   return { text: r.response.text() }
 }
 
@@ -97,7 +126,7 @@ export type LiveCallbacks = {
 export type LiveTransport = {
   sendRealtimeInput: (input: { audio?: { data: string; mimeType: string }; video?: { data: string; mimeType: string } }) => void
   sendClientContent: (content: { turns: string; turnComplete?: boolean }) => void
-  sendToolResponse: (r: { functionResponses: { id?: string; name?: string; response: object }[] }) => void
+  sendToolResponse: (r: { functionResponses: { id?: string; name?: string; response: object; scheduling?: unknown }[] }) => void
   close: () => void
 }
 
@@ -179,7 +208,8 @@ export async function connectLiveViaAiLogic(modelName: string, config: LiveConfi
       if (!session.isClosed) void session.send(turns, turnComplete ?? true).catch(() => {})
     },
     sendToolResponse: ({ functionResponses }) => {
-      if (!session.isClosed) void session.sendFunctionResponses(functionResponses.map((f) => ({ id: f.id, name: f.name ?? '', response: f.response }))).catch(() => {})
+      if (!session.isClosed) // scheduling passed through: SILENT tool responses must not start a reply on this path either.
+        void session.sendFunctionResponses(functionResponses.map((f) => ({ id: f.id, name: f.name ?? '', response: f.response, ...(f.scheduling ? { scheduling: f.scheduling } : {}) }) as never)).catch(() => {})
     },
     close: () => void session.close().catch(() => {}),
   }
@@ -187,7 +217,27 @@ export async function connectLiveViaAiLogic(modelName: string, config: LiveConfi
 
 // One way to open a Live session for both the call and the silent SOS: through Firebase AI Logic when it is on,
 // otherwise the original key-based connection.
-export function liveConnect(p: { model: string; config: Record<string, unknown>; callbacks: LiveCallbacks }): Promise<Session> {
+// Key path: free key first. Free-tier Live quota shows up either as a refused connect or as a close right after
+// opening; both mark free as used up, and the close is passed on so the session's own reconnect reopens it, now on
+// the paid key. A resumption handle belongs to the project that issued it, so it's dropped when the key changes.
+let lastLiveTier: KeyTier | null = null
+export async function liveConnect(p: { model: string; config: Record<string, unknown>; callbacks: LiveCallbacks }): Promise<Session> {
   if (USE_AI_LOGIC) return connectLiveViaAiLogic(p.model, p.config, p.callbacks) as unknown as Promise<Session>
-  return new GoogleGenAI({ apiKey: LEGACY_KEY }).live.connect(p as never)
+  const open = (key: string, tier: KeyTier) => {
+    const resumption = p.config.sessionResumption as { handle?: string } | undefined
+    const config = resumption?.handle && lastLiveTier && lastLiveTier !== tier ? { ...p.config, sessionResumption: {} } : p.config
+    lastLiveTier = tier
+    return new GoogleGenAI({ apiKey: key }).live.connect({
+      ...p,
+      config,
+      callbacks: {
+        ...p.callbacks,
+        onclose: (e?: { code?: number; reason?: string }) => {
+          if (isQuotaError(e?.reason ?? '')) keys.failed(tier, e?.reason ?? 'quota', p.model)
+          p.callbacks.onclose(e)
+        },
+      },
+    } as never)
+  }
+  return withKeyFallback(keys, open, p.model)
 }

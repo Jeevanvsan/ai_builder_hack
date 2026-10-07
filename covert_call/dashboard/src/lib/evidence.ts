@@ -1,6 +1,7 @@
 import type { Incident } from '../../../shared/incidents/types'
 import { livePosition } from './livePosition'
 import { isNegatedIndicator } from '../../../shared/incidents/severity.ts'
+import { AI_FEATURES } from '../../../shared/aiFeatures.ts'
 
 // Sorts what an incident already knows into the case board's evidence tiles. Pure: no new data, no fetching.
 // Each tile has a fixed slot around the hub, so tiles never jump around as facts arrive, and a tile only exists
@@ -51,12 +52,29 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
   const threat: string[] = []
   for (const d of f.dangerIndicators) {
     if (PEOPLE.test(d)) people.push(d)
-    else if (VEHICLE.test(d)) vehicle.push(d)
+    else if (VEHICLE.test(d)) {
+      vehicle.push(d)
+      // "Being chased by a car" is the threat as well: the Threat card used to show only the urgency.
+      if (/chas|follow|stalk|ram|hit|attack|block/i.test(d)) threat.push(d)
+    }
     else if (APPEARANCE.test(d)) appearance.push(d)
     else threat.push(d)
   }
 
-  if (vehicle.length) out.vehicle = { kind: 'vehicle', label: 'Vehicle', values: vehicle.map(cap), tone: 'medium' }
+  // Also what the camera saw and the number plate record (both reported by the AI): the card used to read
+  // only Mia's danger tags, so a plate read off the camera or a car seen on it never showed here.
+  // Classified by the AI when it reported it (category + vehicle attributes); the keyword test is only a fallback
+  // for observations recorded before the AI sent a category.
+  for (const o of i.sceneObservations ?? []) {
+    const isVehicle = o.category ? o.category === 'vehicle' : o.source === 'camera' && VEHICLE.test(`${o.kind} ${o.detail}`)
+    if (!isVehicle) continue
+    const v = o.vehicle
+    const described = [v?.colour, v?.type].filter(Boolean).join(' ')
+    vehicle.push(`Seen: ${described || o.detail || o.kind}${v?.plate ? `, plate ${v.plate}` : ''}`)
+  }
+  if (i.vehicle?.number) vehicle.push(`Plate ${i.vehicle.number}${i.vehicle.source === 'camera' ? ' (read on camera)' : ''}`)
+  const vehicles = [...new Set(vehicle)]
+  if (vehicles.length) out.vehicle = { kind: 'vehicle', label: 'Vehicle', values: vehicles.map(cap), tone: 'medium' }
 
   // A "confirmed" address with no lat/lng means geocoding failed outright (see confirmAddress()) — the text is
   // still shown, but it's not treated as a located pin (no coordinates to fall back to for the ≈lat,lng display).
@@ -79,7 +97,8 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
           ? (c?.confidence === 'uncertain' ? 'Approximate — the exact street could not be matched, area only' : undefined)
           : c ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
       tone: pinned || movedOn ? 'live' : 'neutral',
-      pending: !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,
+      // Local conditions (weather/traffic) are paused (AI_FEATURES.groundedContext), so nothing is coming: no spinner.
+      pending: AI_FEATURES.groundedContext && !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,
     }
   }
 
@@ -115,7 +134,12 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
     out.seen = {
       kind: 'seen',
       label: 'Seen & heard',
-      values: obs.slice(-3).map((o) => `${o.source === 'sound' ? 'Heard' : 'Seen'}: ${o.kind}${o.detail ? ` — ${o.detail}` : ''}`),
+      // The AI's own description: vehicle colour/type/plate when it gave them, else its detail, else the short tag.
+      values: obs.slice(-3).map((o) => {
+        const v = o.vehicle
+        const desc = [v?.colour, v?.type].filter(Boolean).join(' ') || o.detail || o.kind
+        return `${o.source === 'sound' ? 'Heard' : 'Seen'}: ${desc}${v?.plate ? `, plate ${v.plate}` : ''}`
+      }),
       sub: obs.length > 3 ? `+${obs.length - 3} earlier` : undefined,
       tone: 'high',
     }

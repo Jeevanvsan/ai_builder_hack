@@ -1,3 +1,4 @@
+import { AI_FEATURES } from '../../../shared/aiFeatures.ts'
 import { useEffect, useRef, useState } from 'react'
 import { aiInsightsAvailable, generateInsights } from './aiInsights'
 import { getCachedInsights, isStale, saveInsights, type CachedInsights } from './aiInsightsCache'
@@ -7,7 +8,9 @@ import type { IncidentAnalytics } from './analytics'
 // responder to open the Analytics page each day silently triggers a background regenerate if the shared cache
 // is missing or over a day old. Whoever's already looking at AI Insights sees it update live; everyone else just
 // gets a fresh cached result the next time they check. A manual Refresh (in AiInsightsPanel) stays available too.
-export function useAutoInsights(analytics: IncidentAnalytics, generatedBy: string) {
+// `ready` = the incidents have loaded. Auto-refresh used to run on the first render, while the page was still
+// loading, so it paid for a Gemini call on EMPTY stats and saved useless insights for everyone.
+export function useAutoInsights(analytics: IncidentAnalytics, generatedBy: string, ready = true) {
   const [cached, setCached] = useState<CachedInsights | null>(null)
   const [loading, setLoading] = useState(true)
   const [autoRefreshing, setAutoRefreshing] = useState(false)
@@ -15,6 +18,7 @@ export function useAutoInsights(analytics: IncidentAnalytics, generatedBy: strin
 
   useEffect(() => {
     if (!aiInsightsAvailable) { setLoading(false); return }
+    if (!ready) return
     let cancelled = false
 
     getCachedInsights()
@@ -23,7 +27,8 @@ export function useAutoInsights(analytics: IncidentAnalytics, generatedBy: strin
         setCached(c)
         setLoading(false)
 
-        if (!triedAutoRefresh.current && isStale(c)) {
+        // Paused for the prototype (shared/aiFeatures.ts): insights regenerate only from the Refresh button.
+        if (AI_FEATURES.insightsAutoRefresh && !triedAutoRefresh.current && isStale(c) && analytics.total > 0) {
           triedAutoRefresh.current = true
           setAutoRefreshing(true)
           try {
@@ -41,8 +46,8 @@ export function useAutoInsights(analytics: IncidentAnalytics, generatedBy: strin
       .catch(() => setLoading(false))
 
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per page load; analytics/generatedBy intentionally not re-triggering
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per page load (once the data is ready); analytics/generatedBy intentionally not re-triggering
+  }, [ready])
 
   return { cached, setCached, loading, autoRefreshing }
 }

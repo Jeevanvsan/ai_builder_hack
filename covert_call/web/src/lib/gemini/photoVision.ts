@@ -1,9 +1,10 @@
+import { AI_MODELS } from '../../../../shared/aiModels.ts'
 import { geminiConfigured, generateText } from './aiLogic.ts'
 
 // Gemini vision analysis of a photo attached on the silent tap-only screen (Epic 6.1). A person with no way to
 // talk can attach a picture of their situation; Gemini turns it into structured signal for a responder. Runs
 // client-side with the same key/pattern as the other Gemini text passes — no backend needed.
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.photoVision // shared/aiModels.ts
 
 export interface PhotoAnalysis {
   dangerIndicators: string[]
@@ -36,7 +37,26 @@ function fileToBase64(file: Blob): Promise<string> {
 }
 
 // Analyses one attached image into structured incident signal. Throws if Gemini isn't configured.
-export async function analyzePhoto(file: Blob): Promise<PhotoAnalysis> {
+// Phone photos are 3-12 MP; image tokens scale with size, and recognising a weapon, an injury or a plate needs far
+// less. Downscale to 1024 px on the long side as JPEG before sending (falls back to the original if it can't).
+const MAX_SIDE = 1024
+async function downscale(file: Blob): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(file)
+    const scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height))
+    if (scale === 1 && file.type === 'image/jpeg') return file
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bmp.width * scale)
+    canvas.height = Math.round(bmp.height * scale)
+    canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+    return await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b ?? file), 'image/jpeg', 0.8))
+  } catch {
+    return file
+  }
+}
+
+export async function analyzePhoto(original: Blob): Promise<PhotoAnalysis> {
+  const file = await downscale(original)
   if (!geminiConfigured) throw new Error('Gemini is not configured')
   const base64 = await fileToBase64(file)
 
@@ -50,6 +70,7 @@ silent help request. Describe only what is actually visible — do not invent. E
 
   const response = await generateText({
     model: MODEL,
+    task: 'photoVision',
     contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: file.type || 'image/jpeg', data: base64 } }] }],
     config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
   })
@@ -57,4 +78,53 @@ silent help request. Describe only what is actually visible — do not invent. E
   const text = response.text
   if (!text) throw new Error('Gemini returned no content')
   return JSON.parse(text) as PhotoAnalysis
+}
+
+// Live-call camera check: Mia (Gemini Live) often missed what was on camera while busy with the order script
+// (INC-MUXLVU0X, INC-MUXMUWBA), so the latest frame is also checked here every few seconds and anything found is
+// recorded as a scene observation. Night/low light is expected: a silhouette counts as a person.
+export interface FrameFinding {
+  category: 'vehicle' | 'person' | 'weapon' | 'injury' | 'fire_hazard'
+  kind: string
+  detail: string
+  colour?: string
+  vehicleType?: string
+  plate?: string
+}
+
+const FRAME_SCHEMA = {
+  type: 'object',
+  properties: {
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', enum: ['vehicle', 'person', 'weapon', 'injury', 'fire_hazard'] },
+          kind: { type: 'string' },
+          detail: { type: 'string' },
+          colour: { type: 'string' },
+          vehicleType: { type: 'string' },
+          plate: { type: 'string' },
+        },
+        required: ['category', 'kind', 'detail'],
+      },
+    },
+  },
+  required: ['findings'],
+}
+
+export async function checkCameraFrame(base64Jpeg: string): Promise<FrameFinding[]> {
+  if (!geminiConfigured) return []
+  const prompt = `A frame from a caller's phone camera during an emergency call. List only what is actually visible:
+a person (a dark silhouette or shadow of a person counts; describe build, clothing, posture, mood if visible),
+a weapon or weapon-like object, an injury, fire or smoke, a vehicle (type, colour, plate if readable).
+kind: a short tag ("person", "knife", "car"). detail: one short line for a responder. Empty list if none.`
+  const response = await generateText({
+    model: MODEL,
+    task: 'photoVision',
+    contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: base64Jpeg } }] }],
+    config: { responseMimeType: 'application/json', responseSchema: FRAME_SCHEMA },
+  })
+  try { return (JSON.parse(response.text ?? '{}') as { findings?: FrameFinding[] }).findings ?? [] } catch { return [] }
 }

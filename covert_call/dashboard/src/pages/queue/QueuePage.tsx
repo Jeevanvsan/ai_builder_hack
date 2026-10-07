@@ -102,6 +102,7 @@ export default function QueuePage() {
                     <Link to={`/incident/${i.id}`} className="incident-card-id mono" onClick={(e) => e.stopPropagation()}>{i.id}</Link>
                     <span className="sub">
                       {channelLabel(i.channel)}
+                      {i.isDemo && <span className="demo-badge">DEMO</span>}
                       {i.incidentType === 'sos' && <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>}
                     </span>
                     {search.reasons.get(i.id) && <span className="search-reason">AI: {search.reasons.get(i.id)}</span>}

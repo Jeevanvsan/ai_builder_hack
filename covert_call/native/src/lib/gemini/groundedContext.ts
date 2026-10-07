@@ -1,5 +1,7 @@
+import { AI_MODELS } from '../../../../shared/aiModels'
+import { geminiKeys, generateWithFallback } from './keys'
 import { GoogleGenAI } from '@google/genai'
-import { GEMINI_API_KEY, GROUNDED_CONTEXT_ENABLED } from '../config'
+import { GROUNDED_CONTEXT_ENABLED } from '../config'
 
 // Native port of web/src/lib/gemini/groundedContext.ts — keep in sync.
 //
@@ -9,15 +11,14 @@ import { GEMINI_API_KEY, GROUNDED_CONTEXT_ENABLED } from '../config'
 //
 // Off by default (see config.ts): every ended call already makes 1-2 requests to this same shared free-tier
 // model quota, and this is the least essential of the post-call passes.
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.groundedContext // shared/aiModels.ts
 
 export async function groundedLocationContext(address: string): Promise<string | null> {
   if (!GROUNDED_CONTEXT_ENABLED) return null
-  if (!GEMINI_API_KEY) return null
+  if (!geminiKeys.configured) return null
 
   try {
-    const client = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
-    const response = await client.models.generateContent({
+    const response = await generateWithFallback({
       model: MODEL,
       contents: `One short factual sentence (max 20 words) about current weather or road conditions near this location, for an emergency responder's context: ${address}. If nothing relevant is found, reply with exactly "none".`,
       config: { tools: [{ googleSearch: {} }] },

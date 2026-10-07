@@ -1,5 +1,7 @@
 // The Firestore `incidents` document shape (docs/quickbite_plan.md §5b). Shared by the QuickBite app and the dashboard.
 
+export type SceneCategory = 'vehicle' | 'person' | 'weapon' | 'injury' | 'fire_hazard' | 'location_clue' | 'sound_event' | 'other'
+
 export type Channel = 'live-call' | 'silent-tap' | 'click-order' | 'silent-sos'
 export type CallState = 'active' | 'ended'
 export type Severity = 'low' | 'medium' | 'high'
@@ -43,6 +45,10 @@ export interface Incident {
   // Route to the best-fit station (police/hospital/fire), kept current as the caller moves. Set by the AI during the
   // call or by a responder picking a station on the dashboard.
   safeRoute?: import('../nav/route.ts').SafeRoute
+  // Where the caller asked their case report to be emailed (send_case_report), sent after the call.
+  reportEmail?: string
+  // Delivery of that report: set to 'sending' by the app at call end, then 'sent'/'failed' by the Apps Script.
+  reportEmailStatus?: { status: 'sending' | 'sent' | 'failed'; to: string; at: string; error?: string }
   extractedFieldsLive: {
     peopleCount: number | null
     dangerIndicators: string[]
@@ -97,7 +103,8 @@ export interface Incident {
   // What the AI saw on the camera or heard in the background during the call (Epic 10) — kept separate from what
   // the caller actually said. `source` is 'camera' (a video frame) or 'sound' (a background noise like a gunshot
   // or other voices). Absent until the first observation.
-  sceneObservations?: { source: 'camera' | 'sound'; kind: string; detail: string; confidence?: number | null; at: string }[]
+  // category/vehicle: the AI's own classification and vehicle attributes (absent on observations from before 2026-10-05)
+  sceneObservations?: { source: 'camera' | 'sound'; kind: string; detail: string; confidence?: number | null; at: string; category?: SceneCategory; vehicle?: { type?: string; colour?: string; plate?: string } }[]
   // Safety advice the persona gave the caller during the call (Epic 10.4), so a responder knows what they were
   // told. Absent until the first piece of advice.
   adviceGiven?: { text: string; at: string }[]
@@ -124,6 +131,9 @@ export interface Incident {
   // Epic 25: set on every incident written by a hidden demo call. Demo incidents live in the separate
   // `demoIncidents` collection, which the dashboard never reads; this flag is a second safety net.
   isDemo?: boolean
+  // AI tokens used for this incident, per task (live, consolidation, caseLinking, photoVision, credibility…), summed
+  // with Firestore increments as responses arrive. Cost is computed from shared/aiModels.ts prices.
+  aiUsage?: Record<string, import('../aiModels.ts').AiTaskUsage>
   severity: Severity
   // Present once the QuickBite app starts streaming the back camera (Epic 7.1). Absent means no video for this incident.
   video?: { status: 'live' | 'ended'; startedAt: string; endedAt: string | null; heartbeatAt?: string }

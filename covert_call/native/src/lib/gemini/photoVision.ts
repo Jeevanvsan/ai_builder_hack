@@ -1,5 +1,6 @@
+import { AI_MODELS } from '../../../../shared/aiModels'
+import { geminiKeys, generateWithFallback } from './keys'
 import { GoogleGenAI } from '@google/genai'
-import { GEMINI_API_KEY } from '../config'
 
 // Native port of web/src/lib/gemini/photoVision.ts — keep the prompt and schema in sync.
 //
@@ -7,7 +8,7 @@ import { GEMINI_API_KEY } from '../config'
 //   1. The key comes from config.ts (EXPO_PUBLIC_*) rather than import.meta.env.
 //   2. It takes base64 + a mime type instead of a Blob. expo-image-picker hands back base64 directly, so there's
 //      no FileReader step to port.
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.photoVision // shared/aiModels.ts
 
 export interface PhotoAnalysis {
   dangerIndicators: string[]
@@ -29,8 +30,7 @@ const RESPONSE_SCHEMA = {
 
 // Analyses one attached image into structured incident signal. Throws if Gemini isn't configured.
 export async function analyzePhoto(photo: { base64: string; mimeType: string }): Promise<PhotoAnalysis> {
-  if (!GEMINI_API_KEY) throw new Error('Gemini is not configured')
-  const client = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
+  if (!geminiKeys.configured) throw new Error('Gemini is not configured')
 
   const prompt = `You are assisting an emergency responder. A person who cannot speak has attached this photo to a
 silent help request. Describe only what is actually visible — do not invent. Extract:
@@ -40,7 +40,7 @@ silent help request. Describe only what is actually visible — do not invent. E
 - urgency: low / medium / high based on visible danger.
 - summary: one or two sentences a dispatcher can read at a glance.`
 
-  const response = await client.models.generateContent({
+  const response = await generateWithFallback({
     model: MODEL,
     contents: [
       { role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType: photo.mimeType || 'image/jpeg', data: photo.base64 } }] },

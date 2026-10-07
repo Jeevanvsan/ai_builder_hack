@@ -44,9 +44,11 @@ export async function runPostSessionPasses(db: Firestore, incidentId: string, tr
         const address = incident?.location.confirmed?.address ?? null
 
         // Retry once: a transient blip or rate limit shouldn't permanently lose the case summary.
-        const withRetry = <T,>(fn: () => Promise<T>) => fn().catch(() => fn())
+        // Retry only a transient failure (network, overload, rate limit): retrying a bad or unparseable answer just
+        // pays for the same request twice.
+          const withRetry = <T,>(fn: () => Promise<T>) => fn().catch((e) => (/fetch|network|503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded/i.test(String(e)) ? fn() : Promise.reject(e)))
         try {
-          const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address))
+          const consolidation = await withRetry(() => consolidateCall(transcript, fields, stressTrend, address, { scene: incident?.sceneObservations, plate: incident?.vehicle?.number ?? null }))
           await Promise.all([
             consolidateIncident(db, incidentId, consolidation),
             recordLeakageCheck(db, incidentId, consolidation.redactions),

@@ -44,7 +44,7 @@ export default function AnalyticsPage() {
   // computeIncidentAnalytics([]) when incidents haven't loaded yet keeps this hook call unconditional (required
   // by the rules of hooks) — the auto-refresh effect inside only acts once real data + a live doc read confirm
   // staleness, so an empty placeholder here never triggers a spurious Gemini call.
-  const insights = useAutoInsights(loading ? EMPTY_ANALYTICS : computeIncidentAnalytics(incidents), responderLabel(user, responder))
+  const insights = useAutoInsights(loading ? EMPTY_ANALYTICS : computeIncidentAnalytics(incidents), responderLabel(user, responder), !loading)
 
   if (loading || error) return <DataState loading={loading} error={error} />
 

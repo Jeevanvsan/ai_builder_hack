@@ -1,9 +1,10 @@
+import { AI_MODELS } from '../../../../shared/aiModels.ts'
 import { collection, getDocs, limit, orderBy, query, type Firestore } from 'firebase/firestore'
 import { geminiConfigured, generateText } from './aiLogic.ts'
 import { INCIDENTS } from '../../../../shared/incidents/client.ts'
 import type { Incident } from '../../../../shared/incidents/types.ts'
 
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.caseLinking // shared/aiModels.ts
 
 // Epic 19.1: checks whether this incident's confirmed address, any vehicle description, or any name mentioned
 // matches another open or recent incident already in Firestore. Stays entirely inside data we already
@@ -55,6 +56,7 @@ Return matchIds: the incident IDs from OTHER that appear to genuinely match, or 
   try {
     const response = await generateText({
       model: MODEL,
+      task: 'caseLinking',
       contents: prompt,
       config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
     })

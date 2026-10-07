@@ -1,13 +1,14 @@
+import { AI_MODELS } from '../../../shared/aiModels.ts'
+import { geminiFetch, geminiKeys } from './geminiKeys'
 import type { IncidentAnalytics } from './analytics'
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
 // Lite tier: this call is a short summarization task (a dozen aggregated numbers -> a few sentences), well
 // within what the lightest model handles, and keeps free-tier quota usage minimal for a once-a-day auto-refresh.
 // gemini-2.5-flash-lite was retired for new API keys; 3.5-flash-lite is its direct successor.
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.insights // shared/aiModels.ts
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
-export const aiInsightsAvailable = Boolean(API_KEY)
+export const aiInsightsAvailable = geminiKeys.configured
 
 export type Insights = {
   immediateActions: string[]
@@ -61,9 +62,9 @@ function buildPrompt(a: IncidentAnalytics): string {
 }
 
 export async function generateInsights(a: IncidentAnalytics): Promise<Insights> {
-  if (!API_KEY) throw new Error('Gemini API key not configured')
+  if (!geminiKeys.configured) throw new Error('Gemini API key not configured')
 
-  const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
+  const res = await geminiFetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

@@ -20,7 +20,7 @@ export function knownFactsNote(i: Live): string {
 
   const address = i.location.confirmed?.address
   if (address) known.push(`location = ${address}`)
-  else needed.push(isCallerMoving(i) ? 'where they are right now (a landmark) and which way they are heading' : 'exact location (building, floor, flat or landmark)')
+  else needed.push(isCallerMoving(i) ? 'where they are right now (a landmark) and which way they are heading' : 'the delivery address (house name or number, area, town) — ask it next')
 
   if (tags.length) known.push(`situation = ${tags.slice(-6).join('; ')}`)
   else needed.push('what is happening')
@@ -29,6 +29,14 @@ export function knownFactsNote(i: Live): string {
   if (i.extractedFieldsLive.peopleCount != null) known.push(`people = ${i.extractedFieldsLive.peopleCount}`)
   if (i.extractedFieldsLive.urgency) known.push(`urgency = ${i.extractedFieldsLive.urgency}`)
   if (i.vehicle) known.push(`vehicle plate = ${i.vehicle.number}`)
+
+  // A vehicle Mia already saw on camera: say so plainly, or she still asks the caller to describe it (INC-MUWL4J6Q).
+  const car = [...(i.sceneObservations ?? [])].reverse().find((o) => o.source === 'camera' && (o.category === 'vehicle' || o.vehicle))
+  if (car) {
+    const v = car.vehicle ?? {}
+    const desc = [v.colour, v.type].filter(Boolean).join(' ') || car.detail || car.kind
+    known.push(`attacker's vehicle already identified on camera = ${desc}${v.plate ?? i.vehicle?.number ? `, plate ${v.plate ?? i.vehicle?.number}` : ''} (do NOT ask the caller to describe it)`)
+  }
 
   const seen = (i.sceneObservations ?? []).slice(-4).map((o) => `${o.source === 'camera' ? 'seen' : 'heard'}: ${o.detail || o.kind}`)
   if (seen.length) known.push(seen.join('; '))

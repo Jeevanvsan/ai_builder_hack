@@ -125,7 +125,7 @@ export default function HistoryPage() {
                   <tr key={i.id} className={`row-${i.severity}`} onClick={() => navigate(`/incident/${i.id}`)}>
                     <td className="mono"><Link to={`/incident/${i.id}`}>{i.id}</Link></td>
                     <td><Chip tone={i.severity} filled>{i.severity}</Chip></td>
-                    <td className="nowrap">{channelLabel(i.channel)}</td>
+                    <td className="nowrap">{channelLabel(i.channel)}{i.isDemo && <span className="demo-badge">DEMO</span>}</td>
                     <td className="mono">{i.response.resolvedAt ? formatTime(i.response.resolvedAt) : '—'}</td>
                     <td className="mono">{i.response.resolvedAt ? formatElapsed(i.sessionStartedAt, Date.parse(i.response.resolvedAt)) : '—'}</td>
                     <td className="nowrap">{i.response.acknowledgedBy ?? '—'}</td>

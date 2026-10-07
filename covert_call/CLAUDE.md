@@ -2,7 +2,8 @@
 
 This folder is the active build workspace for **QuickBite**, the current near-term focus of the AI_Builders_26 hackathon project (see the repo-root `CLAUDE.md` for full project context, hackathon rules, and the eventual-goal full-platform plan).
 
-## Team status (mandatory, see repo-root `CLAUDE.md`)
+## Team status & details (mandatory, see repo-root `CLAUDE.md`)
+**Team Name:** NexMind
 Always read `../status/person_b_jeevan.md` and `../status/person_a_ameen.md` before starting work. After finishing, update only Jeevan's file (with IST date and time). Never edit Ameen's file: he maintains it himself.
 
 ## The authoritative plan
@@ -52,4 +53,5 @@ Image/text attachment on the silent tap-only mode + single-hop Bluetooth mesh re
 Full detail, rationale, and the complete 4-week schedule: `docs/quickbite_plan.md`.
 
 ## Working conventions
+- **NEVER update or edit `../deck/Submission Template _ AI Builder Cup.pptx` (MANDATORY).** It is strictly a read-only reference template for formatting, titles, and layout. All presentation work must be done in `../deck/QuickBite_Submission_Deck_NexMind.pptx`.
 - No native browser dialogs (`window.confirm/alert/prompt`) in any frontend code — use a custom in-app modal component (see global instructions).

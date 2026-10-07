@@ -1,5 +1,9 @@
-import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore'
+import { AI_MODELS } from '../../../shared/aiModels.ts'
+import { geminiFetch, geminiKeys } from './geminiKeys'
+import { AI_USAGE_FIELDS, usageFromMetadata, type AiTaskUsage } from '../../../shared/aiModels.ts'
+import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc, where, increment } from 'firebase/firestore'
 import { INCIDENTS } from '../../../shared/incidents/client.ts'
+import { incidentDoc } from './incidentsStore'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { db } from './firebase'
 
@@ -9,10 +13,10 @@ import { db } from './firebase'
 // it only helps a responder prioritise and never closes, hides or downgrades a case. Missing a real emergency is
 // far worse than answering a prank.
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-const MODEL = 'gemini-3.5-flash'
+// Flash-Lite: a short structured judgement doesn't need full Flash (≈5x cheaper, and its own, larger quota).
+const MODEL = AI_MODELS.credibility // shared/aiModels.ts
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
-export const credibilityAvailable = Boolean(API_KEY)
+export const credibilityAvailable = geminiKeys.configured
 
 export type Credibility = NonNullable<Incident['credibility']>
 
@@ -60,7 +64,7 @@ function evidence(i: Incident, h: CallerHistory | null): string {
   const conf = i.location.confirmed
   const gap = rough && conf?.lat != null && conf.lng != null ? km(rough, { lat: conf.lat, lng: conf.lng }) : null
   const minutes = i.sessionEndedAt ? (Date.parse(i.sessionEndedAt) - Date.parse(i.sessionStartedAt)) / 60000 : null
-  const lines = (i.transcriptLines ?? []).slice(-40).map((l) => `${l.speaker}: ${l.text}`).join('\n')
+  const lines = (i.transcriptLines ?? []).slice(-20).map((l) => `${l.speaker}: ${l.text}`).join('\n')
   return [
     `channel=${i.channel}${i.incidentType === 'sos' ? ' (silent SOS)' : ''}; call_minutes=${minutes?.toFixed(1) ?? 'unknown'}`,
     `danger_tags=${f.dangerIndicators.join(' | ') || 'none'}; urgency=${f.urgency ?? 'none'}; people=${f.peopleCount ?? 'unknown'}`,
@@ -97,8 +101,9 @@ const SCHEMA = {
 }
 
 export async function assessCredibility(incident: Incident, history: CallerHistory | null): Promise<Credibility> {
-  if (!API_KEY) throw new Error('Gemini is not configured')
-  const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
+  if (!geminiKeys.configured) throw new Error('Gemini is not configured')
+  const t0 = Date.now()
+  const res = await geminiFetch(ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -108,17 +113,26 @@ export async function assessCredibility(incident: Incident, history: CallerHisto
   })
   if (!res.ok) throw new Error(`Gemini request failed (${res.status})`)
   const data = await res.json()
+  // Per-incident AI usage (staging /ai-usage page).
+  void recordIncidentAiUsage(incident.id, 'credibility', { model: MODEL, requests: 1, ms: Date.now() - t0, ...usageFromMetadata(data.usageMetadata) })
   const parsed = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}') as Partial<Credibility>
   const score = Math.max(0, Math.min(100, Math.round(Number(parsed.score ?? 60))))
   const level = parsed.level && ['likely-genuine', 'uncertain', 'possible-false'].includes(parsed.level) ? parsed.level : 'uncertain'
   return { score, level, reasons: (parsed.reasons ?? []).slice(0, 4).map((r) => String(r).slice(0, 160)), at: new Date().toISOString() }
 }
 
-export const saveCredibility = (id: string, c: Credibility) => updateDoc(doc(db, INCIDENTS, id), { credibility: c })
+export const saveCredibility = (id: string, c: Credibility) => updateDoc(incidentDoc(id), { credibility: c })
+
+// Same shape as shared/incidents/client.ts recordAiUsage, but on whichever collection the incident is in (demo or real).
+function recordIncidentAiUsage(id: string, task: string, delta: Partial<AiTaskUsage> & { model: string }) {
+  const patch: Record<string, unknown> = { [`aiUsage.${task}.model`]: delta.model }
+  for (const f of AI_USAGE_FIELDS) if (delta[f]) patch[`aiUsage.${task}.${f}`] = increment(delta[f] as number)
+  return updateDoc(incidentDoc(id), patch).catch(() => {})
+}
 // Saves the responder's finding, then recounts this device's false/prank calls into flaggedDevices/{uid}, which
 // the alert system reads to keep later calls from that device quiet (no siren) and labelled.
 export async function saveOutcome(incident: Incident, outcome: Incident['response']['outcome']): Promise<void> {
-  await updateDoc(doc(db, INCIDENTS, incident.id), { 'response.outcome': outcome ?? null })
+  await updateDoc(incidentDoc(incident.id), { 'response.outcome': outcome ?? null })
   if (!incident.callerUid) return
   const snap = await getDocs(query(collection(db, INCIDENTS), where('callerUid', '==', incident.callerUid)))
   const falseCount = snap.docs.filter((d) => ['false-alarm', 'prank'].includes(d.data().response?.outcome)).length

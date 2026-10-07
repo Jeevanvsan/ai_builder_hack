@@ -92,3 +92,14 @@ With no URL set, the app simply skips the alert. Calls are never affected.
 ## 3. Test it
 Add your own email under **My account → Share live order updates**, place a call, and report a high-severity
 code (e.g. "extra pepperoni"). The email should arrive within a minute.
+
+## 4. Case report email (after a danger call)
+In a danger call, Mia asks for an email before the call ends ("I'll send you the full case report with a reference
+number you can show the police") and saves it on the incident (`reportEmail`). When the call ends and the summary
+is written, the app posts `{ type: 'case_report', incidentId }` to the same script URL. The script reads the address
+**from the incident**, never from the request, so the public URL can't be used to mail anyone else. One report per
+incident.
+
+To turn it on, replace **all** of `Code.gs` with [trusted-alert-Code.gs](trusted-alert-Code.gs) (it contains both the
+trusted-contact alert above and the case report), save, then **Deploy → Manage deployments → edit (pencil) →
+Version: New version → Deploy**. The URL stays the same.

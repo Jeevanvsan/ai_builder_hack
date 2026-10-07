@@ -16,6 +16,7 @@ export default function LiveAudioListen({ incident }: { incident: Incident }) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const [unmuted, setUnmuted] = useState(false)
   const [levels, setLevels] = useState<number[]>(() => Array(BAR_COUNT).fill(0))
+  const voiceRef = useRef(0) // strongest voice-band level above the background, this frame
   const rafRef = useRef<number>(0)
 
   useEffect(() => {
@@ -37,6 +38,14 @@ export default function LiveAudioListen({ incident }: { incident: Incident }) {
     analyser.smoothingTimeConstant = 0.6
     source.connect(analyser)
     const data = new Uint8Array(analyser.frequencyBinCount)
+    // The caller's app keeps noise suppression off (background sound is evidence), so a fan or traffic is always
+    // in the feed and used to read as "caller speaking". Each bar now shows only what rises above that bar's own
+    // learned background level (the floor follows quiet stretches down fast and creeps up slowly), and "speaking"
+    // needs clear energy in the voice band, not just low-frequency hum.
+    const floor = new Float32Array(BAR_COUNT).fill(255)
+    const binHz = ctx.sampleRate / analyser.fftSize
+    const voiceLo = Math.floor(300 / binHz)
+    const voiceHi = Math.ceil(3400 / binHz)
 
     const tick = () => {
       analyser.getByteFrequencyData(data)
@@ -45,8 +54,12 @@ export default function LiveAudioListen({ incident }: { incident: Incident }) {
       for (let i = 0; i < BAR_COUNT; i++) {
         const slice = data.slice(i * step, i * step + step)
         const avg = slice.reduce((s, v) => s + v, 0) / (slice.length || 1)
-        next.push(Math.min(1, avg / 130))
+        floor[i] = avg < floor[i] ? avg : floor[i] + 0.05 // drop to quiet at once, rise slowly
+        next.push(Math.min(1, Math.max(0, avg - floor[i] - 8) / 90))
       }
+      let voice = 0
+      for (let b = voiceLo; b <= voiceHi && b < data.length; b++) voice = Math.max(voice, next[Math.min(BAR_COUNT - 1, Math.floor(b / step))])
+      voiceRef.current = voice
       setLevels(next)
       rafRef.current = requestAnimationFrame(tick)
     }
@@ -60,7 +73,7 @@ export default function LiveAudioListen({ incident }: { incident: Incident }) {
     }
   }, [stream, state])
 
-  const speaking = levels.some((l) => l > 0.15)
+  const speaking = voiceRef.current > 0.25
 
   return (
     <div className="audio-listen">

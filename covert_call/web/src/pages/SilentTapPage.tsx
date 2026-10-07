@@ -1,3 +1,4 @@
+import { setUsageIncident } from '../lib/gemini/aiLogic'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/disguise/PageHeader'
@@ -90,6 +91,7 @@ export function SilentTapPage() {
   useEffect(() => {
     void startIncident(db, { channel: 'silent-tap' }).then(({ id }) => {
       incidentIdRef.current = id
+      setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
       setReady(true)
     })
   }, [])

@@ -51,9 +51,13 @@ function read(i: Incident) {
   // Where this is happening, only from what was said: a room when the caller is inside, a road only with outdoor
   // signs (a road or street named, being chased, moving on GPS, a suspect in a vehicle), otherwise left blank.
   const inVehicle = hasVehicle && /attacker|subject|suspect|driving|in a|on a|rider|car follow|bike follow/i.test(vehicleText)
-  const moving = track.length >= 2
+  // Moving only when the GPS really covered ground (80 m+) or reports walking speed: a phone lying still at home
+  // sends several jittery fixes, and "two fixes" drew a caller at home on a road (INC-MUXNKEBP).
+  const first = track[0]
+  const metres = first && last ? Math.hypot((last.lat - first.lat) * 111_320, (last.lng - first.lng) * 111_320 * Math.cos((first.lat * Math.PI) / 180)) : 0
+  const moving = track.length >= 2 && (metres >= 80 || (last?.speed ?? 0) >= 1.5)
   const indoorText = `${text} | ${i.location.confirmed?.address ?? ''}`
-  const indoor = /\b(home|house|room|bedroom|kitchen|bathroom|toilet|flat|apartment|inside|indoors|office|hostel|hotel|locked in|door)\b/i.test(indoorText)
+  const indoor = /\b(home|house|room|bedroom|kitchen|bathroom|toilet|flat|apartment|inside|indoors|office|hostel|hotel|locked in|door|niwas|nivas|bhavan|bhavanam|veedu|villa)\b/i.test(indoorText)
   const outdoor = /\b(road|street|outside|outdoors|bus stop|junction|highway|lane|park|market|parking|footpath)\b/i.test(text)
     || has(/follow|chas|pursu|tailing/i) || moving || inVehicle
   const setting: 'indoor' | 'outdoor' | 'unknown' = indoor && !moving && !inVehicle ? 'indoor' : outdoor ? 'outdoor' : indoor ? 'indoor' : 'unknown'

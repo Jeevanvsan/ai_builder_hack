@@ -1,7 +1,7 @@
 # Status — Person B: Jeevan
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
-**Last updated:** 2026-09-29 05:00 IST — Landing page built and deployed (see bottom section). Earlier: Two pieces of work this session:
+**Last updated:** 2026-10-06 13:30 IST — Deck preparation: Team Name confirmed as "NexMind". Preserved `deck/Submission Template _ AI Builder Cup.pptx` strictly as a permanent, read-only formatting reference template (rule locked in root and covert_call CLAUDE.md). Active pitch deck maintained in `deck/QuickBite_Submission_Deck_NexMind.pptx`. Earlier (2026-09-29 05:00 IST): Landing page built and deployed (see bottom section). Two pieces of work that session:
 1. Branch `ep-5-dashboard-auth` (Jeevan's own scope): Firebase Auth sign-in, a Responder Management page, a full incident Analytics page + Responder Performance page (ECharts), and a Gemini-powered AI Insights tab, auto-refreshed daily. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone.
 2. **Branch `epic-1-2-3-gemini-live` (Ameen's Epic 1/2 scope, picked up on his behalf since he's currently busy and asked for it to be continued)** — see the dedicated section below. Committed locally (`c5ed12a`), not yet pushed/PR'd, pending Ameen's go-ahead since this is normally his ownership area.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
@@ -494,3 +494,239 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
 **Update 2026-09-29 (IST):** Opened PR #13 (`feature/nl-incident-search` → `main`) for the queue/history sort and 4 call/routing fixes that missed PR #10. Merged `main` into it to resolve a status-file conflict.
 
 **Update 2026-09-29 (IST, ~12:55):** Pushed the local-only `extended-brainstorming` branch and opened PR #14 (docs: brainstorm + Phase 3 backlog Epics 15-19). Ameen is reviewer on both PR #13 and PR #14, and both are mergeable.
+
+## 2026-10-05 (IST, ~18:50) — AI test harness, dashboard fixes, LLM cost cuts (branch `eval/merged-15-scenarios`, not committed yet)
+
+**AI test harness (`covert_call/eval/`)**
+- 16 merged scenarios, each covering several features: covert, open, chase (fake GPS, real routing), domestic, house break-in, coercion, Malayalam/Manglish/Hinglish, camera (knife, plate), background sound (shout + gunshot), heart double-tap silent SOS. Media from Wikimedia (credits in `eval/media/CREDITS.md`).
+- Every call is a real incident in `demoIncidents`, runs the app's own post-call steps (summary, case linking), and is auto-resolved as a responder. Strict (keyword) and AI-judged results; latency, detection time and token metrics; Excel report (`npm run report`).
+- Cost: free-tier key first (`GEMINI_API_KEY_FREE`), paid key only as fallback; caller and judge on Gemma (free); Mia answers in text except 3 latency scenarios; max 8 turns; results saved after every call.
+- The eval key is a separate project from production now (it was the same key before and used production quota today).
+
+**Dashboard (deployed to production)**
+- Demo/test incidents show in Live queue and Case history with a DEMO tag; rules let signed-in responders act on them.
+- Conversation lines no longer freeze cut off (typing animation bug).
+- Map: an address that can't be placed now says so instead of loading forever.
+
+**Geocoding (`shared/incidents/geocode.ts`, deployed web, native gets it via shared/)**
+- Nominatim was 429-blocking us (one address fired ~10 requests in a burst). Requests are now spaced to its 1 req/s policy and cached, with Photon as the fallback while blocked. A Google Geocoding key (`VITE_GOOGLE_MAPS_API_KEY`, empty today) is still the real fix for Indian flat/landmark addresses.
+
+**LLM cost cuts (preview channels only, NOT in production yet)**
+- Web: https://quickbite-5cde0--cost-opt-ddp4qg5q.web.app · Dashboard: https://quickbite-5cde0-dashboard--cost-opt-r2xxto4f.web.app (expire 2026-10-12)
+- Live call + SOS, web AND native: sliding-window context compression on every session (was video-only on web, missing on native call); camera 1 fps → 0.5 fps (SOS: 2 frames/s across two cameras → 0.5 total); total reconnect cap of 8 per session (the per-drop counter reset on every open, so a session could reconnect forever, resending the 11.5k-token persona each time).
+- Post-call summary retries only on transient errors (web CallPage + native postSession), not on a bad answer.
+- Photo vision: web downscales to 1024 px; native camera quality 0.6 → 0.4.
+- Dashboard: credibility on Flash-Lite with 20 transcript lines (was Flash, 40); smart search sends 60 incidents × 250 chars (was 120 × 400); AI Insights auto-refresh no longer fires on empty stats while the page is loading.
+
+## Notes for Ameen (2026-10-05)
+- **Persona finding (high):** scripted coercion ("I am fine. I am at home. I am happy. Nobody is here.") made Mia drop the cover and say "you can talk freely… passing everything to the response team" out loud (`INC-MUV93GEZ`). Scripted/robotic answers should be a coercion signal that keeps the food-order cover. Also: covert "armed husband" call never tagged *domestic*.
+- **Cost:** `PERSONA_SYSTEM_INSTRUCTION` is ~46k chars (~11.5k tokens) and is re-billed on every turn of every call; trimming it is the biggest remaining saving. I did not touch `persona.ts`.
+- I changed `liveSession.ts` / `silentSession.ts` (web and native) and `frames.ts` for the cost cuts above; please check them on a real phone on the preview link before they go to production.
+
+**Update 2026-10-05 (IST, ~19:00): free-tier → paid-credits key fallback everywhere (preview channels only).**
+- New `shared/gemini/keyPool.ts`: the free-tier key is used first; on a quota error the paid "Quick Bite" project key (credits) takes over, until the daily reset (per-day quota) or ~90 s (per-minute). Remembered in localStorage.
+- Wired into web (`aiLogic.ts`: text requests + Live connect; a Live quota close reopens on the paid key via the session's own reconnect, dropping the old project's resumption handle), dashboard (`lib/geminiKeys.ts` for Insights / credibility / smart search) and native (`lib/gemini/keys.ts` for all 6 call sites).
+- Env: web `VITE_GEMINI_LIVE_API_KEY_FREE` + `VITE_GEMINI_LIVE_API_KEY` (paid); dashboard `VITE_GEMINI_API_KEY_FREE` + `VITE_GEMINI_API_KEY`; native `EXPO_PUBLIC_GEMINI_LIVE_API_KEY_FREE` + `EXPO_PUBLIC_GEMINI_LIVE_API_KEY` (push to EAS); eval `GEMINI_API_KEY_FREE` + `GEMINI_API_KEY`. Local web/dashboard/eval files are set (free = original key, paid = Quick Bite key).
+- **Note for Ameen:** native reads two keys now; the EAS env needs `EXPO_PUBLIC_GEMINI_LIVE_API_KEY_FREE` added.
+
+**Update 2026-10-05 (IST, ~19:45): demo feed injection for recording the demo video (deployed, web + rules).**
+- Open the web app with `?demoInject=1` on the phone, make a real call, then from the laptop: `npm run demo -- latest --video knife` / `--sound gunshot` / `--video off` (in `covert_call/eval`). The phone swaps its camera picture / mixes the sound into its mic at the source, so Mia, the dashboard live video, listen-in and recordings all get it. Off for every normal call (flag-gated).
+- Files: `web/src/lib/demoInject.ts` (hooked in `lib/gemini/media.ts`, `CallPage.tsx`, `SosPage.tsx`), clips in `web/public/demo/` (+ CREDITS.md), script `eval/demo.ts`, rule `demoControl/{id}` (responders write). Web only; nothing to port to native (demo-recording tool).
+
+**Update 2026-10-05 (IST, ~20:15): demo feed — no special link on the phone + staging control page.**
+- Every web call is now injectable (camera/mic go through `demoInject.ts` passthrough at the real camera's resolution, ≤1280 px / ≤24 fps); nothing changes until a signed-in responder sends a command. `?demoInject=0` opts a device out.
+- Control page (staging build only, not in the production bundle): https://quickbite-5cde0-staging.web.app/demo-control. Responder sign-in (separate Firebase app instance), live calls list, pick a video (streams until changed), sounds (once/loop). Clip list from `web/public/demo/manifest.json` (written by `npm run demo -- add …`).
+- Removed 4 downloaded clips that were iStock/Getty watermarked previews (unlicensed); kept `alone-street` (source still to be credited).
+
+**Update 2026-10-05 (IST, ~20:45): Mia never actually saw the camera on phones (fixed, deployed web + staging).**
+- `web/src/lib/gemini/frames.ts` read the camera through an off-page `<video>`; phone browsers don't render frames into it, so `readyState` stayed < 2 and NO frames were ever sent to Gemini (calls and the silent SOS). Its timer also only started if the first `play()` succeeded. Now the sampler video is kept in the page invisibly, the timer always runs, and the console logs "camera frames are reaching Gemini" on the first frame.
+- Same fix in `demoInject.ts` for the clip players (clip showed as a still image). Native uses its own frame module, not affected.
+- **Ameen:** this explains any "Mia didn't react to the camera" results on phones before today.
+
+**Update 2026-10-05 (IST, ~21:00): persona — open mode kept using covert lines (deployed web + staging).**
+- After "I can talk freely" Mia still asked "Where should the rider meet you?" and the coded weapon question "Small, medium, or large size?" (`INC-MUVD1YKL`), because the step scripts are written in covert wording. Added an "OPEN MODE OVERRIDES EVERY SCRIPTED LINE" block right after TWO MODES in `persona.ts`: plain translations of the covert lines, no rider/order/size words in open mode, don't re-ask what was said plainly, a short "yes" isn't a reason to go covert. Native imports the same persona.
+- Also confirmed: with the frames fix Mia now reports the camera ("Seen: vehicle — yellow sports car").
+- **Ameen:** this is your file; please review the block (lines ~49-62). The persona is still ~47k chars; trimming it would save cost on every turn.
+
+**Update 2026-10-05 (IST, ~21:30): Live call token optimisation, round 2 (deployed web + staging; native code updated).**
+- Stress and caller-estimate nudges are now context-only (`turnComplete: false`): they ride along with Mia's next turn instead of each forcing a full re-read of the session (~15K tokens). Stress nudge 25 s → 45 s.
+- Persona: "make ALL the tool calls for a turn together, in one go" (each separate tool round re-processes the whole call).
+- Tried NON_BLOCKING tools + SILENT responses (would remove the re-read after report_* calls); reverted, could not confirm Mia keeps talking after a mixed blocking/non-blocking turn. `toolResponse()` in tools.ts is kept so it's a one-line switch to retest.
+- Eval caller/judge back on Flash-Lite first (Gemma took ~165 s per line).
+
+**Update 2026-10-05 (IST, ~22:30): per-task model mapping + paused AI calls + non-blocking tools (deployed web, staging, dashboard).**
+- `shared/aiModels.ts` (+ `covert_call/docs/ai_models.md` table): Live = gemini-3.8-live; case summary = 3.5 Flash-Lite; photo vision, smart search, case linking, credibility, insights = 3.1 Flash-Lite (cheaper); eval caller 3.1 Flash-Lite, judge Gemma. 2.5 Flash-Lite isn't available to new projects.
+- `shared/aiFeatures.ts` (+ `docs/future_features.md`): paused grounded weather/road context, caller age/gender nudge, auto credibility, auto AI Insights (buttons still work).
+- `nonBlockingTools: true`: report_* tools answered silently. A/B on 4 tool-heavy scenarios: 24/25 checks both ways, same turns, p95 reply 2.0 s vs 2.3 s.
+- **Ameen:** model names are no longer hard-coded in consolidate/correlate/photoVision/liveSession (web + native); change them in `shared/aiModels.ts`.
+
+**Update 2026-10-05 (IST, ~23:00): per-call AI usage + cost page (deployed rules, web, staging, dashboard).**
+- Every incident now records `aiUsage.<task>` (requests, tokens in by text/audio/camera, out by text/voice, model, key tier, time) via Firestore increments: live call + SOS observer (web liveSession/silentSession, every 10 s + at end), case summary / case linking / photo vision / weather (web `generateText` with a `task`), credibility (dashboard). Prices + cost estimate in `shared/aiModels.ts`.
+- Staging page: https://quickbite-5cde0-staging.web.app/ai-usage (staging only): totals, cost by task, tokens by kind, every call with a per-task breakdown.
+- First real reading (test call INC-MUVG5IRX, 3 turns): live call 69.2K text-in tokens over 5 inferences (~13.8K each = mostly the persona), 2.5K audio in, 0.6K voice out; summary 0.8K, case linking 1.1K. The live call is ~97% of the cost, and the persona is most of that.
+- Not yet in native (native liveSession/silentSession don't record aiUsage) — **Ameen**, same `recordAiUsage` call when you're next in there.
+
+**Update 2026-10-05 (IST, ~23:45): two Live-call fixes (deployed web, staging, dashboard; native code updated).**
+- Non-blocking report tools switched OFF again: passed the text A/B but on a real voice call Mia went silent ~40 s and then spoke her own reasoning aloud (INC-MUVGI8K0). Lesson: Live-call changes need a real voice test, the text harness doesn't catch this.
+- Chase silence (INC-MUVGTRJY): `get_route_guidance` is blocking and routing hung (free OSM/Overpass rate-limited), so Mia couldn't speak and the silence watchdog fired. Now answered within 4 s with "keep moving to a busy lit place, get a landmark"; the real route follows as a system note Mia relays. Web + native.
+
+**Update 2026-10-06 (IST, ~00:30): call fixes + AI-classified camera evidence (deployed web, staging, dashboard; native code updated).**
+- Mia stopped answering after the first caller turn: the stress nudge had been made context-only (turnComplete false), and it was the only thing closing the turn left open by the known-facts note. Reverted to a normal message every 25 s (web + native), with a comment explaining why.
+- Persona: camera sightings are reported even when the caller already said it (visual confirmation is separate evidence).
+- `report_scene_observation` now carries the AI's own `category` (vehicle/person/weapon/injury/fire_hazard/location_clue/sound_event/other) and vehicle `vehicleType`/`colour`/`plate`; stored on `sceneObservations[]`. The board's Vehicle card and danger logic use the AI category (keyword match only as a fallback for older data), and also show the plate record. Case summary/bulletin now receives camera/sound observations + plate (web call + SOS, native, eval).
+- Dashboard listen-in: "caller speaking" now needs voice-band energy above a learned background level (fan noise no longer counts). Caller mute now also silences listen-in and the recording.
+
+**Update 2026-10-05 (IST, ~22:45): vehicle evidence everywhere + open-mode tracking (deployed web, staging, dashboard; native code updated).**
+- Mia now reports vehicle colour/type/plate in the new structured fields (detail often empty), so the Seen & heard card and the case summary only showed "vehicle". Both now build their text from the AI's fields ("Seen: yellow sports car, plate CRZJ 708"); the Vehicle card already did (reload stale tabs).
+- Open mode is tracked by the app from the caller's words ("I can talk/speak freely", "talk", "I'm alone"; back to covert on "can't talk", "someone is coming", "he's here") and put at the front of every known-facts note: "MODE: OPEN — plain questions only, no food words". Web + native `liveSession.ts`. Mia had slipped back into "extra pepperoni" (INC-MUVHJ6EC).
+
+**Update 2026-10-05 (IST, ~23:30): Live call root-cause fix (STAGING only so far; native code updated).**
+Docs research (ai.google.dev live-tools / live-guide / api/live / models/gemini-3.8-live) changed the picture:
+- gemini-3.8-live runs ALL tools async (NON_BLOCKING) by default; an async tool's response defaults to WHEN_IDLE = start a new reply. A report tool on most turns → 20+ extra replies per call, duplicate/cut-off sentences, Mia voicing her reasoning.
+- `turnComplete: true` unconditionally interrupts the model (the 25 s stress nudge cut Mia off); `turnComplete: false` notes left the turn open, and replies came only at the next nudge (20-25 s gaps, seen since 19:13).
+Fix (web + native call/SOS, eval mirrors it): no turnComplete=false messages left; known facts, open-mode reminder, stress/estimate requests and motion notes ride on tool responses; tool responses per batch: at most ONE WHEN_IDLE (the tool Mia must act on, or the last one if she hasn't spoken since the caller), the rest SILENT (`batchResponses` in tools.ts); route guidance answered when ready (WHEN_IDLE), budget hack removed; `mediaResolution: LOW` (~70 tokens/frame); compression trigger 48K → 28K (default was ~105K, never ran); `<no speech detected>` stripped on save; AI-Logic path passes `scheduling` through.
+Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences for 4 turns (was ~22 per 3-min call). Pending: one real voice call on staging, then production.
+
+**Update 2026-10-06 (IST, ~10:30): routing to safety fixed (staging web + dashboard).**
+- Cause: since ~2026-10 the public Overpass instance answers browser requests with 406 (no CORS header, so the console shows a CORS error), the mirrors time out, and Nominatim answers 403 → no nearby stations → no route; Mia improvised ("keep driving to the beach").
+- Fix (`shared/nav/nearbyServices.ts`, so web, native and dashboard): Photon (komoot OSM search, CORS-friendly) is the primary live source — police/fire/hospital by OSM tag inside a ~5 km box, nearest landmark via reverse, caller-named landmarks inside ~3 km; Overpass/Nominatim kept as fallbacks. Measured from here: nearby 1.5 s (Alappuzha South police 0.6 km, General Hospital 1.0 km, fire 1.6 km), landmark 0.7 s, named landmark 0.8 s, full route 0.7 s.
+- Same staging call also showed the turn fix working: replies mostly 1-3 s (was 20-25 s).
+
+### 2026-10-06 ~15:30 IST: live-call fixes from staging tests (INC-MUW73RZ6, INC-MUW7XJDA), web only
+- **Mia silent after "I'm being chased"**: the route answer now has a 6 s budget, with a holding line ("head somewhere busy and lit, tell me a landmark"); a late route is passed to Mia once she's quiet. A reply watchdog prompts her once if the caller has waited 6 s; it skips while a route is pending and restarts when a reply is already coming.
+- **Slow routing**: OSRM 5 s timeout; the route is prefetched as soon as the caller is reported moving; one shared in-flight request; the Firestore write is no longer awaited; turn landmarks are looked up together and capped at 1.5 s; Overpass is skipped when Photon answered.
+- **Plus-code names on the location card** ("LKJ8X8G QC R6*"): filtered out of landmark lookups.
+- **Map pin snapping back to the call-start GPS** after the caller gave an address: the confirmed address now keeps the pin until the track has moved 150 m (dashboard `livePosition.ts`).
+- **Mia's reasoning shown in the conversation** ("Constraint Checklist & Confidence Score…"): stripped from transcript lines. App notes no longer say "per your … rule" without also saying "say only the words meant for the caller". The persona's first section now says everything she outputs is spoken.
+- Deployed: web **staging** + dashboard. Production web is NOT yet updated; waiting for a real voice call on staging.
+- Thorough inspection workflow: ran out of session quota before the verify/fix stages. 37 unverified findings are listed in its output (eval harness drift, connect/setup hangs, OTP account reload, order-placed page); not acted on yet.
+- **Native: paused** on Jeevan's instruction ("focus on web only"). Native's `liveSession.ts` has the route-budget/watchdog change but not today's routing, transcript or persona-note fixes.
+
+### 2026-10-06 ~16:45 IST: staging call INC-MUWJYDV8 follow-up (web only)
+- **Pin in the wrong place**: "Convent Square Junction, Alleppey" found nothing (OpenStreetMap uses "Alappuzha"), so the loose fallback pinned another "convent" 1.2 km away. Old town names are now mapped to official ones (Alleppey, Cochin, Trivandrum, Calicut, Trichur, Quilon, Cannanore, Palghat, Bangalore, Bombay, Madras), and fallback phrases are searched near the caller (hits more than 25 km away are ignored). Now resolves to the real junction.
+- **Route not drawn on the map although Mia quoted it**: in Node the same tracker code computes and saves the route (Alappuzha South police, 547 m). The phone-side failure is not reproduced yet. A failed save now logs `[QuickBite call] safe route not saved` with the reason and retries once; each route is logged as `[QuickBite call] route:`.
+- **Voice sounding male mid-call**: the voice config ("Kore") is sent on every connect, reconnect and key switch, so this is model drift. The persona now says to keep the same female voice for the whole call. If it persists, try another female voice (Aoede/Leda).
+- Deployed web staging. Ameen: the persona's first section gained 2 lines (spoken output only, same voice).
+
+### 2026-10-06 ~17:10 IST: routing no longer depends on Mia calling the tool (INC-MUWKHLNF)
+- That call had no precise GPS (no track), "chased" was reported before the address was confirmed, and Mia never called `get_route_guidance`; she said "I'm guiding you to the police station" with no route. The pin was correct (Convent Square, after the town-name fix).
+- Now: once the caller is reported moving, the tracker computes the route as soon as any trusted position exists (precise GPS or the confirmed address), saves it for the dashboard, and hands Mia a "route to safety is ready" note. Navigation notes wait until she is quiet and no route call is open. Tested in Node with this call's sequence: route saved, note sent 5.7 s after the address was confirmed.
+- Deployed web staging.
+
+### 2026-10-06 ~17:40 IST: route still missing on INC-MUWKMTTG
+- Console showed no route lookup at all; Mia's "500 m ahead" was invented. The tracker itself works: tested in Node and in a real (headless Edge) browser with this call's sequence, the route is saved and Mia's note sent.
+- Added a second trigger: the call's own incident listener starts the route whenever the incident says the caller is moving, and re-tries on every update (for example when the address is confirmed). Each step now logs one line (`caller is on the move`, `route waiting for a position`, `working out the route from`, `route:`, `no route found`, `route lookup failed`).
+- Deployed web staging.
+
+### 2026-10-06 ~18:05 IST: routing confirmed working on staging (INC-MUWKW3B7); camera reminder; leftovers
+- Routing works end to end on a real call: route started by the moving trigger, saved (Alappuzha South police, 529 m), drawn on the map, relayed to Mia.
+- Camera: the yellow car was in every frame, but Mia never reported it this call. With the camera on and nothing reported for 20 s, the next tool response now asks her to check the latest frame and report it (rides on tool responses, no extra message).
+- Overpass removed from the browser path (always 406 from browsers; Node/eval only). It was hit when Photon reverse took 6.9 s. Guarded the empty-list case so the nearby-services lookup can't hang.
+- Dashboard: "Checking local conditions…" no longer shows while the local-conditions feature is paused.
+- Deployed web staging + dashboard.
+
+### 2026-10-06 ~18:25 IST: INC-MUWL4J6Q follow-up
+- Camera reporting works (yellow sports car, plate CRZJ-708, read on camera; route 262 m → 529 m once the address was confirmed). But Mia still asked the caller to describe the vehicle: the known-facts note now names the camera-identified vehicle (colour/type/plate) and says not to ask for it.
+- Voice stress: the first reading is requested ~5 s after the call starts and the caller has spoken (was 25 s), then every 25 s.
+- Deployed web staging.
+
+### 2026-10-06 ~19:00 IST: case report email, duplicate replies, Threat card (INC-MUWLCO49)
+- **Case report by email (new)**: in danger calls Mia asks once, before the end, for an email to send the case report to (covert mode: "email you the order receipt?"), reads it back, calls the new `send_case_report` tool. The address is saved as `incidents/{id}.reportEmail` (rules updated + deployed). After the summary is written, the app posts `{type:'case_report', incidentId}` to the trusted-alert Apps Script, which reads the address from the incident and emails reference number, summary, location + map, route destination, reported danger, and camera/sound evidence + plate. **Jeevan: paste the `caseReport` code from `covert_call/docs/setup/trusted-alert.md` §4 into the Apps Script and deploy a new version**; until then nothing is sent.
+- **Duplicate sentences** ("…Are you safe right now? Okay, I'm here with you… Are you safe right now?"): with async tools, a record-only tool batch was answered "reply" just before her audio started, so she said it twice. Such a batch is now answered 1.5 s later: silent if she has started speaking, a reply only if she is still quiet. The reply watchdog now measures 8 s from the model's last activity, not only from the caller's last words.
+- **Threat card** showed only "Urgency: high": chase/follow/ram tags now appear on the Threat card as well as the Vehicle card.
+- Ameen: persona gained a "CASE REPORT BY EMAIL" section; tools.ts gained `send_case_report`.
+- Deployed: Firestore rules, dashboard, web staging.
+
+### 2026-10-06 ~19:30 IST: case report email ask made deterministic (INC-MUWM64RK)
+- Apps Script with `caseReport` deployed by Jeevan; verified live (it refuses incidents with no `reportEmail`, and bad ids).
+- Mia didn't ask for the email: the call ended on "take care" after "I have reached the police station, the car is gone". Now, once danger was reported and the caller says they're safe (reached / safe now / car gone / at the station), the app prompts her once, when she's quiet, to ask for the email (skipped if she already mentioned email).
+- The `failed-precondition` 400 in the console is a voice-stress transaction conflict that the SDK retries (the score was written); harmless.
+- Deployed web staging.
+
+### 2026-10-06 ~20:15 IST: full case report email with PDF, scene sketch, camera snaps, dashboard status
+- Sent the moment the call ends (in parallel with the AI summary; the script waits up to ~25 s for it).
+- Contents (HTML email + PDF attachment): overview, summary, key points (bulletin), danger list, locations with map links/coordinates/movement trail, route with destination, distance, reason and every turn, people, vehicle (plate + camera descriptions), everything seen/heard, other signals, voice stress, recording links, AI reasoning, advice given, responder notes, full timestamped conversation.
+- Images: scene sketch (OSM map drawn in the caller's browser at call end: start point, address pin, movement trail, route, safe place) + up to 4 camera snaps saved when Mia reports a vehicle/person/weapon/injury/fire/plate. Stored in `incidents/{id}/snaps` (new rules, public read so the script can include them).
+- Status: app sets `reportEmailStatus` = sending; the script sets sent/failed. Shown on the dashboard Case file tab.
+- **Jeevan: paste the updated `covert_call/docs/setup/trusted-alert-Code.gs` over Code.gs again and deploy a new version.**
+- Deployed: rules, web staging, dashboard.
+
+### 2026-10-06 ~20:45 IST: case report email verified end to end (INC-MUWMRXPL)
+- Mia asked for the email after the caller was safe, read it back, and the report arrived with the sketch, the camera snap (yellow sports car) and the PDF.
+- Sketch fix: the laptop's start position (~40 km away) zoomed the map out to the whole district. Points more than 3 km from the address/route are now left off, with a note at the bottom; the sketch zooms to the incident (address pin, route, police station).
+- Deployed web staging.
+
+### 2026-10-06 ~21:10 IST: report includes the dashboard's Scene sketch
+- The case report now contains the dashboard's own Scene sketch (the same `SceneSketch` component, rendered in the caller's browser at call end, animations at their final state, with its fact list), followed by the OSM map (address, trail, route) and the camera snaps. Snap kinds: `sketch`, `map`, `camera` (rules updated + deployed).
+- **Jeevan: paste the updated `trusted-alert-Code.gs` and deploy a new version** (image order and captions).
+- Deployed: rules, web staging.
+
+### 2026-10-06 ~21:35 IST: INC-MUWN5ZK9: email ask primed earlier, clearer directions
+- Email still not asked: the backup prompt fired only after Mia's "take care", and the call ended first. Now, once danger is reported, the known-facts note tells her in advance to ask for the email in the same reply where the caller says they're safe. The safe statement also adds a note to her next tool response, and the backup prompt fires 0.6 s after she stops talking.
+- Directions: the first step now names the compass direction and the next road ("Head south on Fr. Monsignor Reynolds Purackal Road, towards CCSB Road") instead of "Head forward". The guidance tells her how to answer "left or right?" (compass + a visible road or landmark, never the same sentence again). The landmark lookup inside guidance is capped at 2.5 s (it once missed the 6 s budget).
+- Deployed web staging.
+
+### 2026-10-06 ~21:50 IST: wrong report email fixed
+- The transcript had "jeevanvsan@gmail.com" but Mia passed "jeevanvsn gmail com" to `send_case_report`. The tool now takes the address from the caller's last 3 transcript lines (spelled-out letters joined, "at"/"dot" converted); Mia's argument is only the fallback. She's told to read back exactly the saved address and to re-call the tool if corrected.
+- Deployed web staging.
+- (~22:05) Email is now saved only after the caller confirms: the first `send_case_report` keeps it pending and tells Mia to read it back and ask "Is that right?". It's saved when she calls again with `confirmed=true`, or when the caller answers yes right after her read-back. A correction restarts the check. Deployed web staging.
+
+### 2026-10-06 ~22:15 IST: production web deployed
+- `https://quickbite-5cde0.web.app` now has everything verified on staging today: reply guard + route budget, routing started from the moving state, Photon/geocode fixes, map pin, transcript leak cleanup, camera reminder, duplicate-reply fix, case report email (confirmed address, sent at call end with PDF, scene sketch, map, camera snaps). Production uses the free Gemini key first with the paid key as fallback; staging stays free-only. `/demo-control` and `/ai-usage` remain staging-only.
+
+### 2026-10-06 ~22:40 IST: Mia went silent after the email prompt (INC-MUWNW8I9), fixed on staging + production
+- After "I think I have reached the police station" the email prompt went out while a record-only tool batch was still unanswered (the 1.5 s deferral window). From then on Mia never replied (two watchdog nudges unanswered), and the dashboard flagged "caller silent after danger".
+- Now no app message to Mia (watchdog, navigation note, email prompt, silence/time-budget prompts, responder messages) goes out while any tool batch or route call is open. If she shows no activity 10 s after an app message, the session is closed and reopened with the resumption handle ("sorry, I lost you for a second").
+- Deployed web staging AND production (production had the same window).
+
+### 2026-10-06 ~23:00 IST: report email = the address the caller confirmed (INC-MUWO3P2Y)
+- The transcript misheard the email ("jeevanjeevanvsa@gmail.com"); Mia's last read-back was right ("J E E V A N V S A N at gmail dot com"); the caller said yes, but the transcript version was saved and emailed.
+- Now the saved address is the one parsed from Mia's latest read-back (what the caller actually confirmed); the transcript or her tool argument only supplies the first guess she reads back. Spelled-letter parsing fixed (it joined the "s" of "that's").
+- Deployed web staging + production.
+- (~23:20) INC-MUWOZNEF: Mia read the address back as "J, E, E, V, A, N, V, S, A, N at gmail dot com" (comma-separated), which parsed as "n@gmail.com". Comma-separated spelled letters are now joined, and an address with a 1-2 letter name is rejected as a misparse (falls back to the next source). Deployed staging + production.
+- (~23:35) Demo injection: the injected clip sometimes switched to the real camera mid-call. When Firestore's listen stream dropped and recovered, the demoControl listener got a cached/missing snapshot, read it as "no video" (real camera), then restarted the clip. Cached and missing snapshots are now ignored (Stop still works: it writes video:null). A buffering clip keeps its last frame instead of flashing black. Deployed staging + production.
+
+### 2026-10-06 ~23:55 IST: "no route found" (INC-MUWPBPUX)
+- Photon's free server answered in 5-6.5 s this evening; the 6 s timeout dropped the police list (dashboard showed hospitals only), and that partial answer was cached for 5 min, so every retry failed and Mia invented "police station about 2 km ahead".
+- Fixes: Photon timeout 10 s for nearby services (routing runs in the background; landmark lookups keep their 1.5-2.5 s caps); a partial answer is cached only 15 s; the last complete answer per area is kept in the browser and fills any kind a slow lookup misses (still fetched live first); if no police station is found the route goes to the nearest other help; failed route attempts retry every 15 s instead of on every update; with no route Mia is told not to name any destination, distance or turn.
+- Deployed web staging + production, dashboard.
+
+### 2026-10-07 10:05 IST: demo clips + preview on /demo-control
+- Added `person-in-shadow` clip and re-encoded `alone-street` from the team's Downloads copy (web/public/demo/video, manifest updated, CREDITS line added: source TBD).
+- /demo-control: new 👁 Preview button for videos and sounds (plays on the laptop only, works before a call is picked); Start/Stop stay disabled until a live call is selected. Deployed to staging.
+
+### 2026-10-07 10:30 IST: case report email = Mia's address
+- INC-MUXLVU0X sent to the wrong address (jeevanvesan instead of jeevanvsan): code parsing of read-backs/transcripts failed. Now the address Mia passes to send_case_report (full, corrected) is the one saved to `reportEmail` and emailed; only its format is checked. Deployed to staging.
+
+### 2026-10-07 11:00 IST: confirm personal details
+- Email: Mia's send_case_report argument is saved (standard name@domain.tld syntax required). Address: confirm_address now has confirmed=true and a read-back loop until the caller says yes. Persona: every personal detail (address, email, phone, name, caller-given plate) is read back with spelling and repeated until confirmed (skipped if hiding/mid-escape). Deployed to staging.
+
+### 2026-10-07 10:50 IST: address read-back + dark clip
+- INC-MUXMGXPK: Mia asked floor/flat after a house name and read the address back without spelling. Persona: a house name/number is a complete address (floor/flat only for flats), every house/street/place name is spelled letter by letter; confirm_address response says the same.
+- Camera: scene prompt and tool now say a dark silhouette/shadow counts as a person; person-in-shadow clip re-encoded brighter (still a blurry shadow; alone-street is detected reliably). Deployed to staging.
+
+### 2026-10-07 11:20 IST: backup camera check + pin kept
+- INC-MUXMUWBA: angry-man clip on camera, nothing reported (Mia busy with the order script). New backup: every 8 s the latest frame goes to gemini-3.1-flash-lite (`checkCameraFrame` in photoVision.ts); each new person/weapon/vehicle/injury/fire is recorded as a scene observation (+ snap) and Mia gets a note.
+- Address not pinned although geocoding "Jeevan Niwas, Vazhicherry, Alappuzha" works: the read-back loop saved it twice and a failed second lookup overwrote the pin. Now one lookup per distinct address, a failed one retried once after 3 s, and a re-save of the same address keeps its pin. Deployed to staging.
+
+### 2026-10-07 11:45 IST: shorter calls
+- INC-MUXMUWBA ran 4+ min. Persona TIME BUDGET rewritten: only essential questions (what, how many, where with one read-back, still there), extras only when relevant, never ask the same thing more than twice. Notes at 2:00 (wrap up, at most one more question) and 3:00 (goodbye + end_call); Mia ends the call herself, exception only for a caller chased/hiding right now. Also: caller's spelling is final in read-backs. Deployed to staging.
+
+### 2026-10-07 12:00 IST: address pin fallback
+- INC-MUXN9EK5: backup camera check works (man + smoke reported). Address "Jeevan Niwas, Vazhichery Market, Vazhichery, Alappuzha" still unpinned (one-r spelling unmatched, Nominatim throttled). confirmAddress now pins at the phone's GPS fix (source gps only, never the IP guess), marked uncertain, when geocoding fails. Deployed to staging.
+
+### 2026-10-07 12:15 IST: email confirm fix
+- INC-MUXN9EK5 emailed jeevanvsn (first guess): "Yes. No, no, no. It's wrong…" was taken as a yes, and Mia's corrected read-back never went to the tool. Now a line with no/wrong/@/at is never a yes, and a real yes no longer auto-saves: Mia is told (tool-response note + nudge after 2.5 s) to call send_case_report confirmed=true with exactly the address she just read back, which is what gets saved. Deployed to staging.
+
+### 2026-10-07 12:40 IST: address spelling cleanup + email yes guard
+- INC-MUXNKEBP: address saved as "Jeevan Niwas, J, E, E, V, A, N, N, I, V, A, S, Vazhicherry, V, A, Z…". confirm_address now strips letter-by-letter runs and applies them to the word they spell ("Jeevan Nivas, Vazhicherry, Alappuzha"); tool says normal words only.
+- Same call: Mia confirmed the email after "Can you repeat again?". send_case_report confirmed=true is now refused unless the caller's last line is a plain yes (no no/wrong/repeat/question); Mia is told to read it back again. Deployed to staging.
+
+### 2026-10-07 13:15 IST: Mia prompt rewrite + sketch movement
+- persona.ts rewritten (≈52 KB → 22 KB): numbered HARD RULES up front (same-breath meaning, covert = choices only, one question then wait, never re-ask, max 2 tries, tools silent/batched, never invent); one PRIORITY list; TIME BUDGET (no pin code/name/"anything else"/order read-back); CONFIRMING DETAILS (spell back, caller's letters final, correction ≠ yes, clean values to tools); route guidance merged into one section. Section names the code refers to kept (TIME BUDGET, RESPONDER MESSAGES, SILENCE, CAN THEY GET OUT). Old version saved in git history.
+- Scene sketch: "moving" now needs 80 m+ of GPS movement or walking speed (GPS jitter drew a caller at home on a road); Niwas/Nivas/Bhavan/Veedu/Villa count as indoors. Dashboard + web staging deployed.
+
+### 2026-10-07 12:20 IST (wall clock ~12:10): deterministic fixes over prompt-only ones
+- Pattern noted: fixes that only told Mia what to do kept failing intermittently (live model doesn't follow every rule); fixes enforced in code held. Moving remaining critical rules into code.
+- Address spelling: letter runs in Mia's latest read-back and the caller's last lines (caller wins) are applied to the saved address (edit distance ≤2, same first letter), both when confirm_address is called and when the caller says yes to a read-back. "Jeevan Niwas" + "N I V A S" → "Jeevan Nivas"; "Vazhichery" + "V A Z H I C H E R R Y" → "Vazhicherry".
+- Earlier today in code: email tool refuses until an address is saved; 2-min note demands the address/email; missed short answer re-ask; email read-back finished before the 3-min goodbye. Prod + staging deployed.

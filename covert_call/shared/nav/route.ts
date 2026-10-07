@@ -21,15 +21,21 @@ export type SafeRoute = {
 type OsrmStep = {
   distance: number
   name: string
-  maneuver: { type: string; modifier?: string; location: [number, number] }
+  maneuver: { type: string; modifier?: string; location: [number, number]; bearing_after?: number }
 }
 
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']
+const compass = (deg: number) => COMPASS[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
+
 // OSRM gives structured maneuvers; turn them into short spoken-style instructions.
-function instructionOf(s: OsrmStep): string {
+function instructionOf(s: OsrmStep, next?: OsrmStep): string {
   const road = s.name ? ` onto ${s.name}` : ''
   const mod = s.maneuver.modifier ?? ''
   switch (s.maneuver.type) {
-    case 'depart': return `Head ${mod || 'forward'}${s.name ? ` on ${s.name}` : ''}`
+    case 'depart': {
+      const dir = s.maneuver.bearing_after != null ? compass(s.maneuver.bearing_after) : mod || 'forward'
+      return `Head ${dir}${s.name ? ` on ${s.name}` : ''}${next?.name && next.name !== s.name ? `, towards ${next.name}` : ''}`
+    }
     case 'arrive': return 'Arrive at the destination'
     case 'roundabout':
     case 'rotary': return `At the roundabout, take the exit${road}`
@@ -46,14 +52,18 @@ function instructionOf(s: OsrmStep): string {
 
 export async function drivingRoute(from: LatLng, to: LatLng) {
   const url = `${OSRM}/${from.lng},${from.lat};${to.lng},${to.lat}?steps=true&geometries=geojson&overview=full`
+  // The public OSRM server normally answers in ~1 s; a stalled request must not hold up the caller's directions.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5_000)
   try {
-    const res = await fetch(url)
+    const res = await fetch(url, { signal: controller.signal })
     if (!res.ok) return null
     const data = await res.json()
     const r = data.routes?.[0]
     if (!r) return null
-    const steps: RouteStep[] = (r.legs?.[0]?.steps ?? []).map((s: OsrmStep) => ({
-      instruction: instructionOf(s),
+    const raw: OsrmStep[] = r.legs?.[0]?.steps ?? []
+    const steps: RouteStep[] = raw.map((s: OsrmStep, k: number) => ({
+      instruction: instructionOf(s, raw[k + 1]),
       distanceM: Math.round(s.distance),
       lat: s.maneuver.location[1],
       lng: s.maneuver.location[0],
@@ -69,6 +79,8 @@ export async function drivingRoute(from: LatLng, to: LatLng) {
     // Returning null here instead lets bestSafeRoute skip just this one candidate and still pick the best of the
     // rest, the same way a bad OSRM response (caught by `if (!res.ok)` above) was already handled.
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -83,7 +95,11 @@ export function kindForSituation(indicators: string[]): ServiceKind {
 // candidate routes are requested IN PARALLEL, not one after another — this was the main cause of routing feeling
 // slow (up to 3 sequential OSRM round-trips, on top of the Overpass lookup, could add up to several seconds).
 export async function bestSafeRoute(from: LatLng, kind: ServiceKind, reason: string, requestedBy: 'ai' | 'responder', target?: NearbyService): Promise<SafeRoute | null> {
-  const candidates = target ? [target] : (await nearbyServices(from)).filter((s) => s.kind === kind).slice(0, 3)
+  const all = target ? [target] : await nearbyServices(from)
+  // The right kind first; if none was found, the nearest other help (a hospital or fire station is a safe, staffed,
+  // lit place) rather than no route at all.
+  const ofKind = all.filter((s) => s.kind === kind)
+  const candidates = (ofKind.length ? ofKind : all).slice(0, 3)
   const results = await Promise.all(candidates.map(async (c) => ({ c, r: await drivingRoute(from, c) })))
   let best: SafeRoute | null = null
   for (const { c, r } of results) {

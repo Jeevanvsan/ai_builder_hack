@@ -1,4 +1,6 @@
-import { GoogleGenAI, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
+import { AI_MODELS } from '../../../../shared/aiModels'
+import { geminiKeys, liveConnectWithFallback } from './keys'
+import { GoogleGenAI, MediaResolution, Modality, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import type { Firestore } from 'firebase/firestore'
 import {
   appendTranscriptLine,
@@ -8,11 +10,13 @@ import {
   updateLiveFields,
 } from '../../../../shared/incidents/client'
 import { SILENT_OBSERVER_INSTRUCTION } from '../../../../web/src/lib/gemini/persona'
-import { REPORT_SCENE_OBSERVATION_TOOLS } from '../../../../web/src/lib/gemini/tools'
+import { REPORT_SCENE_OBSERVATION_TOOLS, toolResponse } from '../../../../web/src/lib/gemini/tools'
 import { startMicCapture, type MicHandle } from '../platform/audio'
 import { startCallRecording, type CallRecorder } from './recorder'
 import type { FrameSource } from '../../../modules/qb-frames'
-import { GEMINI_API_KEY } from '../config'
+
+// A camera still every 2 s (web: frames.ts FRAMES_PER_SECOND = 0.5).
+const FRAME_INTERVAL_MS = 2_000
 
 // Native port of web/src/lib/gemini/silentSession.ts — keep the two in sync.
 //
@@ -23,7 +27,7 @@ import { GEMINI_API_KEY } from '../config'
 // needs a frame source that doesn't exist yet (Epic 12 phase 3). Audio-only still covers the sound-based
 // observations, the stress trend and the caller estimate; camera observations simply won't appear until frames
 // land. Everything else here is the web's logic unchanged.
-const LIVE_MODEL = 'gemini-3.8-live'
+const LIVE_MODEL = AI_MODELS.liveCall // shared/aiModels.ts
 
 export type SosRecording = { base64: string; mimeType: string }
 
@@ -37,13 +41,15 @@ export async function startSilentObserver(
   incidentId: string,
   opts: { frames?: FrameSource | null } = {},
 ): Promise<SilentObserverHandle> {
-  if (!GEMINI_API_KEY) throw new Error('Gemini Live is not configured')
-
-  const client = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
+  if (!geminiKeys.configured) throw new Error('Gemini Live is not configured')
   let finished = false
   let resumptionHandle: string | undefined
   let reconnects = 0
   const MAX_RECONNECTS = 3
+  // Hard cap per session on top of the per-drop limit (which resets on each reopen): every reconnect resends the
+  // whole persona and tools, so a session that keeps dropping must not reconnect forever.
+  let totalReconnects = 0
+  const MAX_TOTAL_RECONNECTS = 8
 
   const transcriptLines: string[] = []
 
@@ -75,6 +81,8 @@ export async function startSilentObserver(
               kind,
               detail: typeof args.detail === 'string' ? args.detail : undefined,
               confidence: typeof args.confidence === 'number' ? args.confidence : undefined,
+              category: typeof args.category === 'string' ? args.category : undefined,
+              vehicle: { type: args.vehicleType as string | undefined, colour: args.colour as string | undefined, plate: args.plate as string | undefined },
             }),
           )
         }
@@ -136,7 +144,7 @@ export async function startSilentObserver(
     if (calls?.length) {
       for (const call of calls) handleToolCall(call)
       void session.sendToolResponse({
-        functionResponses: calls.map((call) => ({ id: call.id, name: call.name, response: { output: 'ok' } })),
+        functionResponses: calls.map((call) => toolResponse(call)),
       })
     }
   }
@@ -147,7 +155,7 @@ export async function startSilentObserver(
   let connected = false
 
   const openSession = (resume?: string) =>
-    client.live.connect({
+    liveConnectWithFallback({
       model: LIVE_MODEL,
       config: {
         // This model rejects TEXT-only responseModalities outright (close code 1007), which silently killed
@@ -160,7 +168,11 @@ export async function startSilentObserver(
         systemInstruction: SILENT_OBSERVER_INSTRUCTION,
         tools: REPORT_SCENE_OBSERVATION_TOOLS,
         // An SOS can run long, so compress the context and keep a resumption handle to reopen on a drop.
-        contextWindowCompression: { slidingWindow: {} },
+        // Keep the session lean: compress from ~48K tokens down to ~28K (the default only starts at 80% of the 131K
+        // window, so it never ran and every re-read kept growing). System instructions are always kept.
+        contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } },
+        // Camera frames at low media resolution (~70 tokens per frame on Gemini 3 instead of ~280).
+        mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
         sessionResumption: resume ? { handle: resume } : {},
       },
       callbacks: {
@@ -178,7 +190,8 @@ export async function startSilentObserver(
           // A quiet SOS — exactly the scenario this exists for — can idle out with a clean 1000 close before the
           // server ever sends a resumption handle, so reconnect regardless of whether one arrived. A fresh
           // connection without prior context beats a dead observer.
-          if (!finished && reconnects < MAX_RECONNECTS) {
+          if (!finished && reconnects < MAX_RECONNECTS && totalReconnects < MAX_TOTAL_RECONNECTS) {
+            totalReconnects += 1
             reconnects += 1
             void openSession(resumptionHandle)
               .then((s) => {
@@ -213,7 +226,7 @@ export async function startSilentObserver(
         if (finished) return
         const jpeg = opts.frames?.grab()
         if (jpeg && canSend()) session.sendRealtimeInput({ video: { data: jpeg, mimeType: 'image/jpeg' } })
-      }, 1_000)
+      }, FRAME_INTERVAL_MS)
     : null
 
   if (canSend()) {

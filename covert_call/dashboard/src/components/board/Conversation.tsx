@@ -31,11 +31,14 @@ function Bubble({ line, isNew }: { line: Line; isNew: boolean }) {
   }, [isNew, shown, line.text.length])
 
   const mia = line.speaker === 'Mia'
+  // Only the newest line types itself out. Once a newer line arrives, show this one in full: the typing state
+  // would otherwise freeze wherever it was ("The ride" for "The rider should bring it in").
+  const visible = isNew ? shown : line.text.length
   return (
     <li className={`bubble ${mia ? 'bubble-mia' : 'bubble-caller'}`}>
       <span className="bubble-who">{mia ? 'Mia (AI)' : 'Caller'}</span>
       <span className="bubble-text">
-        {annotate(line.text.slice(0, shown)).map((p, i) =>
+        {annotate(line.text.slice(0, visible)).map((p, i) =>
           p.code ? (
             <span key={i} className="bubble-coded" title={`Really means: ${p.code.meaning}`}>
               <s>{p.plain}</s>

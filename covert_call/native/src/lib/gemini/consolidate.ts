@@ -1,10 +1,11 @@
+import { AI_MODELS } from '../../../../shared/aiModels'
+import { geminiKeys, generateWithFallback } from './keys'
 import { GoogleGenAI } from '@google/genai'
 import type { FieldConfidence, Incident } from '../../../../shared/incidents/types'
-import { GEMINI_API_KEY } from '../config'
 
 // Native port of web/src/lib/gemini/consolidate.ts — keep the prompt and schema in sync. The only change is
 // where the API key comes from.
-const MODEL = 'gemini-3.5-flash-lite'
+const MODEL = AI_MODELS.consolidation // shared/aiModels.ts
 
 export type ConsolidationResult = {
   consolidatedSummary: string
@@ -55,10 +56,11 @@ export async function consolidateCall(
   fields: Incident['extractedFieldsLive'],
   voiceStressTrend: Incident['voiceStressTrend'],
   address?: string | null,
+  // What the camera and background-sound analysis observed, and any plate. Without this the bulletin only knew what
+  // was SAID ("unknown vehicle chasing caller" while the camera had shown a yellow sports car).
+  evidence?: { scene?: { source?: string; kind?: string; detail?: string; vehicle?: { type?: string; colour?: string; plate?: string } }[]; plate?: string | null },
 ): Promise<ConsolidationResult> {
-  if (!GEMINI_API_KEY) throw new Error('Gemini is not configured')
-
-  const client = new GoogleGenAI({ apiKey: GEMINI_API_KEY })
+  if (!geminiKeys.configured) throw new Error('Gemini is not configured')
   const avgStress = voiceStressTrend.length
     ? Math.round(voiceStressTrend.reduce((sum, s) => sum + s.score, 0) / voiceStressTrend.length)
     : null
@@ -68,6 +70,8 @@ export async function consolidateCall(
 Transcript: ${transcript || '(no transcript captured)'}
 Extracted so far: peopleCount=${fields.peopleCount ?? '-'} dangerIndicators=${fields.dangerIndicators.join(',') || '-'} urgency=${fields.urgency ?? '-'} notes=${fields.notes ?? '-'}
 Confirmed address: ${address ?? '-'}
+Seen/heard (camera + background sound): ${(evidence?.scene ?? []).slice(-8).map((o) => `${o.source === 'camera' ? 'seen' : 'heard'}: ${[o.vehicle?.colour, o.vehicle?.type].filter(Boolean).join(' ') || o.detail || o.kind}${o.vehicle?.plate ? `, plate ${o.vehicle.plate}` : ''}`).join('; ') || '-'}
+Vehicle plate: ${evidence?.plate ?? '-'}
 Avg voice stress: ${avgStress ?? '-'}/100
 
 Write consolidatedSummary: 2-4 sentences, dispatcher case-note style, stating what's known and any uncertainty.
@@ -85,7 +89,7 @@ detail, where naming them isn't necessary to the report itself. Write redactions
 should be redacted (e.g. "child's name: Priya"), or an empty list if nothing needs redacting. Don't flag the
 caller themselves or clearly necessary details (like "my neighbor" without a name, or a stated address).`
 
-  const response = await client.models.generateContent({
+  const response = await generateWithFallback({
     model: MODEL,
     contents: prompt,
     config: { responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },

@@ -69,6 +69,7 @@ export default function IncidentDetailPage() {
           <div className="case-title-row">
             <span className="mono case-id">{incident.id}</span>
             <Chip tone={incident.severity} filled>{incident.severity}</Chip>
+            {incident.isDemo && <span className="demo-badge" title="Demo / test call (demoIncidents), not a real incident">DEMO</span>}
             <Chip tone={incident.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(incident.response.status)}</Chip>
             {incident.incidentType === 'sos' && <span className="sos-badge">SOS{incident.scenario ? ` · ${incident.scenario}` : ''}</span>}
           </div>
