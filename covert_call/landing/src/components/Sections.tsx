@@ -228,6 +228,9 @@ const VIDEOS: { file: string; drive?: string; title: string; d: string }[] = [
   { file: 'click-order', title: 'Tap and order', d: 'A coded cart is placed and arrives as a decoded incident.' },
 ]
 
+// Only clips that exist (a Drive link or a file in public/videos) get a slide; no "coming soon" cards.
+const AVAILABLE = VIDEOS.filter((v) => v.drive || __VIDEOS__.includes(v.file))
+
 function VideoSlide({ v, active }: { v: (typeof VIDEOS)[number]; active: boolean }) {
   const [missing, setMissing] = useState(!__VIDEOS__.includes(v.file))
   const ref = useRef<HTMLVideoElement>(null)
@@ -273,11 +276,12 @@ export function DemoSlider() {
   }, [])
   useEffect(() => {
     // Never auto-advance away from a slide that has a real video to watch.
-    if (paused || VIDEOS[i].drive) return
-    const t = setTimeout(() => setI((n) => (n + 1) % VIDEOS.length), 7000)
+    if (paused || AVAILABLE[i].drive) return
+    const t = setTimeout(() => setI((n) => (n + 1) % AVAILABLE.length), 7000)
     return () => clearTimeout(t)
   }, [i, paused])
-  const go = (n: number) => setI((n + VIDEOS.length) % VIDEOS.length)
+  if (!AVAILABLE.length) return null
+  const go = (n: number) => setI((n + AVAILABLE.length) % AVAILABLE.length)
 
   return (
     <section className="dark" id="demo" style={{ overflow: 'hidden' }}>
@@ -286,27 +290,27 @@ export function DemoSlider() {
           <div className="section-head">
             <span className="eyebrow">See it working</span>
             <h2 style={{ color: '#fff' }}>Demo videos</h2>
-            <p className="muted">Drag, swipe or use the arrows.</p>
+            {AVAILABLE.length > 1 && <p className="muted">Drag, swipe or use the arrows.</p>}
           </div>
         </Reveal>
         <div className="slider" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
           <motion.div ref={trackRef} className="slides" animate={{ x: -i * slideW }} transition={{ type: 'spring', stiffness: 120, damping: 22 }}
-            drag="x" dragConstraints={{ left: -(VIDEOS.length - 1) * slideW, right: 0 }} dragElastic={0.15}
+            drag="x" dragConstraints={{ left: -(AVAILABLE.length - 1) * slideW, right: 0 }} dragElastic={0.15}
             onDragEnd={(_, info) => { if (info.offset.x < -80) go(i + 1); else if (info.offset.x > 80) go(i - 1) }}>
-            {VIDEOS.map((v, n) => (
+            {AVAILABLE.map((v, n) => (
               <motion.div key={v.file} className="slide" animate={{ opacity: n === i ? 1 : 0.4, scale: n === i ? 1 : 0.94 }}>
                 <VideoSlide v={v} active={n === i} />
                 <div className="slide-info"><div><h3>{v.title}</h3><p>{v.d}</p></div><span className="chip acc">0{n + 1}</span></div>
               </motion.div>
             ))}
           </motion.div>
-          <div className="slider-ctrl">
+          {AVAILABLE.length > 1 && <div className="slider-ctrl">
             <button className="arrow" onClick={() => go(i - 1)} aria-label="Previous">←</button>
             <button className="arrow" onClick={() => go(i + 1)} aria-label="Next">→</button>
             <div style={{ display: 'flex', gap: 8, marginLeft: 12 }}>
-              {VIDEOS.map((v, n) => <button key={v.file} className={`dotbtn${n === i ? ' on' : ''}`} onClick={() => go(n)} aria-label={v.title} />)}
+              {AVAILABLE.map((v, n) => <button key={v.file} className={`dotbtn${n === i ? ' on' : ''}`} onClick={() => go(n)} aria-label={v.title} />)}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </section>
