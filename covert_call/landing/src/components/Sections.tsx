@@ -448,7 +448,7 @@ export function Footer() {
           </div>
           <div><h4>Product</h4><ul><li><a href="/#disguise">Disguise</a></li><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/#demo">Demo</a></li></ul></div>
           <div><h4>Try it</h4><ul><li><a href={LINKS.web} target="_blank" rel="noreferrer">Web app</a></li><li><a href="/#download">Android APK</a></li></ul></div>
-          <div><h4>Project</h4><ul><li><a href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a></li><li>Team: Jeevan &amp; Ameen</li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
+          <div><h4>Project</h4><ul><li><a href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a></li><li>Team: NexMind</li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
         </div>
         <div className="footer-note"><span>© 2026 Team NexMind · <a href="/privacy">Privacy Policy</a></span></div>
       </div>
