@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { primeMic } from '../../lib/micAccess'
 import { requestMotionPermission } from '../../lib/motion'
 import { formatRupees, useCart } from '../../state/cart'
 import { ChevronRightIcon, PhoneIcon } from './icons'
@@ -34,7 +35,7 @@ export function BottomBar() {
           <strong>Ordering as guest</strong>
           <Link to="/delivery-instructions" className="guest-subtle-link">Delivery instructions</Link>
         </span>
-        <Link to="/call" className="call-cta" onClick={() => void requestMotionPermission()}>
+        <Link to="/call" className="call-cta" onClick={() => { primeMic(); void requestMotionPermission() }}>
           <PhoneIcon size={16} /> Call to order
         </Link>
       </div>

@@ -34,9 +34,26 @@ export const inAppBrowser = (): string | null => {
   return null
 }
 
+// The tap on "Call to order" asks for the mic right away (a request made inside a tap is the one phones most
+// reliably show the permission box for); the call screen then reuses that answer instead of asking again.
+let primed: Promise<MicIssue | null> | null = null
+export function primeMic(): void {
+  primed = requestMic()
+}
+
 // Asks for the mic once (this is what shows the browser's permission box) and releases it again; the call opens
 // it for real right after. Returns null when the mic works.
 export async function checkMic(): Promise<MicIssue | null> {
+  const fromTap = primed
+  primed = null
+  if (fromTap) {
+    const result = await fromTap
+    if (!result) return null
+  }
+  return requestMic()
+}
+
+async function requestMic(): Promise<MicIssue | null> {
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) return inAppBrowser() ? 'in-app' : 'unsupported'
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -77,13 +94,13 @@ export function micHelp(issue: MicIssue): MicHelp {
     }
   }
   if (issue === 'no-mic') {
-    return { title: 'No microphone found', intro: 'Your phone didn’t report a microphone.', steps: ['Unplug and re-plug any headset or earphones.', 'Then tap "Try again".'] }
+    return { title: 'No microphone found', intro: 'Your phone didn’t report a microphone.', steps: ['Unplug and re-plug any headset or earphones.', 'Then tap "Allow microphone".'] }
   }
   if (issue === 'busy') {
     return {
       title: 'Microphone is busy',
       intro: 'Another app is using the microphone right now.',
-      steps: ['Finish any phone or video call, or close apps that record sound.', 'Then tap "Try again".'],
+      steps: ['Finish any phone or video call, or close apps that record sound.', 'Then tap "Allow microphone".'],
     }
   }
   // blocked
@@ -95,7 +112,7 @@ export function micHelp(issue: MicIssue): MicHelp {
         'Safari: tap "aA" in the address bar → Website Settings → Microphone → Allow.',
         'Chrome on iPhone: open the iPhone Settings app → Chrome → turn on Microphone.',
         'Safari still asking nothing? Settings app → Safari → Microphone → Ask or Allow.',
-        'Come back and tap "Try again".',
+        'Come back here: the call connects by itself (or tap "Allow microphone").',
       ],
     }
   }
@@ -107,13 +124,13 @@ export function micHelp(issue: MicIssue): MicHelp {
         'Tap the icon left of the web address (🔒 or ⚙) → Permissions → Microphone → Allow.',
         'Not listed? Chrome ⋮ menu → Settings → Site settings → Microphone → make sure it’s on, and remove QuickBite from "Blocked".',
         'Still nothing? Phone Settings → Apps → Chrome → Permissions → Microphone → Allow.',
-        'Come back and tap "Try again".',
+        'Come back here: the call connects by itself (or tap "Allow microphone").',
       ],
     }
   }
   return {
     title: 'Allow the microphone',
     intro: 'Your browser blocked the microphone for QuickBite.',
-    steps: ['Click the icon left of the web address → Microphone → Allow.', 'Then click "Try again".'],
+    steps: ['Click the icon left of the web address → Microphone → Allow.', 'Then click "Allow microphone".'],
   }
 }

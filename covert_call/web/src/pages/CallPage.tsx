@@ -70,7 +70,20 @@ export function CallPage() {
   // Mic refused or unavailable: the call never starts (no incident), and the caller sees how to fix it.
   const [micIssue, setMicIssue] = useState<MicIssue | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
+  // Back from the phone's settings with the mic now allowed: connect straight away, no extra tap.
+  useEffect(() => {
+    if (!micIssue || micIssue === 'in-app' || micIssue === 'unsupported') return
+    const onBack = () => { if (document.visibilityState === 'visible') void runCallRef.current?.() }
+    document.addEventListener('visibilitychange', onBack)
+    window.addEventListener('focus', onBack)
+    return () => {
+      document.removeEventListener('visibilitychange', onBack)
+      window.removeEventListener('focus', onBack)
+    }
+  }, [micIssue])
   const runCallRef = useRef<(() => Promise<void>) | null>(null)
+  const micCheckingRef = useRef(false)
+  const callStartedRef = useRef(false)
 
   useEffect(() => {
     // startedRef makes this a true one-shot for the component's whole lifetime, including across React
@@ -89,12 +102,18 @@ export function CallPage() {
     runCallRef.current = async () => {
       // Ask for the mic first, before anything else: this is what shows the permission box, and a refused mic
       // used to end on a bare "Couldn't connect" after an empty incident had already been created.
+      // One attempt at a time, and the call is started once: returning to the tab fires both focus and
+      // visibilitychange, which must not open two calls.
+      if (micCheckingRef.current || callStartedRef.current) return
+      micCheckingRef.current = true
       setStatus('connecting')
       const issue = await checkMic()
+      micCheckingRef.current = false
       if (issue) {
         setMicIssue(issue)
         return
       }
+      callStartedRef.current = true
       setMicIssue(null)
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
@@ -393,12 +412,9 @@ export function CallPage() {
           )}
           {micIssue !== 'in-app' && micIssue !== 'unsupported' && (
             <button type="button" className="mic-help-btn" onClick={() => void runCallRef.current?.()}>
-              Try again
+              Allow microphone
             </button>
           )}
-          {/* No mic at all (e.g. the browser has no microphone permission in the phone's settings and the caller
-              can't change it now): the tap-only screen sends the same help without a call. */}
-          <Link to="/delivery-instructions" className="link-btn" replace>Can't use the microphone? Add delivery instructions instead</Link>
           <Link to="/" className="link-btn" replace>Back to menu</Link>
         </div>
       </div>

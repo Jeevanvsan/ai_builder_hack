@@ -745,3 +745,7 @@ Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
 ### 2026-10-08 IST: microphone permission help
 - Reports: some phones never showed the mic permission box. Causes: site previously blocked, browser itself has no mic permission in the phone's settings, link opened in an in-app browser (WhatsApp/Instagram/Facebook), or mic busy.
 - CallPage now asks for the mic first (lib/micAccess.ts checkMic), before creating an incident. On failure it shows a help panel in the call screen's style: cause + steps for Android Chrome / iPhone Safari & Chrome / in-app browsers, "Try again", "Copy link" (in-app), and a link to the tap-only delivery-instructions screen (no mic needed). Prod + staging deployed. Intro video project added under covert_call/intro-video (Remotion).
+
+### 2026-10-08 IST: microphone permission
+- Reports: some phones never showed the mic permission box / calls ended on "Couldn't connect · Back to menu". Causes: site blocked earlier, browser has no mic permission in the phone's settings, in-app browser (WhatsApp/Instagram/Facebook), or mic busy.
+- "Call to order" now asks for the mic inside the tap (lib/micAccess.ts primeMic); the call screen reuses the answer, before any incident is created. If refused, the call screen stays open with the cause, steps for Android Chrome / iPhone Safari & Chrome / in-app browsers, an "Allow microphone" button, and it connects by itself when the caller returns from the phone's settings. Start-once guard. Prod + staging deployed.
