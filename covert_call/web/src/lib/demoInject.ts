@@ -1,7 +1,7 @@
 declare const __DEMO_V__: string
 import { keepAudioRunning } from './gemini/audio'
 import { watchGpsSim } from './gpsSim'
-import { DEFAULT_SCENARIO, startAiCaller, type AiCallerHandle } from './aiCaller'
+import { DEFAULT_SCENARIO, SCENARIOS, startAiCaller, type AiCallerHandle } from './aiCaller'
 // Demo feed injection (for recording the demo video): a REAL call from this phone, but the camera picture and/or a
 // background sound can be switched to a prepared clip while it runs, from a laptop script (eval/demo.ts) or the
 // dashboard. Everything downstream (Mia's camera frames, the dashboard's live video, listen-in, the recordings)
@@ -203,20 +203,21 @@ async function playSound(name: string | null | undefined, loop = false) {
 
 // Mia's voice, handed over by the live call so the AI caller can hear her directly (demo recording only).
 let miaAudio: MediaStream | null = null
-// Fully automatic demo: open the app once with ?aiCaller=1 (remembered until ?aiCaller=0) and every call on that
-// phone starts the AI caller as soon as Mia's line opens, with the default scenario and voice.
+// Fully automatic demo: open the app once with ?aiCaller=1 (chase) or ?aiCaller=domestic (remembered until
+// ?aiCaller=0) and every call on that phone starts the AI caller as soon as Mia's line opens.
 const AUTO_KEY = 'qb-ai-caller'
 const aiCallerAuto = (() => {
   try {
     const q = new URLSearchParams(location.search).get('aiCaller')
     if (q === '0') localStorage.removeItem(AUTO_KEY)
-    else if (q) localStorage.setItem(AUTO_KEY, '1')
-    return localStorage.getItem(AUTO_KEY) === '1'
-  } catch { return false }
+    else if (q) localStorage.setItem(AUTO_KEY, SCENARIOS[q] ? q : 'chase')
+    const v = localStorage.getItem(AUTO_KEY)
+    return v ? (SCENARIOS[v] ? v : 'chase') : null
+  } catch { return null }
 })()
 export const setMiaAudio = (s: MediaStream | null) => {
   miaAudio = s
-  if (s && aiCallerAuto && demoInjectEnabled) setTimeout(() => { if (!aiCaller) void applyAiCaller({ aiCallerOn: true }) }, 300)
+  if (s && aiCallerAuto && demoInjectEnabled) setTimeout(() => { if (!aiCaller) void applyAiCaller({ aiCallerOn: true, aiScenario: SCENARIOS[aiCallerAuto].text }) }, 300)
 }
 let aiCaller: AiCallerHandle | null = null
 function stopAiCaller() {

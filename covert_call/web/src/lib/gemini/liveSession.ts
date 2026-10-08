@@ -7,6 +7,7 @@ import { INCIDENTS, recordAiUsage, appendTranscriptLine, replaceTranscriptLine, 
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { checkCameraFrame } from './photoVision.ts'
 import { setMiaAudio } from '../demoInject.ts'
+import { gpsSimEnabled } from '../gpsSim.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
 import { ALL_CODES } from '../../../../shared/codes.ts'
@@ -650,6 +651,7 @@ export async function startLiveCall(
     if (miaText && derailed) { /* dropped: part of the derailed output */ }
     else if (miaText) {
       appendTranscript('Mia', miaText)
+      if (gpsSimEnabled) window.dispatchEvent(new CustomEvent('qb-mia-said', { detail: miaText })) // demo GPS legs
       if (/e-?mail/i.test(miaText)) emailAsked = true
     }
 

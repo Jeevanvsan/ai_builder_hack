@@ -8,7 +8,7 @@ import { initializeApp, getApps } from 'firebase/app'
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth'
 import { collection, doc, getFirestore, onSnapshot, query, setDoc, where } from 'firebase/firestore'
 import { DEMO_CONTROL, type DemoControl } from '../lib/demoInject'
-import { DEFAULT_SCENARIO } from '../lib/aiCaller'
+import { DEFAULT_SCENARIO, SCENARIOS } from '../lib/aiCaller'
 
 declare const __DEMO_V__: string
 const APP_NAME = 'demo-control'
@@ -198,8 +198,12 @@ export default function DemoControlPage() {
         <p style={{ color: '#6b7280', marginTop: 0, fontSize: 14 }}>
           A second AI voice plays the caller: it hears Mia and answers her out loud into the call, so the whole scene runs by itself
           (with section 4's simulated GPS, Mia's directions move the caller too). Fully automatic: open the phone once with
-          <code> ?demoInject=1&amp;aiCaller=1&amp;gpsSim=LAT,LNG</code> and just tap "Call to order"; it uses the default scenario below. Turn off with <code>?aiCaller=0</code>.
+          <code> ?demoInject=1&amp;aiCaller=1&amp;gpsSim=LAT,LNG</code> (chase) or <code>?demoInject=1&amp;aiCaller=domestic</code> and just tap "Call to order". Turn off with <code>?aiCaller=0</code>.
         </p>
+        <div style={{ marginBottom: 8 }}>
+          <b style={{ fontSize: 14, marginRight: 8 }}>Scenario</b>
+          {Object.entries(SCENARIOS).map(([k, v]) => <button key={k} style={btn(scenario === v.text)} onClick={() => setScenario(v.text)}>{v.label}</button>)}
+        </div>
         <textarea value={scenario} onChange={(e) => setScenario(e.target.value)} rows={7} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', font: 'inherit', fontSize: 14 }} />
         <div style={{ margin: '8px 0' }}>
           <b style={{ fontSize: 14, marginRight: 8 }}>Voice</b>

@@ -34,7 +34,9 @@ export const metres = (a: LatLng, b: LatLng) => {
 }
 const lerp = (a: LatLng, b: LatLng, t: number): LatLng => ({ lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t })
 
-type State = { pos: LatLng; route: LatLng[] | null; idx: number; speedKmh: number; paused: boolean; arrived: boolean }
+// target: how far the caller may walk. Nothing until Mia gives her first direction; each direction she speaks
+// lets the caller walk to the next turn point (one leg), so the caller turns when Mia says so, not before.
+type State = { pos: LatLng; route: LatLng[] | null; idx: number; speedKmh: number; paused: boolean; arrived: boolean; steps: LatLng[]; target: LatLng | null }
 let state: State | null = null
 const watchers = new Map<number, PositionCallback>()
 let nextId = 1
@@ -57,11 +59,28 @@ function fix(): GeolocationPosition {
 }
 const emit = () => watchers.forEach((cb) => { try { cb(fix()) } catch { /* the app's own handler */ } })
 
-// Moves `m` metres forward along the route from the current position.
-function advance(m: number) {
+const nearestIdx = (route: LatLng[], p: LatLng, from = 0) => {
+  let best = from
+  let bestD = Infinity
+  for (let i = from; i < route.length; i++) { const d = metres(p, route[i]); if (d < bestD) { bestD = d; best = i } }
+  return best
+}
+
+// Mia just gave a direction: allow the next leg, up to the next turn point ahead (or the destination).
+function grantLeg() {
+  const s = state
+  if (!s?.route || s.arrived) return
+  const ahead = s.steps.map((p) => ({ p, i: nearestIdx(s.route!, p) })).filter((x) => x.i > s.idx + 1)
+  s.target = ahead[0]?.p ?? s.route[s.route.length - 1]
+}
+
+// Moves `m` metres forward along the route, never past the current leg's turn point.
+function advance(m: number, ignoreLeg = false) {
   const s = state!
   if (!s.route || s.arrived) return
-  while (m > 0 && s.idx < s.route.length - 1) {
+  if (!ignoreLeg && !s.target) return
+  const limit = ignoreLeg ? s.route.length - 1 : nearestIdx(s.route, s.target!, s.idx)
+  while (m > 0 && s.idx < limit) {
     const next = s.route[s.idx + 1]
     const left = metres(s.pos, next)
     if (left <= m) { s.pos = next; s.idx++; m -= left } else { s.pos = lerp(s.pos, next, m / left); m = 0 }
@@ -86,7 +105,7 @@ function adoptRoute(geometry: LatLng[]) {
 
 // Replaces navigator.geolocation so the whole app (incident start, live tracking, routing) sees the simulated fix.
 if (gpsSimEnabled && navigator.geolocation) {
-  state = { pos: readStart()!, route: null, idx: 0, speedKmh: DEFAULT_SPEED_KMH, paused: false, arrived: false }
+  state = { pos: readStart()!, route: null, idx: 0, speedKmh: DEFAULT_SPEED_KMH, paused: false, arrived: false, steps: [], target: null }
   const geo = navigator.geolocation as Geolocation & Record<string, unknown>
   geo.getCurrentPosition = (ok: PositionCallback) => { setTimeout(() => ok(fix()), 50) }
   geo.watchPosition = (ok: PositionCallback) => {
@@ -115,6 +134,7 @@ export function watchGpsSim(db: Firestore, incidentId: string, controlCollection
   let lastJump = 0
   let lastSet = 0
   const unRoute = onSnapshot(doc(db, INCIDENTS, incidentId), (snap) => {
+    if (state) state.steps = ((snap.data()?.safeRoute?.steps ?? []) as LatLng[]).map((p) => ({ lat: p.lat, lng: p.lng }))
     const g = (snap.data()?.safeRoute?.geometry ?? []) as LatLng[]
     const key = g.length ? `${g.length}:${g[0].lat},${g[0].lng}:${g[g.length - 1].lat}` : ''
     if (key && key !== lastGeometry) { lastGeometry = key; adoptRoute(g) }
@@ -124,10 +144,22 @@ export function watchGpsSim(db: Firestore, incidentId: string, controlCollection
     const c = snap.data() as GpsSimControl
     if (typeof c.gpsSpeedKmh === 'number' && c.gpsSpeedKmh > 0) state.speedKmh = c.gpsSpeedKmh
     if (typeof c.gpsPaused === 'boolean') state.paused = c.gpsPaused
-    if ((c.gpsJumpAt ?? 0) > lastJump) { lastJump = c.gpsJumpAt!; advance(c.gpsJumpM ?? 150); emit() }
+    if ((c.gpsJumpAt ?? 0) > lastJump) { lastJump = c.gpsJumpAt!; advance(c.gpsJumpM ?? 150, true); emit() }
     if ((c.gpsSetAt ?? 0) > lastSet && c.gpsSet) { lastSet = c.gpsSetAt!; state.pos = c.gpsSet; if (state.route) adoptRoute(state.route); emit() }
   }, () => {})
-  return () => { unRoute(); unCtl() }
+  // What Mia says (from the live call). A direction ("turn right in 100 metres", "keep going straight") lets the
+  // caller walk the next leg, about 2 s after she stops talking, so the move starts once she has said it.
+  const DIRECTION = /\b(turn|(go|bear|keep|take a|take the) (left|right)|straight|keep (going|moving|walking|running)|ahead|continue|head (north|south|east|west)|go (north|south|east|west)|metres|meters)\b/i
+  let heard = ''
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const onMia = (e: Event) => {
+    heard = `${heard}${(e as CustomEvent<string>).detail ?? ''}`.slice(-400)
+    if (!DIRECTION.test(heard)) return
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => { heard = ''; grantLeg() }, 2_000)
+  }
+  window.addEventListener('qb-mia-said', onMia)
+  return () => { unRoute(); unCtl(); window.removeEventListener('qb-mia-said', onMia); if (timer) clearTimeout(timer) }
 }
 
 export const gpsSimStatus = () => (state ? { ...state.pos, speedKmh: state.speedKmh, paused: state.paused, arrived: state.arrived, onRoute: !!state.route } : null)
