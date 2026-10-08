@@ -396,7 +396,7 @@ export function SplitView() {
 }
 
 export function Marquee() {
-  const items = ['✦ Gemini Live', '🧠 Gemini function calling', '☁️ Cloud Run', '📡 WebRTC', '⚛️ React + Vite', '📱 React Native', '📈 Apache ECharts', '🗺️ Leaflet / OSM']
+  const items = ['✦ Gemini Live', '🧠 Gemini function calling', '🔥 Firebase Hosting', '⚡ Cloud Firestore', '🔐 Firebase Auth', '☁️ Cloud Run', '📡 WebRTC', '⚛️ React + Vite', '📱 React Native', '📈 Apache ECharts', '🗺️ Leaflet / OSM']
   return (
     <section style={{ padding: '70px 0' }}>
       <div className="container" style={{ textAlign: 'center', marginBottom: 30 }}><span className="eyebrow">Built with</span></div>
