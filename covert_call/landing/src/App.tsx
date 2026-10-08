@@ -1,6 +1,7 @@
 import { MotionConfig } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Bento, DeepDives } from './components/Features'
+import { Gallery } from './components/Gallery'
 import Hero from './components/Hero'
 import Manual from './components/Manual'
 import Privacy from './components/Privacy'
@@ -55,6 +56,7 @@ export default function App() {
         <Bento />
         <Compare />
         <DemoSlider />
+        <Gallery />
         <SplitView />
         <Marquee />
         <Download onDownload={openApk} />

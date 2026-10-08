@@ -16,6 +16,7 @@ export function Nav({ onDownload }: { onDownload: () => void }) {
           <a href="/#how">How it works</a>
           <a href="/#features">Features</a>
           <a href="/#demo">Demo</a>
+          <a href="/#gallery">Gallery</a>
           <a href="/#download">Download</a>
           <a href="/manual" className={location.pathname.startsWith('/manual') ? 'active' : ''}>User manual</a>
         </div>
