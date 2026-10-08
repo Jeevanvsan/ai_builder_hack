@@ -105,7 +105,9 @@ export async function startLiveCall(
     return quoted ?? text.slice(0, at)
   }
   // Code-like output (fences, statements, function definitions) never belongs in a phone call.
-  const CODE_LIKE = /```|\bfunction\s+\w+\s*\(|\b(let|const|var)\s+\w+\s*=|[;{}]\s*\n|\bconsole\.log\(|=>\s*\{/
+  // Also the model's own reasoning read out instead of staying quiet ("**Step 1: Understand the Goal** The user
+  // wants…", INC-MUZNEL3B).
+  const CODE_LIKE = /```|\bfunction\s+\w+\s*\(|\b(let|const|var)\s+\w+\s*=|[;{}]\s*\n|\bconsole\.log\(|=>\s*\{|\*\*\s*step\s*\d|\bstep\s*\d+\s*:|\bthe user (wants|is asking|said|has)\b|\baccording to (the|my) (rules|instructions)\b|\bi should (not )?(say|respond|stay)\b|\bmy (task|goal) is\b/i
   let derailed = false
   const written: number[] = []
   const savedEntries: (TranscriptEntry | undefined)[] = []
@@ -134,7 +136,7 @@ export async function startLiveCall(
   // whole line happens to be only one, since consecutive fragments get merged into the same line before this
   // would otherwise be checked. Previously leaked straight into the responder-facing conversation view looking
   // like Mia or the caller had spoken gibberish.
-  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]|-{2,}/gi
+  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]|-{2,}|\bno speech( detected| to)?\b\.?/gi
   const appendTranscript = (speaker: string, rawText: string) => {
     const text = rawText.replace(NON_SPEECH_TOKEN, '')
     if (!text) return
