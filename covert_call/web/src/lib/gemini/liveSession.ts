@@ -587,6 +587,24 @@ export async function startLiveCall(
   let callerHeard = ''
   const OPEN_SIGNAL = /\b(talk|speak)\b[^.?!]{0,15}\bfreely\b|\bi can (talk|speak)\b|\bi'?m alone\b|\bno one(?:'s| is) (here|around)\b|^\s*talk\b/i
   const COVERT_SIGNAL = /\b(can'?t|cannot) (talk|speak)\b|\bsomeone(?:'s| is) coming\b|\b(he|she|they)(?:'s|'re| is| are) (here|back|close|coming)\b/i
+  // Someone else in the room questioning or controlling the caller ("who are you talking to?", "give me the phone")
+  // is picked up by the caller's mic and transcribed as the caller. A caller never says these to the order line, so
+  // the app records them itself as another person's voice and a coercion sign, and tells Mia, instead of relying on
+  // her to notice. Each distinct line is recorded once.
+  const THIRD_PARTY = /\b(who (are|r) you (talking|speaking) to|who(?:'s| is) (it|that|on the phone)|give me (the|that|your) phone|hang up|put (the|that) phone down|what are you doing|who did you call)\b/i
+  const thirdPartySeen = new Set<string>()
+  const noteThirdParty = () => {
+    const line = transcriptLines.at(-1)
+    if (!line || line.speaker !== 'Caller') return
+    const m = THIRD_PARTY.exec(line.text)
+    if (!m || thirdPartySeen.has(m[0].toLowerCase())) return
+    thirdPartySeen.add(m[0].toLowerCase())
+    const sentence = (line.text.slice(m.index).match(/^[^.?!]*[.?!]?/)?.[0] ?? m[0]).trim()
+    console.info('[QuickBite call] another person in the room:', sentence)
+    handleToolCall({ name: 'report_scene_observation', args: { source: 'sound', kind: 'second voice', category: 'sound_event', confidence: 80, detail: `Another person near the caller (likely the abuser) said: "${sentence}"` } } as FunctionCall)
+    handleToolCall({ name: 'report_coercion_signal', args: { kind: 'second voice', confidence: 80, detail: `Someone else in the room questioned the caller: "${sentence}"` } } as FunctionCall)
+    extraNotes.push(`(Background, not the caller: another person in the room just said "${sentence}". Someone may be controlling the caller and listening. Stay fully in character, never react to it out loud, keep the order normal and short.)`)
+  }
   const noteMode = (text: string) => {
     callerHeard = `${callerHeard} ${text}`.slice(-160)
     const before = openMode
@@ -632,6 +650,7 @@ export async function startLiveCall(
       callerSpokeAt = Date.now()
       nudgedForTurn = false
       noteMode(callerText)
+      noteThirdParty()
       confirmEmailIfYes(transcriptLines.at(-1)?.text ?? callerText)
       fixAddressOnYes(transcriptLines.at(-1)?.text ?? callerText)
       if (dangerReported && !callerSafe && SAFE_NOW.test(transcriptLines.at(-1)?.text ?? callerText)) {
