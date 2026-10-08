@@ -1073,6 +1073,14 @@ export async function startLiveCall(
     }
     if (Date.now() - lastActivityAt < SILENCE_MS || toolsPending > 0 || routesPending > 0) return
     lastActivityAt = Date.now()
+    // The caller spoke last and Mia never answered (INC-MUZIAK8T: she ran the route tools after "he's chasing me" and
+    // went quiet): that is Mia owing a reply, not the caller going silent. Treating it as "silent after danger" told
+    // her to say nothing, and the call froze with both sides waiting.
+    if (callerSpokeAt && !spokeSinceCaller) {
+      console.info('[QuickBite call] silence while Mia owes a reply: nudging her')
+      nudge('(System note, not the caller: the caller spoke and is waiting for your reply. Reply now to what they last said; if you have a route to safety, give the first direction. Say only the words meant for the caller.)')
+      return
+    }
     silentNudges += 1
     // After danger, silence usually means the caller is hiding or the attacker is right there. Nudging Mia to
     // re-ask made her say "Still there? I'm still listening" out loud over and over during an armed attack,
