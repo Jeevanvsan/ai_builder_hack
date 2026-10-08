@@ -101,7 +101,7 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     const src = ctx.createBufferSource()
     src.buffer = buf
     const level = ctx.createGain()
-    level.gain.value = quiet ? 0.15 : 1
+    level.gain.value = quiet ? 1 : 1 // her aside to him is at normal volume too
     src.connect(level)
     level.connect(o.out)
     if (o.speaker) level.connect(o.speaker)
@@ -123,7 +123,7 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
       model: AI_MODELS.liveCall,
       config: {
         responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } },
         systemInstruction: 'You are an angry, controlling Indian man in his 30s in a small flat, voicing one line for a film. When you are given a line, shout it exactly as written, harsh, aggressive and suspicious, then stop. Never say anything else, never reply to anyone.',
       },
       callbacks: {
@@ -138,14 +138,21 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
             for (let i = 0; i < ch.length; i++) ch[i] = ((bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) << 16 >> 16) / 32768
             const src = ctx.createBufferSource()
             src.buffer = buf
+            // Deeper and heavier: played slightly slower (lower pitch) through a bass boost.
+            src.playbackRate.value = 0.86
+            const bass = ctx.createBiquadFilter()
+            bass.type = 'lowshelf'
+            bass.frequency.value = 220
+            bass.gain.value = 9
             const level = ctx.createGain()
             level.gain.value = 0.85 // across the room, a little further from the phone than she is
-            src.connect(level)
+            src.connect(bass)
+            bass.connect(level)
             level.connect(o.out)
             if (o.speaker) level.connect(o.speaker)
             hNext = Math.max(hNext, ctx.currentTime + 0.05)
             src.start(hNext)
-            hNext += buf.duration
+            hNext += buf.duration / src.playbackRate.value
           }
           if (m.serverContent?.turnComplete && onDone) {
             const done = onDone
