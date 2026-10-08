@@ -158,19 +158,23 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
 
   // Joins a recorded line into one clip and shortens every pause longer than 0.2 s to 0.15 s.
   const squeeze = (bufs: AudioBuffer[]): AudioBuffer | null => {
-    const all: number[] = []
-    for (const b of bufs) all.push(...b.getChannelData(0))
-    if (!all.length) return null
+    if (!bufs.length) return null
     const out: number[] = []
     const maxGap = Math.round(0.2 * OUT_RATE)
     const keep = Math.round(0.15 * OUT_RATE)
-    let quietRun: number[] = []
-    for (const x of all) {
-      if (Math.abs(x) < 0.02) { quietRun.push(x); continue }
-      out.push(...(quietRun.length > maxGap ? quietRun.slice(0, keep) : quietRun))
-      quietRun = []
-      out.push(x)
+    let quiet = 0 // length of the current silent run
+    for (const b of bufs) {
+      for (const x of b.getChannelData(0)) {
+        if (Math.abs(x) < 0.02) {
+          quiet++
+          if (quiet <= keep || quiet <= maxGap) out.push(x) // keep at most ~0.2 s of any pause
+          continue
+        }
+        quiet = 0
+        out.push(x)
+      }
     }
+    if (!out.length) return null
     const buf = ctx.createBuffer(1, out.length, OUT_RATE)
     buf.getChannelData(0).set(out)
     return buf
