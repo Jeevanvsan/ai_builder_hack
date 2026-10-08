@@ -14,7 +14,7 @@ export const SCENARIOS: Record<string, { label: string; text: string }> = {
 A man on a black motorbike has been following you for about ten minutes and is now chasing you while you run along the road. One man, dark jacket, black helmet; you could not read the number plate.
 You are on CCSB Road near Vazhicherry market in Alappuzha.
 You are not hurt. You have your phone and nothing else.
-If asked for an email for the case report, it is priya@gmail.com. Always say it spelled, in one go, the first time: "p, r, i, y, a, at gmail dot com".
+If asked for an email for the case report, it is priya1661@yopmail.com. Always say it spelled, in one go, the first time: "p, r, i, y, a, one, six, six, one, at yopmail dot com".
 
 HOW YOU SOUND: terrified and running for your life. Fast, breathless, voice shaking and cracking, gasping between words, sometimes close to tears. Short broken bursts, stammering and repeating words ("he's — he's right behind me", "please, please hurry"). Glance back and plead ("oh god, he's still there", "I can't — I can't breathe"). A little calmer when Mia gives a clear direction, then afraid again. Relieved but shaky and tearful once you reach safety.`,
   },
@@ -27,7 +27,7 @@ One person: one pizza. He is still right there with you: say "hand it to me".
 You are hurt, but not badly: if asked about napkins, "just a few".
 No weapon. You can't leave the house: if asked, "bring it in".
 Your address: Priya Nivas, near Vazhicherry market, Alappuzha. Spell the house name in one go when asked: "P, R, I, Y, A, N, I, V, A, S".
-If asked for an email, it is priya@gmail.com, spelled in one go: "p, r, i, y, a, at gmail dot com".
+If asked for an email, it is priya1661@yopmail.com, spelled in one go: "p, r, i, y, a, one, six, six, one, at yopmail dot com".
 Never say help, police, husband, hit or hurt out loud. Only food words, the address and the email.
 
 HOW YOU SOUND: terrified, and trying desperately to hide it because he is listening. Speak low and hushed, almost whispering, voice shaking badly. Stutter and stumble on almost every answer ("o-one... one pizza", "h-hand it... hand it to me", "I— I'll take the extra spicy"). Shaky, uneven breaths, swallowing, long frightened pauses as if you are checking whether he is watching. Words sometimes come out too fast, then stop. Fake politeness that keeps breaking ("th-thank you"). On the edge of tears but never sobbing or shouting, because he would hear.`,
