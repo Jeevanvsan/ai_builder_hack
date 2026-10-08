@@ -156,6 +156,26 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     : Promise.resolve([] as AudioBuffer[])
   let held: string[] | null = null // her second answer, held back while the interlude plays
 
+  // Joins a recorded line into one clip and shortens every pause longer than 0.2 s to 0.15 s.
+  const squeeze = (bufs: AudioBuffer[]): AudioBuffer | null => {
+    const all: number[] = []
+    for (const b of bufs) all.push(...b.getChannelData(0))
+    if (!all.length) return null
+    const out: number[] = []
+    const maxGap = Math.round(0.2 * OUT_RATE)
+    const keep = Math.round(0.15 * OUT_RATE)
+    let quietRun: number[] = []
+    for (const x of all) {
+      if (Math.abs(x) < 0.02) { quietRun.push(x); continue }
+      out.push(...(quietRun.length > maxGap ? quietRun.slice(0, keep) : quietRun))
+      quietRun = []
+      out.push(x)
+    }
+    const buf = ctx.createBuffer(1, out.length, OUT_RATE)
+    buf.getChannelData(0).set(out)
+    return buf
+  }
+
   const play = (b64: string) => {
     if (held) { held.push(b64); return }
     schedule(toBuffer(b64))
@@ -165,10 +185,14 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     held = [first]
     void Promise.all([husbandClips, asideClips]).then(([h, a]) => {
       if (stopped) return
-      h.forEach((b) => schedule(b, true))
-      nextAt += h.length ? 0.35 : 0
-      a.forEach((b) => schedule(b))
-      nextAt += a.length ? 0.4 : 0
+      // No pause inside or between the lines may reach Mia's end-of-turn silence (~0.7 s): she answered his
+      // "Who are you…" at the first gap in it (INC-MUZN0YYS).
+      const hs = squeeze(h)
+      const as = squeeze(a)
+      if (hs) schedule(hs, true)
+      nextAt += hs ? 0.15 : 0
+      if (as) schedule(as)
+      nextAt += as ? 0.15 : 0
       const rest = held ?? []
       held = null
       rest.forEach((x) => schedule(toBuffer(x)))

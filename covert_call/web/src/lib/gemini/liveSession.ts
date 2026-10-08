@@ -591,7 +591,7 @@ export async function startLiveCall(
   // is picked up by the caller's mic and transcribed as the caller. A caller never says these to the order line, so
   // the app records them itself as another person's voice and a coercion sign, and tells Mia, instead of relying on
   // her to notice. Each distinct line is recorded once.
-  const THIRD_PARTY = /\b(who (are|r) you (talking|speaking) to|who(?:'s| is) (it|that|on the phone)|give me (the|that|your) phone|hang up|put (the|that) phone down|what are you doing|who did you call)\b/i
+  const THIRD_PARTY = /\b(who (are|r) you (talking|speaking) to|who(?:'s| is) (it|that|on the phone)|who are you\b(?! (?:going|getting|sending))|give me (the|that|your) phone|hang up|put (the|that) phone down|what are you doing|who did you call)\b/i
   const thirdPartySeen = new Set<string>()
   const noteThirdParty = () => {
     const line = transcriptLines.at(-1)
