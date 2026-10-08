@@ -201,7 +201,7 @@ function go(e: ReactMouseEvent, href: string, onNavigate: (path: string) => void
 const ALL_TABS = [...FEATURES.map((f) => ({ id: f.id, icon: f.icon, title: f.title })), { id: 'codes', icon: '🍕', title: 'Code table' }]
 
 // Shown at the top of the manual and of every topic: what the app needs permission for, and how to allow it.
-// Callers (and judges) who never saw the browser's permission box couldn't start a call.
+// Callers who never saw the browser's permission box couldn't start a call.
 const PERMISSIONS = [
   { icon: '🎙️', name: 'Microphone', need: 'Required', why: 'to talk to the order desk on a call' },
   { icon: '📷', name: 'Camera', need: 'Recommended', why: 'so responders can see what is happening (calls still work without it)' },
