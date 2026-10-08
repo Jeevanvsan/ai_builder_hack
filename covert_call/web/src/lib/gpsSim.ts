@@ -76,6 +76,9 @@ function adoptRoute(geometry: LatLng[]) {
   let best = 0
   let bestD = Infinity
   geometry.forEach((p, i) => { const d = metres(s.pos, p); if (d < bestD) { bestD = d; best = i } })
+  // A route that doesn't pass near the caller was planned from somewhere else (a misplaced landmark): following it
+  // would teleport the caller. Keep walking the current route instead.
+  if (s.route && bestD > 80) { console.info('[QuickBite demo] ignored a route planned away from the caller', Math.round(bestD), 'm'); return }
   s.route = geometry
   s.idx = best
   s.arrived = false

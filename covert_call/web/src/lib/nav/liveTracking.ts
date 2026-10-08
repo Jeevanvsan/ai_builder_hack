@@ -3,6 +3,7 @@ import { appendTrackPoint, INCIDENTS, setSafeRoute } from '../../../../shared/in
 import type { Incident } from '../../../../shared/incidents/types.ts'
 import { bestSafeRoute, distanceM, kindForSituation, progressOnRoute, type LatLng, type SafeRoute } from '../../../../shared/nav/route.ts'
 import { landmarkNear, locateLandmark } from '../../../../shared/nav/nearbyServices.ts'
+import { gpsSimEnabled } from '../gpsSim.ts'
 
 const WRITE_EVERY_MS = 10_000
 const WRITE_EVERY_M = 30
@@ -188,7 +189,8 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       if (landmark && anchor) {
         // Capped: a slow lookup (Photon took 7 s once) made the whole answer miss its 6 s budget.
         const hit = await Promise.race([locateLandmark(landmark, anchor).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2_500))])
-        if (hit && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
+        // The simulated GPS (demo recording) is exact: a landmark the caller names never moves it.
+        if (hit && !gpsSimEnabled && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
           // The dashboard follows a trail of 2+ points, so the first reported landmark also records where they
           // started — from the anchor (what the caller confirmed), not a possibly-wrong GPS/rough fix.
           if (!latestIncident?.location.track?.length) void appendTrackPoint(db, incidentId, { ...anchor, speed: null })
