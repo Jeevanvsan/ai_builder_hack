@@ -84,95 +84,95 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
   let nextAt = 0
   const playing = new Set<AudioBufferSourceNode>()
 
-  // The aside to the husband (the scenario's ASIDE LINE) is triggered by the app right after the caller's first
-  // answer, because a prompt alone did not make the model say it (INC-MUZMBPLA). That whole reply is played at a
-  // fraction of the volume: a voice model cannot be told to whisper reliably.
+  // The husband's shout (HUSBAND LINE) and her reply to him (ASIDE LINE) are recorded once at the start, then played
+  // together right before her SECOND answer: shout, her reply, then her answer, as one stretch of sound. Mia hears the
+  // caller still talking and waits. (Generated live, they landed on top of Mia's next question.)
   const asideLine = /ASIDE LINE: "([^"]+)"/.exec(o.scenario)?.[1] ?? null
+  const husbandLine = /HUSBAND LINE: "([^"]+)"/.exec(o.scenario)?.[1] ?? null
   let turns = 0
-  let quiet = false
+  let interludeDone = !asideLine && !husbandLine
 
-  const play = (b64: string) => {
+  const toBuffer = (b64: string) => {
     const bin = atob(b64)
-    const pcm = new Int16Array(bin.length / 2)
-    for (let i = 0; i < pcm.length; i++) pcm[i] = (bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) << 16 >> 16
-    const buf = ctx.createBuffer(1, pcm.length, OUT_RATE)
+    const buf = ctx.createBuffer(1, bin.length / 2, OUT_RATE)
     const ch = buf.getChannelData(0)
-    for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768
+    for (let i = 0; i < ch.length; i++) ch[i] = ((bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) << 16 >> 16) / 32768
+    return buf
+  }
+  // Schedules one clip after whatever is queued. `deep` = the husband: slower (lower pitch) through a bass boost.
+  const schedule = (buf: AudioBuffer, deep = false) => {
     const src = ctx.createBufferSource()
     src.buffer = buf
     const level = ctx.createGain()
-    level.gain.value = quiet ? 1 : 1 // her aside to him is at normal volume too
-    src.connect(level)
+    let tail: AudioNode = src
+    if (deep) {
+      src.playbackRate.value = 0.86
+      const bass = ctx.createBiquadFilter()
+      bass.type = 'lowshelf'
+      bass.frequency.value = 220
+      bass.gain.value = 9
+      src.connect(bass)
+      tail = bass
+      level.gain.value = 0.85 // across the room, a little further from the phone than she is
+    }
+    tail.connect(level)
     level.connect(o.out)
     if (o.speaker) level.connect(o.speaker)
     nextAt = Math.max(nextAt, ctx.currentTime + 0.05)
     src.start(nextAt)
-    nextAt += buf.duration
+    nextAt += buf.duration / src.playbackRate.value
     playing.add(src)
     src.onended = () => playing.delete(src)
   }
 
-  // The angry husband (the scenario's HUSBAND LINE): a separate male voice in the room, played into the call so Mia
-  // hears another person there. He only ever says his one line, when the app tells him to.
-  const husbandLine = /HUSBAND LINE: "([^"]+)"/.exec(o.scenario)?.[1] ?? null
-  let husband: { say: (line: string, done: () => void) => void; close: () => void } | null = null
-  if (husbandLine) {
-    let hNext = 0
-    let onDone: (() => void) | null = null
-    const hSession = await liveConnect({
+  // Records one line in a given voice (a short separate session), returning its audio.
+  const record = (voice: string, instruction: string, line: string) => new Promise<AudioBuffer[]>((resolve) => {
+    const clips: AudioBuffer[] = []
+    let done = false
+    const finish = () => { if (!done) { done = true; resolve(clips) } }
+    setTimeout(finish, 15_000)
+    void liveConnect({
       model: AI_MODELS.liveCall,
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Charon' } } },
-        systemInstruction: 'You are an angry, controlling Indian man in his 30s in a small flat, voicing one line for a film. When you are given a line, shout it exactly as written, harsh, aggressive and suspicious, then stop. Never say anything else, never reply to anyone.',
-      },
+      config: { responseModalities: [Modality.AUDIO], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }, systemInstruction: instruction },
       callbacks: {
         onopen: () => {},
         onmessage: (m: LiveServerMessage) => {
-          if (stopped) return
-          for (const p of m.serverContent?.modelTurn?.parts ?? []) {
-            if (!p.inlineData?.data || !p.inlineData.mimeType?.startsWith('audio/')) continue
-            const bin = atob(p.inlineData.data)
-            const buf = ctx.createBuffer(1, bin.length / 2, OUT_RATE)
-            const ch = buf.getChannelData(0)
-            for (let i = 0; i < ch.length; i++) ch[i] = ((bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) << 16 >> 16) / 32768
-            const src = ctx.createBufferSource()
-            src.buffer = buf
-            // Deeper and heavier: played slightly slower (lower pitch) through a bass boost.
-            src.playbackRate.value = 0.86
-            const bass = ctx.createBiquadFilter()
-            bass.type = 'lowshelf'
-            bass.frequency.value = 220
-            bass.gain.value = 9
-            const level = ctx.createGain()
-            level.gain.value = 0.85 // across the room, a little further from the phone than she is
-            src.connect(bass)
-            bass.connect(level)
-            level.connect(o.out)
-            if (o.speaker) level.connect(o.speaker)
-            hNext = Math.max(hNext, ctx.currentTime + 0.05)
-            src.start(hNext)
-            hNext += buf.duration / src.playbackRate.value
-          }
-          if (m.serverContent?.turnComplete && onDone) {
-            const done = onDone
-            onDone = null
-            setTimeout(done, Math.max(0, (hNext - ctx.currentTime) * 1000))
-          }
+          for (const p of m.serverContent?.modelTurn?.parts ?? []) if (p.inlineData?.data && p.inlineData.mimeType?.startsWith('audio/')) clips.push(toBuffer(p.inlineData.data))
+          if (m.serverContent?.turnComplete) finish()
         },
-        onerror: () => {},
-        onclose: () => {},
+        onerror: () => finish(),
+        onclose: () => finish(),
       },
-    }).catch(() => null)
-    if (hSession) {
-      husband = {
-        say: (line, done) => {
-          onDone = done
-          try { hSession.sendClientContent({ turns: `Shout this line now, exactly: "${line}"` }) } catch { done() }
-        },
-        close: () => { try { hSession.close() } catch { /* closed */ } },
-      }
-    }
+    }).then((sess) => {
+      try { sess.sendClientContent({ turns: `Say this line now, exactly as written: "${line}"` }) } catch { finish() }
+      void Promise.resolve().then(async () => { while (!done) await new Promise((r) => setTimeout(r, 200)); try { sess.close() } catch { /* closed */ } })
+    }, () => finish())
+  })
+  const husbandClips = husbandLine
+    ? record('Charon', 'You are an angry, controlling Indian man in his 30s in a small flat, voicing one line for a film. Shout the line exactly as written: harsh, aggressive and suspicious. Say nothing else.', husbandLine)
+    : Promise.resolve([] as AudioBuffer[])
+  const asideClips = asideLine
+    ? record(o.voice, 'You are a frightened young Indian woman covering for yourself in front of your angry husband, voicing one line for a film. Say the line exactly as written, quickly and nervously, voice shaking, trying to sound casual. Say nothing else.', asideLine)
+    : Promise.resolve([] as AudioBuffer[])
+  let held: string[] | null = null // her second answer, held back while the interlude plays
+
+  const play = (b64: string) => {
+    if (held) { held.push(b64); return }
+    schedule(toBuffer(b64))
+  }
+  const startInterlude = (first: string) => {
+    interludeDone = true
+    held = [first]
+    void Promise.all([husbandClips, asideClips]).then(([h, a]) => {
+      if (stopped) return
+      h.forEach((b) => schedule(b, true))
+      nextAt += h.length ? 0.35 : 0
+      a.forEach((b) => schedule(b))
+      nextAt += a.length ? 0.4 : 0
+      const rest = held ?? []
+      held = null
+      rest.forEach((x) => schedule(toBuffer(x)))
+    })
   }
 
   const session = await liveConnect({
@@ -187,22 +187,13 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
       onopen: () => console.info('[QuickBite demo] AI caller connected'),
       onmessage: (m: LiveServerMessage) => {
         if (stopped) return
-        if (m.serverContent?.turnComplete) {
-          turns++
-          quiet = false
-          // After her first answer: he shouts (his own voice, in the room), then she answers him under her breath.
-          if (turns === 1 && asideLine) {
-            const aside = () => {
-              if (stopped) return
-              quiet = true
-              try { session.sendClientContent({ turns: `(Note, not Mia: your husband just asked who you are talking to. Say ONLY this to him now, nothing else, then stop: "${asideLine}")` }) } catch { /* closed */ }
-            }
-            if (husband && husbandLine) husband.say(husbandLine, () => setTimeout(aside, 300))
-            else setTimeout(aside, 400)
-          }
+        if (m.serverContent?.turnComplete) turns++
+        for (const p of m.serverContent?.modelTurn?.parts ?? []) {
+          if (!p.inlineData?.data || !p.inlineData.mimeType?.startsWith('audio/')) continue
+          // Her second answer is about to start: play his shout and her reply to him first.
+          if (turns === 1 && !interludeDone) startInterlude(p.inlineData.data)
+          else play(p.inlineData.data)
         }
-
-        for (const p of m.serverContent?.modelTurn?.parts ?? []) if (p.inlineData?.data && p.inlineData.mimeType?.startsWith('audio/')) play(p.inlineData.data)
         // Mia started talking over the caller: drop what is still queued, like a person stopping mid-sentence.
         if (m.serverContent?.interrupted) { playing.forEach((s) => { try { s.stop() } catch { /* ended */ } }); playing.clear(); nextAt = 0 }
       },
@@ -236,7 +227,6 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
       source.disconnect()
       playing.forEach((s) => { try { s.stop() } catch { /* ended */ } })
       try { session.close() } catch { /* closed */ }
-      husband?.close()
     },
   }
 }
