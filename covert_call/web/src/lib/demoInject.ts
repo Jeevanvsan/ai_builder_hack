@@ -1,5 +1,6 @@
 declare const __DEMO_V__: string
 import { keepAudioRunning } from './gemini/audio'
+import { watchGpsSim } from './gpsSim'
 // Demo feed injection (for recording the demo video): a REAL call from this phone, but the camera picture and/or a
 // background sound can be switched to a prepared clip while it runs, from a laptop script (eval/demo.ts) or the
 // dashboard. Everything downstream (Mia's camera frames, the dashboard's live video, listen-in, the recordings)
@@ -29,7 +30,7 @@ export const demoInjectEnabled = typeof window !== 'undefined' && readFlag()
 export const DEMO_CONTROL = 'demoControl'
 // video + videoAt: start a clip (videoAt changes = start again); loopVideo false = play once, then back to the real
 // camera. sound + soundAt: play a sound (loopSound to repeat).
-export type DemoControl = { video?: string | null; videoAt?: number; loopVideo?: boolean; sound?: string | null; soundAt?: number; loopSound?: boolean }
+export type DemoControl = import('./gpsSim').GpsSimControl & { video?: string | null; videoAt?: number; loopVideo?: boolean; sound?: string | null; soundAt?: number; loopSound?: boolean }
 
 // The canvas matches the real camera (capped at 1280 px wide, 24 fps), so a normal call looks the same as before.
 const MAX_W = 1280
@@ -201,7 +202,10 @@ let unwatch: (() => void) | null = null
 export function watchDemoControl(db: Firestore, incidentId: string): void {
   if (!demoInjectEnabled) return
   unwatch?.()
+  const stopGps = watchGpsSim(db, incidentId, DEMO_CONTROL)
   let lastSoundAt = 0
+  // Only a press after this call started counts (a leftover trigger from an earlier call never fires).
+  let lastChase = Date.now() - 5_000
   let lastVideoKey: string | undefined
   unwatch = onSnapshot(doc(db, DEMO_CONTROL, incidentId), { includeMetadataChanges: false }, (snap) => {
     // Only real server state may change the clip. When Firestore's connection drops and recovers (the "Listen
@@ -209,11 +213,14 @@ export function watchDemoControl(db: Firestore, incidentId: string): void {
     // that switched the call to the real camera for a moment and then restarted the clip.
     if (snap.metadata.fromCache || !snap.exists()) return
     const c = (snap.data() ?? {}) as DemoControl
+    if ((c.chaseAt ?? 0) > lastChase) { lastChase = c.chaseAt!; window.dispatchEvent(new Event('qb-demo-chase')) }
     const videoKey = `${c.video ?? ''}|${c.videoAt ?? 0}`
     if (videoKey !== lastVideoKey) { lastVideoKey = videoKey; setVideo(c.video, c.loopVideo ?? true) }
     // A sound is a one-shot trigger: replayed whenever soundAt changes (same clip twice = two gunshots).
     if ((c.soundAt ?? 0) !== lastSoundAt) { lastSoundAt = c.soundAt ?? 0; void playSound(c.sound, c.loopSound) }
   }, () => {})
+  const stopControl = unwatch
+  unwatch = () => { stopControl?.(); stopGps() }
 }
 
 export function stopDemoInject() {

@@ -8,6 +8,8 @@ import { setCallerUid } from '../../shared/incidents/client.ts'
 import { callerReady } from './lib/caller.ts'
 import './styles/tokens.css'
 import './styles/global.css'
+// Demo recording only (?gpsSim=lat,lng): must replace navigator.geolocation before anything asks for a fix.
+import './lib/gpsSim'
 
 // TURN credentials are injected from the environment, never committed — this repository is public, and a
 // relay credential in it would be scraped and the quota drained. With none set the app stays on STUN and the

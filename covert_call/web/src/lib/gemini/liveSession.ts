@@ -552,6 +552,18 @@ export async function startLiveCall(
     nudgeAt = Date.now()
     session.sendClientContent({ turns })
   }
+  // Demo recording only: /demo-control's "Start chase & route" (via demoInject) tells Mia the caller is on the move,
+  // so the route is planned at once and the simulated GPS can follow it. Sent when she is quiet.
+  const onDemoChase = () => {
+    markMoving()
+    const send = () => {
+      if (finished) return
+      if (player.isPlaying() || toolsPending > 0 || !canSend()) { setTimeout(send, 800); return }
+      nudge('(System note, not the caller: the caller is being chased and is moving right now. Call report_situation (e.g. "being chased", urgency high) and get_route_guidance now, then give the first direction to safety. Say only the words meant for the caller.)')
+    }
+    send()
+  }
+  window.addEventListener('qb-demo-chase', onDemoChase)
   // A tool response that starts Mia's reply restarts the watchdog clock, so it never nudges while that reply is
   // being generated (generation takes 1-2 s before the first audio arrives).
   const replyStarted = () => { if (callerSpokeAt && !spokeSinceCaller) callerSpokeAt = Date.now() }
@@ -1123,6 +1135,7 @@ export async function startLiveCall(
       tracker?.stop()
       clearInterval(transcriptFlushTimer)
       frameSampler?.stop()
+      window.removeEventListener('qb-demo-chase', onDemoChase)
       clearInterval(missedTimer)
       if (frameCheckTimer) clearInterval(frameCheckTimer)
       micStop?.()

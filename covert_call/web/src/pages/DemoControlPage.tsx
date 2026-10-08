@@ -84,6 +84,25 @@ export default function DemoControlPage() {
 
   const selectedCall = useMemo(() => calls.find((c) => c.id === selected), [calls, selected])
 
+  // Chase demo: the call's route to safety and the caller's latest position, to watch the simulated GPS move.
+  const [routeInfo, setRouteInfo] = useState<{ dest: string; kind: string; leftM: number | null; lat: number | null; lng: number | null; speed: number | null } | null>(null)
+  const [setPos, setSetPos] = useState('')
+  useEffect(() => {
+    if (!selected || !selectedCall) { setRouteInfo(null); return }
+    return onSnapshot(doc(db, selectedCall.collection, selected), (s) => {
+      const x = s.data() ?? {}
+      const r = x.safeRoute
+      const track = (x.location?.track ?? []) as { lat: number; lng: number; speed?: number | null }[]
+      const last = track[track.length - 1] ?? x.location?.rough ?? null
+      let leftM: number | null = null
+      if (r && last) {
+        const steps = (r.steps ?? []) as { distanceM: number }[]
+        leftM = steps.slice(r.stepIndex ?? 0).reduce((a, st) => a + (st.distanceM ?? 0), 0)
+      }
+      setRouteInfo({ dest: r?.destination?.name ?? '', kind: r?.destination?.kind ?? '', leftM, lat: last?.lat ?? null, lng: last?.lng ?? null, speed: last?.speed ?? null })
+    }, () => {})
+  }, [selected, selectedCall])
+
   if (!user) {
     return (
       <main style={{ maxWidth: 420, margin: '48px auto', padding: 16, fontFamily: 'system-ui, sans-serif' }}>
@@ -136,6 +155,37 @@ export default function DemoControlPage() {
         <button style={{ ...btn(true), opacity: soundPick && selected ? 1 : 0.5 }} disabled={!soundPick || !selected} onClick={() => soundPick && void send({ sound: soundPick, soundAt: Date.now(), loopSound: soundLoop }, `Play ${soundPick}${soundLoop ? ' (loop)' : ''}`)}>▶ Play sound</button>
         <button style={{ ...btn(), opacity: selected ? 1 : 0.5 }} disabled={!selected} onClick={() => void send({ sound: null, soundAt: Date.now(), loopSound: false }, 'Sound off')}>■ Stop sound</button>
         {preview?.kind === 'sound' && <audio key={preview.name} src={`/demo/sound/${preview.name}.mp3?v=${__DEMO_V__}`} controls autoPlay style={{ display: 'block', width: '100%', maxWidth: 480, marginTop: 8 }} />}
+      </section>
+
+
+      <section style={{ ...box, opacity: selected ? 1 : 0.5, pointerEvents: selected ? 'auto' : 'none' }}>
+        <h2 style={{ fontSize: 16, marginTop: 0 }}>4. Chase &amp; route to safety</h2>
+        <p style={{ color: '#6b7280', marginTop: 0, fontSize: 14 }}>
+          On the caller's phone, open the app once with <code>?demoInject=1&amp;gpsSim=LAT,LNG</code> (the start point, e.g. <code>gpsSim=9.4981,76.3388</code>) so its GPS is simulated. The phone holds there until Mia has a route, then moves along exactly her route and stops at the destination. Without gpsSim the real GPS is used.
+        </p>
+        <button style={btn(true)} onClick={() => void send({ chaseAt: Date.now() }, 'Start chase & route')}>🏃 Start chase &amp; route</button>
+        <div style={{ margin: '6px 0 10px' }}>
+          <b style={{ fontSize: 14, marginRight: 8 }}>Speed</b>
+          {[{ k: 6, l: 'Walk 6 km/h' }, { k: 12, l: 'Run 12' }, { k: 25, l: 'Scooter 25' }, { k: 40, l: 'Car 40' }, { k: 80, l: 'Fast-forward 80' }].map((o) => (
+            <button key={o.k} style={btn(control.gpsSpeedKmh === o.k)} onClick={() => void send({ gpsSpeedKmh: o.k }, `Speed ${o.k} km/h`)}>{o.l}</button>
+          ))}
+        </div>
+        <button style={btn(!!control.gpsPaused)} onClick={() => void send({ gpsPaused: !control.gpsPaused }, control.gpsPaused ? 'Resume moving' : 'Pause (stand still)')}>{control.gpsPaused ? '▶ Resume moving' : '⏸ Pause (stand still)'}</button>
+        <button style={btn()} onClick={() => void send({ gpsJumpAt: Date.now(), gpsJumpM: 150 }, 'Jump 150 m ahead')}>⏩ Jump 150 m ahead</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+          <input value={setPos} onChange={(e) => setSetPos(e.target.value)} placeholder="Move to lat,lng (e.g. 9.4981,76.3388)" style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid #d1d5db' }} />
+          <button style={btn()} onClick={() => {
+            const [lat, lng] = setPos.split(',').map((v) => Number(v.trim()))
+            if (Number.isFinite(lat) && Number.isFinite(lng)) void send({ gpsSetAt: Date.now(), gpsSet: { lat, lng } }, `Moved to ${lat},${lng}`)
+            else setError('Enter the position as lat,lng')
+          }}>📍 Move here</button>
+        </div>
+        {routeInfo && (
+          <p style={{ fontSize: 14, marginBottom: 0 }}>
+            {routeInfo.dest ? <>Route: <b>{routeInfo.kind} · {routeInfo.dest}</b>{routeInfo.leftM != null && <> · about {Math.round(routeInfo.leftM)} m to go</>}</> : <span style={{ color: '#6b7280' }}>No route yet (Mia plans it once the caller is on the move).</span>}
+            {routeInfo.lat != null && <><br />Caller at {routeInfo.lat.toFixed(5)}, {routeInfo.lng?.toFixed(5)}{routeInfo.speed ? ` · ${Math.round(routeInfo.speed * 3.6)} km/h` : ''}</>}
+          </p>
+        )}
       </section>
 
       {sent && <p style={{ color: '#047857' }}>✓ {sent}</p>}
