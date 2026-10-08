@@ -450,7 +450,7 @@ export function Footer() {
           <div><h4>Try it</h4><ul><li><a href={LINKS.web} target="_blank" rel="noreferrer">Web app</a></li><li><a href="/#download">Android APK</a></li></ul></div>
           <div><h4>Project</h4><ul><li><a href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a></li><li>Team: Jeevan &amp; Ameen</li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
         </div>
-        <div className="footer-note"><span>© 2026 Covert Call team · <a href="/privacy">Privacy Policy</a></span><span>Made with Gemini on Google Cloud</span></div>
+        <div className="footer-note"><span>© 2026 Team NexMind · <a href="/privacy">Privacy Policy</a></span><span>Built by Team NexMind for AI Builder Cup 2026</span></div>
       </div>
     </footer>
   )
