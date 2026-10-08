@@ -81,6 +81,12 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
   let nextAt = 0
   const playing = new Set<AudioBufferSourceNode>()
 
+  // The aside to the husband ("It's just... food. For dinner. Give me a minute.") is played at a fraction of the
+  // volume: a voice model can't be told to whisper reliably, so the app turns it down while that line is spoken.
+  const ASIDE = /(just\W+food|for dinner|give me a minute)/i
+  const ASIDE_END = /give me a minute\W*$/i
+  let turnText = ''
+  let quiet = false
   const play = (b64: string) => {
     const bin = atob(b64)
     const pcm = new Int16Array(bin.length / 2)
@@ -90,8 +96,11 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768
     const src = ctx.createBufferSource()
     src.buffer = buf
-    src.connect(o.out)
-    if (o.speaker) src.connect(o.speaker)
+    const level = ctx.createGain()
+    level.gain.value = quiet ? 0.2 : 1
+    src.connect(level)
+    level.connect(o.out)
+    if (o.speaker) level.connect(o.speaker)
     nextAt = Math.max(nextAt, ctx.currentTime + 0.05)
     src.start(nextAt)
     nextAt += buf.duration
@@ -104,12 +113,20 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: o.voice } } },
+      outputAudioTranscription: {},
       systemInstruction: persona(o.scenario),
     },
     callbacks: {
       onopen: () => console.info('[QuickBite demo] AI caller connected'),
       onmessage: (m: LiveServerMessage) => {
         if (stopped) return
+        const said = m.serverContent?.outputTranscription?.text
+        if (said) {
+          turnText += said
+          if (ASIDE.test(said)) quiet = true
+          else if (quiet && !ASIDE_END.test(turnText.trim()) && /[a-z]/i.test(said) && /minute/i.test(turnText)) quiet = false
+        }
+        if (m.serverContent?.turnComplete) { turnText = ''; quiet = false }
         for (const p of m.serverContent?.modelTurn?.parts ?? []) if (p.inlineData?.data && p.inlineData.mimeType?.startsWith('audio/')) play(p.inlineData.data)
         // Mia started talking over the caller: drop what is still queued, like a person stopping mid-sentence.
         if (m.serverContent?.interrupted) { playing.forEach((s) => { try { s.stop() } catch { /* ended */ } }); playing.clear(); nextAt = 0 }
