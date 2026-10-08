@@ -83,7 +83,7 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
 
   // The aside to the husband ("It's just... food. For dinner. Give me a minute.") is played at a fraction of the
   // volume: a voice model can't be told to whisper reliably, so the app turns it down while that line is spoken.
-  const ASIDE = /(just\W+food|for dinner|give me a minute)/i
+  const ASIDE = /\b(just\W+food|for dinner|give me a minute)/i
   const ASIDE_END = /give me a minute\W*$/i
   let turnText = ''
   let quiet = false
