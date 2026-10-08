@@ -53,9 +53,9 @@ export default function Hero({ onDownload }: { onDownload: () => void }) {
             <button className="btn btn-ghost" onClick={onDownload}>⬇ Download APK</button>
           </motion.div>
           <motion.div className="hero-badges" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }}>
-            <span><i className="pulse" /> Live on Firebase</span>
+            <span><i className="pulse" /> Live web app</span>
             <span>✦ Gemini Live</span>
-            <span>⚡ Real-time Firestore</span>
+            <span>⚡ Real-time dashboard</span>
           </motion.div>
         </div>
 

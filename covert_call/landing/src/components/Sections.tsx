@@ -396,7 +396,7 @@ export function SplitView() {
 }
 
 export function Marquee() {
-  const items = ['✦ Gemini Live', '🧠 Gemini function calling', '🔥 Firebase Hosting', '⚡ Cloud Firestore', '🔐 Firebase Auth', '☁️ Cloud Run', '📡 WebRTC', '⚛️ React + Vite', '📱 React Native', '📈 Apache ECharts', '🗺️ Leaflet / OSM']
+  const items = ['✦ Gemini Live', '🧠 Gemini function calling', '☁️ Cloud Run', '📡 WebRTC', '⚛️ React + Vite', '📱 React Native', '📈 Apache ECharts', '🗺️ Leaflet / OSM']
   return (
     <section style={{ padding: '70px 0' }}>
       <div className="container" style={{ textAlign: 'center', marginBottom: 30 }}><span className="eyebrow">Built with</span></div>
@@ -417,7 +417,7 @@ export function Download({ onDownload }: { onDownload: () => void }) {
             <div style={{ position: 'relative' }}>
               <span className="eyebrow">Get Covert Call</span>
               <h2>Try it now, in your browser or on Android.</h2>
-              <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app runs live on Firebase with nothing to install. The Android build carries the same disguise as a real app icon.</p>
+              <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app runs live in the browser with nothing to install. The Android build carries the same disguise as a real app icon.</p>
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
               <button className="dl-opt" onClick={onDownload}><span className="ico">🤖</span><span><b>Download APK</b><small>Android · about 150 MB</small></span><span className="go">⬇</span></button>

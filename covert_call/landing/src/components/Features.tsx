@@ -228,7 +228,7 @@ const DIVES: Dive[] = [
   {
     tag: 'Live structured extraction',
     title: <>A conversation in, <span className="grad">an incident report out</span>, as it happens.</>,
-    body: "Gemini function calling turns each answer into typed incident fields as soon as it's spoken, and Firestore listeners push them to the dashboard in under a second. Severity is recalculated live and never drops mid-call. When the call ends, a consolidation pass writes the full case record.",
+    body: "Gemini function calling turns each answer into typed incident fields as soon as it's spoken, and live sync pushes them to the dashboard in under a second. Severity is recalculated live and never drops mid-call. When the call ends, a consolidation pass writes the full case record.",
     ticks: ['Danger tags, people count, injuries, weapons, address', 'Camera frames (~1 fps) and background sounds logged as "Seen & heard"', 'Voice-stress score and trend feed into severity'],
     visual: <Browser url="dashboard · incident"><Shot name="extraction" alt="Live extracted fields" fallback={<MockExtraction />} /></Browser>,
   },
