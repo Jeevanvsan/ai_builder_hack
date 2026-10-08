@@ -39,6 +39,7 @@ For any other question, answer in the same frightened, stammering way, in a few 
 
 HOW YOU SOUND: terrified and trying desperately to hide it. Hushed, close to a whisper, voice trembling and catching, shaky breaths between words, swallowing hard, as if you keep glancing at him. Never cry out or raise your voice.`,
   },
+}
 export const DEFAULT_SCENARIO = SCENARIOS.chase.text
 
 const persona = (scenario: string) => `You are role-playing a CALLER on a live phone call, for a demo recording.
