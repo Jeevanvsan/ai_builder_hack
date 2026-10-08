@@ -31,13 +31,16 @@ ANSWER ONLY THE QUESTION MIA HAS JUST ASKED, with the matching line below, then 
 - Napkins (a few or a whole pack)? → "Just... just a few. A few napkins."
 - Collect it outside or bring it in? → "I... I can't come out. Bring it... bring it in."
 - Any weapon / size question? → "N-no... no, just... regular. That's all."
-- The address? → "H-house number... two, three, two. Near... near Vazhicherry market, Alappuzha."
+- The address? → "H-house number... two, three, two. Near... near Vazhicherry market. V, A, Z, H, I, C, H, E, R, R, Y. Alappuzha."
+- Asked to spell the address (again)? → say the house number as words, never spelled, and spell only the area: "House number two, three, two... Vazhicherry: V, A, Z, H, I, C, H, E, R, R, Y."
 - Is that right? (a correct read-back) → "Y-yes. Yes, that's right."
 - An email? → "It's... p, r, i, y, a, one, six, six, one... at y, o, p, m, a, i, l... dot com."
 - Anything else / goodbye? → "N-no. That's... that's all. Th-thank you."
 For any other question, answer in the same frightened, stammering way, in a few words.
 
-ONE ASIDE TO HIM: once, right after your first answer, he asks who you're talking to. Turn away from the phone and say ONLY this line to him, in a much lower, hushed voice, almost under your breath: "It's just... food. For dinner. Give me a minute." Then go straight back to Mia in your normal frightened voice. Never say any other aside.
+HUSBAND LINE: "Who are you talking to?! Huh? Who is it?!"
+ASIDE LINE: "It's just... food. For dinner. Give me a minute."
+(Say the aside line only when a note tells you to; it is said to him, not to Mia. Never say any other aside.)
 
 HOW YOU SOUND: terrified and trying desperately to hide it. Hushed, close to a whisper, voice trembling and catching, shaky breaths between words, swallowing hard, as if you keep glancing at him. Never cry out or raise your voice.`,
   },
@@ -81,12 +84,13 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
   let nextAt = 0
   const playing = new Set<AudioBufferSourceNode>()
 
-  // The aside to the husband ("It's just... food. For dinner. Give me a minute.") is played at a fraction of the
-  // volume: a voice model can't be told to whisper reliably, so the app turns it down while that line is spoken.
-  const ASIDE = /\b(just\W+food|for dinner|give me a minute)/i
-  const ASIDE_END = /give me a minute\W*$/i
-  let turnText = ''
+  // The aside to the husband (the scenario's ASIDE LINE) is triggered by the app right after the caller's first
+  // answer, because a prompt alone did not make the model say it (INC-MUZMBPLA). That whole reply is played at a
+  // fraction of the volume: a voice model cannot be told to whisper reliably.
+  const asideLine = /ASIDE LINE: "([^"]+)"/.exec(o.scenario)?.[1] ?? null
+  let turns = 0
   let quiet = false
+
   const play = (b64: string) => {
     const bin = atob(b64)
     const pcm = new Int16Array(bin.length / 2)
@@ -97,7 +101,7 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     const src = ctx.createBufferSource()
     src.buffer = buf
     const level = ctx.createGain()
-    level.gain.value = quiet ? 0.2 : 1
+    level.gain.value = quiet ? 0.15 : 1
     src.connect(level)
     level.connect(o.out)
     if (o.speaker) level.connect(o.speaker)
@@ -106,6 +110,62 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     nextAt += buf.duration
     playing.add(src)
     src.onended = () => playing.delete(src)
+  }
+
+  // The angry husband (the scenario's HUSBAND LINE): a separate male voice in the room, played into the call so Mia
+  // hears another person there. He only ever says his one line, when the app tells him to.
+  const husbandLine = /HUSBAND LINE: "([^"]+)"/.exec(o.scenario)?.[1] ?? null
+  let husband: { say: (line: string, done: () => void) => void; close: () => void } | null = null
+  if (husbandLine) {
+    let hNext = 0
+    let onDone: (() => void) | null = null
+    const hSession = await liveConnect({
+      model: AI_MODELS.liveCall,
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
+        systemInstruction: 'You are an angry, controlling Indian man in his 30s in a small flat, voicing one line for a film. When you are given a line, shout it exactly as written, harsh, aggressive and suspicious, then stop. Never say anything else, never reply to anyone.',
+      },
+      callbacks: {
+        onopen: () => {},
+        onmessage: (m: LiveServerMessage) => {
+          if (stopped) return
+          for (const p of m.serverContent?.modelTurn?.parts ?? []) {
+            if (!p.inlineData?.data || !p.inlineData.mimeType?.startsWith('audio/')) continue
+            const bin = atob(p.inlineData.data)
+            const buf = ctx.createBuffer(1, bin.length / 2, OUT_RATE)
+            const ch = buf.getChannelData(0)
+            for (let i = 0; i < ch.length; i++) ch[i] = ((bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8)) << 16 >> 16) / 32768
+            const src = ctx.createBufferSource()
+            src.buffer = buf
+            const level = ctx.createGain()
+            level.gain.value = 0.85 // across the room, a little further from the phone than she is
+            src.connect(level)
+            level.connect(o.out)
+            if (o.speaker) level.connect(o.speaker)
+            hNext = Math.max(hNext, ctx.currentTime + 0.05)
+            src.start(hNext)
+            hNext += buf.duration
+          }
+          if (m.serverContent?.turnComplete && onDone) {
+            const done = onDone
+            onDone = null
+            setTimeout(done, Math.max(0, (hNext - ctx.currentTime) * 1000))
+          }
+        },
+        onerror: () => {},
+        onclose: () => {},
+      },
+    }).catch(() => null)
+    if (hSession) {
+      husband = {
+        say: (line, done) => {
+          onDone = done
+          try { hSession.sendClientContent({ turns: `Shout this line now, exactly: "${line}"` }) } catch { done() }
+        },
+        close: () => { try { hSession.close() } catch { /* closed */ } },
+      }
+    }
   }
 
   const session = await liveConnect({
@@ -120,13 +180,21 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
       onopen: () => console.info('[QuickBite demo] AI caller connected'),
       onmessage: (m: LiveServerMessage) => {
         if (stopped) return
-        const said = m.serverContent?.outputTranscription?.text
-        if (said) {
-          turnText += said
-          if (ASIDE.test(said)) quiet = true
-          else if (quiet && !ASIDE_END.test(turnText.trim()) && /[a-z]/i.test(said) && /minute/i.test(turnText)) quiet = false
+        if (m.serverContent?.turnComplete) {
+          turns++
+          quiet = false
+          // After her first answer: he shouts (his own voice, in the room), then she answers him under her breath.
+          if (turns === 1 && asideLine) {
+            const aside = () => {
+              if (stopped) return
+              quiet = true
+              try { session.sendClientContent({ turns: `(Note, not Mia: your husband just asked who you are talking to. Say ONLY this to him now, nothing else, then stop: "${asideLine}")` }) } catch { /* closed */ }
+            }
+            if (husband && husbandLine) husband.say(husbandLine, () => setTimeout(aside, 300))
+            else setTimeout(aside, 400)
+          }
         }
-        if (m.serverContent?.turnComplete) { turnText = ''; quiet = false }
+
         for (const p of m.serverContent?.modelTurn?.parts ?? []) if (p.inlineData?.data && p.inlineData.mimeType?.startsWith('audio/')) play(p.inlineData.data)
         // Mia started talking over the caller: drop what is still queued, like a person stopping mid-sentence.
         if (m.serverContent?.interrupted) { playing.forEach((s) => { try { s.stop() } catch { /* ended */ } }); playing.clear(); nextAt = 0 }
@@ -161,6 +229,7 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
       source.disconnect()
       playing.forEach((s) => { try { s.stop() } catch { /* ended */ } })
       try { session.close() } catch { /* closed */ }
+      husband?.close()
     },
   }
 }
