@@ -15,6 +15,7 @@ import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
 import { saveCallRecording } from '../lib/gemini/uploadRecording'
 import { acquireCallMedia, videoOnly } from '../lib/gemini/media'
+import { checkMic, micHelp, type MicIssue } from '../lib/micAccess'
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
@@ -66,6 +67,10 @@ export function CallPage() {
   // confirms or after 3 silent retries) — guard so whichever fires first wins and the other is a no-op.
   const endingRef = useRef(false)
   const finishCallRef = useRef<(opts?: { dropped?: boolean }) => void>(() => {})
+  // Mic refused or unavailable: the call never starts (no incident), and the caller sees how to fix it.
+  const [micIssue, setMicIssue] = useState<MicIssue | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const runCallRef = useRef<(() => Promise<void>) | null>(null)
 
   useEffect(() => {
     // startedRef makes this a true one-shot for the component's whole lifetime, including across React
@@ -81,7 +86,16 @@ export function CallPage() {
       recordDemoCall()
     }
 
-    void (async () => {
+    runCallRef.current = async () => {
+      // Ask for the mic first, before anything else: this is what shows the permission box, and a refused mic
+      // used to end on a bare "Couldn't connect" after an empty incident had already been created.
+      setStatus('connecting')
+      const issue = await checkMic()
+      if (issue) {
+        setMicIssue(issue)
+        return
+      }
+      setMicIssue(null)
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
       setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
@@ -147,7 +161,8 @@ export function CallPage() {
           }
         }
       }
-    })()
+    }
+    void runCallRef.current()
   }, [])
 
   useEffect(() => {
@@ -346,6 +361,44 @@ export function CallPage() {
           <div className="call-avatar" aria-hidden="true">QB</div>
           <h1>Demo limit reached</h1>
           <p className="call-status">Try another demo call in about {minutesUntilNextDemo()} min.</p>
+          <Link to="/" className="link-btn" replace>Back to menu</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (micIssue) {
+    const help = micHelp(micIssue)
+    const copyLink = async () => {
+      try {
+        await navigator.clipboard.writeText(window.location.origin)
+        setLinkCopied(true)
+      } catch {
+        setLinkCopied(false)
+      }
+    }
+    return (
+      <div className="page call-page">
+        <div className="call-top mic-help">
+          <div className="call-avatar" aria-hidden="true">QB</div>
+          <h1>{help.title}</h1>
+          <p className="mic-help-intro">{help.intro}</p>
+          <ol className="mic-help-steps">
+            {help.steps.map((step) => <li key={step}>{step}</li>)}
+          </ol>
+          {help.canCopyLink && (
+            <button type="button" className="mic-help-btn secondary" onClick={() => void copyLink()}>
+              {linkCopied ? 'Link copied' : 'Copy link'}
+            </button>
+          )}
+          {micIssue !== 'in-app' && micIssue !== 'unsupported' && (
+            <button type="button" className="mic-help-btn" onClick={() => void runCallRef.current?.()}>
+              Try again
+            </button>
+          )}
+          {/* No mic at all (e.g. the browser has no microphone permission in the phone's settings and the caller
+              can't change it now): the tap-only screen sends the same help without a call. */}
+          <Link to="/delivery-instructions" className="link-btn" replace>Can't use the microphone? Add delivery instructions instead</Link>
           <Link to="/" className="link-btn" replace>Back to menu</Link>
         </div>
       </div>

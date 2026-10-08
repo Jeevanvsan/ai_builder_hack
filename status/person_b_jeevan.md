@@ -741,3 +741,7 @@ Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
 - INC-MUXXR8TP: the model derailed into a full p5.js Tic-Tac-Toe program mid-call. New guard: code-like output stops playback, isn't saved, and Mia is told to repeat her last question.
 - Every long line appeared twice on the dashboard (5 s partial flush + full line appended). Partial lines are now replaced in place (transaction; the rules only allow the transcript to grow, so no arrayRemove).
 - Emails: older calls (before mandatory spelling) saved STT mishearings (jeevanvsain, geevanvsan); latest call with the spelling flow saved jeevanvsan correctly. Prod + staging deployed.
+
+### 2026-10-08 IST: microphone permission help
+- Reports: some phones never showed the mic permission box. Causes: site previously blocked, browser itself has no mic permission in the phone's settings, link opened in an in-app browser (WhatsApp/Instagram/Facebook), or mic busy.
+- CallPage now asks for the mic first (lib/micAccess.ts checkMic), before creating an incident. On failure it shows a help panel in the call screen's style: cause + steps for Android Chrome / iPhone Safari & Chrome / in-app browsers, "Try again", "Copy link" (in-app), and a link to the tap-only delivery-instructions screen (no mic needed). Prod + staging deployed. Intro video project added under covert_call/intro-video (Remotion).

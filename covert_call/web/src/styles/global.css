@@ -1316,3 +1316,43 @@ img {
 .account-save { display: flex; width: 100%; }
 .account-verified { margin: 0; font-weight: 600; }
 .account-msg { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+
+/* Mic permission help on the call screen (lib/micAccess.ts): shown instead of the call when the mic is refused. */
+.mic-help {
+  padding: 12vh 24px 32px;
+  gap: 12px;
+  text-align: center;
+}
+.mic-help-intro {
+  font-size: 15px;
+  color: var(--call-muted);
+  max-width: 340px;
+}
+.mic-help-steps {
+  text-align: left;
+  max-width: 360px;
+  margin: 8px 0 4px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.mic-help-btn {
+  width: 100%;
+  max-width: 360px;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+.mic-help-btn.secondary {
+  background: transparent;
+  color: var(--call-ink);
+  border: 1px solid var(--call-muted);
+}
