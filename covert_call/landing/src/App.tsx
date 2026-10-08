@@ -1,6 +1,7 @@
 import { MotionConfig } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Bento, DeepDives } from './components/Features'
+import { Gallery } from './components/Gallery'
 import Hero from './components/Hero'
 import Manual from './components/Manual'
 import Privacy from './components/Privacy'
@@ -27,7 +28,7 @@ export default function App() {
     document.title = 'User manual · Covert Call'
     return (
       <MotionConfig reducedMotion="user">
-        <Nav onDownload={openApk} />
+        <Nav />
         <Manual path={path} onNavigate={setPath} />
         <Footer />
         <ApkModal open={apkOpen} onClose={() => setApkOpen(false)} />
@@ -45,9 +46,9 @@ export default function App() {
   }
   return (
     <MotionConfig reducedMotion="user">
-      <Nav onDownload={openApk} />
+      <Nav />
       <main>
-        <Hero onDownload={openApk} />
+        <Hero />
         <Problem />
         <Disguise />
         <HowItWorks />
@@ -55,6 +56,7 @@ export default function App() {
         <Bento />
         <Compare />
         <DemoSlider />
+        <Gallery />
         <SplitView />
         <Marquee />
         <Download onDownload={openApk} />

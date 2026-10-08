@@ -15,6 +15,7 @@ import { zeroTraceExit } from '../lib/gemini/exit'
 import { startLiveCall, type CallStatus, type LiveCallHandle } from '../lib/gemini/liveSession'
 import { saveCallRecording } from '../lib/gemini/uploadRecording'
 import { acquireCallMedia, videoOnly } from '../lib/gemini/media'
+import { checkMic, micHelp, type MicIssue } from '../lib/micAccess'
 import { startVideoRecording, type VideoRecorderHandle } from '../lib/gemini/videoRecorder'
 import { driveConfigured, uploadCallVideo } from '../lib/gemini/videoUpload'
 import { MicIcon, MicOffIcon, PhoneIcon, SpeakerIcon } from '../components/disguise/icons'
@@ -66,6 +67,23 @@ export function CallPage() {
   // confirms or after 3 silent retries) — guard so whichever fires first wins and the other is a no-op.
   const endingRef = useRef(false)
   const finishCallRef = useRef<(opts?: { dropped?: boolean }) => void>(() => {})
+  // Mic refused or unavailable: the call never starts (no incident), and the caller sees how to fix it.
+  const [micIssue, setMicIssue] = useState<MicIssue | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+  // Back from the phone's settings with the mic now allowed: connect straight away, no extra tap.
+  useEffect(() => {
+    if (!micIssue || micIssue === 'in-app' || micIssue === 'unsupported') return
+    const onBack = () => { if (document.visibilityState === 'visible') void runCallRef.current?.() }
+    document.addEventListener('visibilitychange', onBack)
+    window.addEventListener('focus', onBack)
+    return () => {
+      document.removeEventListener('visibilitychange', onBack)
+      window.removeEventListener('focus', onBack)
+    }
+  }, [micIssue])
+  const runCallRef = useRef<(() => Promise<void>) | null>(null)
+  const micCheckingRef = useRef(false)
+  const callStartedRef = useRef(false)
 
   useEffect(() => {
     // startedRef makes this a true one-shot for the component's whole lifetime, including across React
@@ -81,7 +99,22 @@ export function CallPage() {
       recordDemoCall()
     }
 
-    void (async () => {
+    runCallRef.current = async () => {
+      // Ask for the mic first, before anything else: this is what shows the permission box, and a refused mic
+      // used to end on a bare "Couldn't connect" after an empty incident had already been created.
+      // One attempt at a time, and the call is started once: returning to the tab fires both focus and
+      // visibilitychange, which must not open two calls.
+      if (micCheckingRef.current || callStartedRef.current) return
+      micCheckingRef.current = true
+      setStatus('connecting')
+      const issue = await checkMic()
+      micCheckingRef.current = false
+      if (issue) {
+        setMicIssue(issue)
+        return
+      }
+      callStartedRef.current = true
+      setMicIssue(null)
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
       setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
@@ -147,7 +180,8 @@ export function CallPage() {
           }
         }
       }
-    })()
+    }
+    void runCallRef.current()
   }, [])
 
   useEffect(() => {
@@ -346,6 +380,41 @@ export function CallPage() {
           <div className="call-avatar" aria-hidden="true">QB</div>
           <h1>Demo limit reached</h1>
           <p className="call-status">Try another demo call in about {minutesUntilNextDemo()} min.</p>
+          <Link to="/" className="link-btn" replace>Back to menu</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (micIssue) {
+    const help = micHelp(micIssue)
+    const copyLink = async () => {
+      try {
+        await navigator.clipboard.writeText(window.location.origin)
+        setLinkCopied(true)
+      } catch {
+        setLinkCopied(false)
+      }
+    }
+    return (
+      <div className="page call-page">
+        <div className="call-top mic-help">
+          <div className="call-avatar" aria-hidden="true">QB</div>
+          <h1>{help.title}</h1>
+          <p className="mic-help-intro">{help.intro}</p>
+          <ol className="mic-help-steps">
+            {help.steps.map((step) => <li key={step}>{step}</li>)}
+          </ol>
+          {help.canCopyLink && (
+            <button type="button" className="mic-help-btn secondary" onClick={() => void copyLink()}>
+              {linkCopied ? 'Link copied' : 'Copy link'}
+            </button>
+          )}
+          {micIssue !== 'in-app' && micIssue !== 'unsupported' && (
+            <button type="button" className="mic-help-btn" onClick={() => void runCallRef.current?.()}>
+              Allow microphone
+            </button>
+          )}
           <Link to="/" className="link-btn" replace>Back to menu</Link>
         </div>
       </div>

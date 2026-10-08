@@ -2,7 +2,7 @@ import { animate, motion, useInView, useMotionValueEvent, useScroll } from 'moti
 import { useEffect, useRef, useState } from 'react'
 import { LINKS, Phone, QuickBiteScreen, Reveal, Shot, SwipeDots } from './ui'
 
-export function Nav({ onDownload }: { onDownload: () => void }) {
+export function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const { scrollY, scrollYProgress } = useScroll()
   useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 30))
@@ -16,13 +16,14 @@ export function Nav({ onDownload }: { onDownload: () => void }) {
           <a href="/#how">How it works</a>
           <a href="/#features">Features</a>
           <a href="/#demo">Demo</a>
+          <a href="/#gallery">Gallery</a>
           <a href="/#download">Download</a>
           <a href="/manual" className={location.pathname.startsWith('/manual') ? 'active' : ''}>User manual</a>
         </div>
         <div className="nav-cta">
           <a className="nav-manual-mobile" href="/manual">Manual</a>
           <a className="btn btn-ghost" href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a>
-          <button className="btn btn-primary" onClick={onDownload}>Get the app</button>
+          <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open the web app</a>
         </div>
       </div>
     </nav>
@@ -227,6 +228,9 @@ const VIDEOS: { file: string; drive?: string; title: string; d: string }[] = [
   { file: 'click-order', title: 'Tap and order', d: 'A coded cart is placed and arrives as a decoded incident.' },
 ]
 
+// Only clips that exist (a Drive link or a file in public/videos) get a slide; no "coming soon" cards.
+const AVAILABLE = VIDEOS.filter((v) => v.drive || __VIDEOS__.includes(v.file))
+
 function VideoSlide({ v, active }: { v: (typeof VIDEOS)[number]; active: boolean }) {
   const [missing, setMissing] = useState(!__VIDEOS__.includes(v.file))
   const ref = useRef<HTMLVideoElement>(null)
@@ -272,11 +276,12 @@ export function DemoSlider() {
   }, [])
   useEffect(() => {
     // Never auto-advance away from a slide that has a real video to watch.
-    if (paused || VIDEOS[i].drive) return
-    const t = setTimeout(() => setI((n) => (n + 1) % VIDEOS.length), 7000)
+    if (paused || AVAILABLE[i].drive) return
+    const t = setTimeout(() => setI((n) => (n + 1) % AVAILABLE.length), 7000)
     return () => clearTimeout(t)
   }, [i, paused])
-  const go = (n: number) => setI((n + VIDEOS.length) % VIDEOS.length)
+  if (!AVAILABLE.length) return null
+  const go = (n: number) => setI((n + AVAILABLE.length) % AVAILABLE.length)
 
   return (
     <section className="dark" id="demo" style={{ overflow: 'hidden' }}>
@@ -285,27 +290,27 @@ export function DemoSlider() {
           <div className="section-head">
             <span className="eyebrow">See it working</span>
             <h2 style={{ color: '#fff' }}>Demo videos</h2>
-            <p className="muted">Drag, swipe or use the arrows.</p>
+            {AVAILABLE.length > 1 && <p className="muted">Drag, swipe or use the arrows.</p>}
           </div>
         </Reveal>
         <div className="slider" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
           <motion.div ref={trackRef} className="slides" animate={{ x: -i * slideW }} transition={{ type: 'spring', stiffness: 120, damping: 22 }}
-            drag="x" dragConstraints={{ left: -(VIDEOS.length - 1) * slideW, right: 0 }} dragElastic={0.15}
+            drag="x" dragConstraints={{ left: -(AVAILABLE.length - 1) * slideW, right: 0 }} dragElastic={0.15}
             onDragEnd={(_, info) => { if (info.offset.x < -80) go(i + 1); else if (info.offset.x > 80) go(i - 1) }}>
-            {VIDEOS.map((v, n) => (
+            {AVAILABLE.map((v, n) => (
               <motion.div key={v.file} className="slide" animate={{ opacity: n === i ? 1 : 0.4, scale: n === i ? 1 : 0.94 }}>
                 <VideoSlide v={v} active={n === i} />
                 <div className="slide-info"><div><h3>{v.title}</h3><p>{v.d}</p></div><span className="chip acc">0{n + 1}</span></div>
               </motion.div>
             ))}
           </motion.div>
-          <div className="slider-ctrl">
+          {AVAILABLE.length > 1 && <div className="slider-ctrl">
             <button className="arrow" onClick={() => go(i - 1)} aria-label="Previous">←</button>
             <button className="arrow" onClick={() => go(i + 1)} aria-label="Next">→</button>
             <div style={{ display: 'flex', gap: 8, marginLeft: 12 }}>
-              {VIDEOS.map((v, n) => <button key={v.file} className={`dotbtn${n === i ? ' on' : ''}`} onClick={() => go(n)} aria-label={v.title} />)}
+              {AVAILABLE.map((v, n) => <button key={v.file} className={`dotbtn${n === i ? ' on' : ''}`} onClick={() => go(n)} aria-label={v.title} />)}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </section>
@@ -416,13 +421,13 @@ export function Download({ onDownload }: { onDownload: () => void }) {
             <div className="blob" style={{ width: 400, height: 400, background: 'var(--accent)', right: -100, top: -150, opacity: 0.35 }} />
             <div style={{ position: 'relative' }}>
               <span className="eyebrow">Get Covert Call</span>
-              <h2>Try it now, in your browser or on Android.</h2>
-              <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app runs live on Firebase with nothing to install. The Android build carries the same disguise as a real app icon.</p>
+              <h2>Try it now, in your browser.</h2>
+              <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app is the recommended way in: it runs live in any phone or laptop browser, with nothing to install and every feature.</p>
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
-              <button className="dl-opt" onClick={onDownload}><span className="ico">🤖</span><span><b>Download APK</b><small>Android · about 150 MB</small></span><span className="go">⬇</span></button>
-              <a className="dl-opt" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🍕</span><span><b>Open QuickBite web app</b><small>quickbite-5cde0.web.app</small></span><span className="go">↗</span></a>
+              <a className="dl-opt dl-primary" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🍕</span><span><b>Open QuickBite web app <em className="rec-pill">Recommended</em></b><small>Quickest access, nothing to install · quickbite-5cde0.web.app</small></span><span className="go">↗</span></a>
               <a className="dl-opt" href={LINKS.github} target="_blank" rel="noreferrer"><span className="ico">💻</span><span><b>Source on GitHub</b><small>Public repository</small></span><span className="go">↗</span></a>
+              <button className="dl-sub" onClick={onDownload}>Prefer an Android app? <b>Download the APK</b> (about 150 MB)</button>
             </div>
           </div>
         </Reveal>
@@ -443,9 +448,9 @@ export function Footer() {
           </div>
           <div><h4>Product</h4><ul><li><a href="/#disguise">Disguise</a></li><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/#demo">Demo</a></li></ul></div>
           <div><h4>Try it</h4><ul><li><a href={LINKS.web} target="_blank" rel="noreferrer">Web app</a></li><li><a href="/#download">Android APK</a></li></ul></div>
-          <div><h4>Project</h4><ul><li><a href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a></li><li>Team: Jeevan &amp; Ameen</li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
+          <div><h4>Project</h4><ul><li><a href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a></li><li>Team: NexMind</li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
         </div>
-        <div className="footer-note"><span>© 2026 Covert Call team · <a href="/privacy">Privacy Policy</a></span><span>Made with Gemini on Google Cloud</span></div>
+        <div className="footer-note"><span>© 2026 Team NexMind · <a href="/privacy">Privacy Policy</a></span></div>
       </div>
     </footer>
   )

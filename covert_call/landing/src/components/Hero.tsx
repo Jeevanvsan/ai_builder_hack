@@ -17,7 +17,7 @@ const FIELDS = [
   { k: 'Voice stress', v: '78%', c: 'acc', at: 5 },
   { k: 'Severity', v: 'HIGH', c: 'high', at: 5 },
 ]
-export default function Hero({ onDownload }: { onDownload: () => void }) {
+export default function Hero() {
   const [step, setStep] = useState(-1) // -1 = menu, 0..n = call lines
   const { scrollY } = useScroll()
   const yStage = useTransform(scrollY, [0, 600], [0, 90])
@@ -50,12 +50,14 @@ export default function Hero({ onDownload }: { onDownload: () => void }) {
           </motion.p>
           <motion.div className="hero-ctas" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.15 }}>
             <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Try the web app →</a>
-            <button className="btn btn-ghost" onClick={onDownload}>⬇ Download APK</button>
           </motion.div>
+          <motion.p className="web-note" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }}>
+            ★ Recommended: use the web app. It's the quickest way in, nothing to install, and has every feature.
+          </motion.p>
           <motion.div className="hero-badges" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }}>
-            <span><i className="pulse" /> Live on Firebase</span>
+            <span><i className="pulse" /> Live web app</span>
             <span>✦ Gemini Live</span>
-            <span>⚡ Real-time Firestore</span>
+            <span>⚡ Real-time dashboard</span>
           </motion.div>
         </div>
 

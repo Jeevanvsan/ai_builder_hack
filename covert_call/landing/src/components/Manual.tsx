@@ -200,6 +200,46 @@ function go(e: ReactMouseEvent, href: string, onNavigate: (path: string) => void
 
 const ALL_TABS = [...FEATURES.map((f) => ({ id: f.id, icon: f.icon, title: f.title })), { id: 'codes', icon: '🍕', title: 'Code table' }]
 
+// Shown at the top of the manual and of every topic: what the app needs permission for, and how to allow it.
+// Callers who never saw the browser's permission box couldn't start a call.
+const PERMISSIONS = [
+  { icon: '🎙️', name: 'Microphone', need: 'Required', why: 'to talk to the order desk on a call' },
+  { icon: '📷', name: 'Camera', need: 'Recommended', why: 'so responders can see what is happening (calls still work without it)' },
+  { icon: '📍', name: 'Location', need: 'Recommended', why: 'for your live position and directions to the nearest help' },
+  { icon: '📳', name: 'Motion sensors', need: 'iPhone asks', why: 'to notice if the phone is grabbed, dropped or you are running' },
+]
+
+function PermissionsNotice() {
+  return (
+    <section className="manual-permissions" role="note" aria-label="Permissions you must allow">
+      <div className="manual-permissions-head">
+        <span aria-hidden="true">⚠️</span>
+        <div>
+          <b>Before you start: allow these permissions</b>
+          <p>When the browser asks, tap <b>Allow</b>. Without the microphone, a call cannot connect.</p>
+        </div>
+      </div>
+      <ul className="manual-permissions-list">
+        {PERMISSIONS.map((x) => (
+          <li key={x.name}>
+            <span aria-hidden="true">{x.icon}</span>
+            <span><b>{x.name}</b> <em className={x.need === 'Required' ? 'req' : ''}>{x.need}</em><br />{x.why}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="manual-permissions-help">
+        <p><b>No permission box appeared?</b></p>
+        <ul>
+          <li>Open the link in <b>Chrome</b> (Android) or <b>Safari</b> (iPhone), not inside WhatsApp, Instagram or Facebook.</li>
+          <li><b>Android:</b> tap the icon left of the web address → Permissions → allow Microphone, Camera and Location. Still blocked? Phone Settings → Apps → Chrome → Permissions.</li>
+          <li><b>iPhone:</b> Safari → tap “aA” → Website Settings → Allow. Chrome on iPhone: Settings app → Chrome → turn on Microphone, Camera and Location.</li>
+          <li>Then reload the page and tap “Call to order” again.</li>
+        </ul>
+      </div>
+    </section>
+  )
+}
+
 export default function Manual({ path, onNavigate }: { path: string; onNavigate: (path: string) => void }) {
   const slug = path.replace(/^\/manual\/?/, '').replace(/\/$/, '')
   const feature = FEATURES.find((f) => f.id === slug)
@@ -262,6 +302,7 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
                 its own page: what it is, when to use it, and exactly what to do.
               </p>
             </header>
+            <PermissionsNotice />
             <section className="manual-pick">
               <h2>Which one should I use?</h2>
               <div className="manual-pick-grid">
@@ -291,6 +332,8 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
             </section>
           </>
         )}
+
+        {current && <PermissionsNotice />}
 
         {feature && (
           <article className="manual-card">

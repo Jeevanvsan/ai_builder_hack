@@ -1,3 +1,5 @@
+declare const __DEMO_V__: string
+import { keepAudioRunning } from './gemini/audio'
 // Demo feed injection (for recording the demo video): a REAL call from this phone, but the camera picture and/or a
 // background sound can be switched to a prepared clip while it runs, from a laptop script (eval/demo.ts) or the
 // dashboard. Everything downstream (Mia's camera frames, the dashboard's live video, listen-in, the recordings)
@@ -119,9 +121,7 @@ function wrapAudio(stream: MediaStream): MediaStreamTrack | null {
   const ctx = new AudioContext()
   // Phones can create an AudioContext 'suspended' when it isn't started from a tap; then the mixed mic track
   // carries silence/stutter to Gemini. Resume now and on the next touch, just in case.
-  void ctx.resume().catch(() => {})
-  const resumeOnTouch = () => { void ctx.resume().catch(() => {}); if (ctx.state === 'running') window.removeEventListener('pointerdown', resumeOnTouch) }
-  window.addEventListener('pointerdown', resumeOnTouch)
+  const stopResume = keepAudioRunning(ctx)
   const out = ctx.createMediaStreamDestination()
   ctx.createMediaStreamSource(new MediaStream([micTrack])).connect(out)
   audioState = { ctx, out, playing: null }
@@ -129,6 +129,7 @@ function wrapAudio(stream: MediaStream): MediaStreamTrack | null {
   if (!track) return null
   return linkStop(track, micTrack, () => {
     if (audioState?.ctx === ctx) { audioState.playing?.stop(); audioState = null }
+    stopResume()
     void ctx.close().catch(() => {})
   })
 }
@@ -160,7 +161,7 @@ function setVideo(name: string | null | undefined, loop = true) {
     return
   }
   const clip = document.createElement('video')
-  clip.src = `/demo/video/${name}.mp4`
+  clip.src = `/demo/video/${name}.mp4?v=${__DEMO_V__}`
   clip.muted = true
   clip.loop = loop
   // Played once: when it ends, the call shows the real camera again.
@@ -183,7 +184,7 @@ async function playSound(name: string | null | undefined, loop = false) {
   const { ctx, out } = audioState
   if (ctx.state === 'suspended') await ctx.resume().catch(() => {})
   if (!soundCache.has(name)) {
-    soundCache.set(name, fetch(`/demo/sound/${name}.mp3`).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)))
+    soundCache.set(name, fetch(`/demo/sound/${name}.mp3?v=${__DEMO_V__}`).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)))
   }
   const buffer = await soundCache.get(name)!.catch(() => null)
   if (!buffer || !audioState) return

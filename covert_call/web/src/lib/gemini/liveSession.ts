@@ -3,7 +3,7 @@ import { AI_FEATURES } from '../../../../shared/aiFeatures.ts'
 import { FunctionResponseScheduling, MediaResolution, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
 import { addDoc, arrayRemove, collection, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
 import { usageFromMetadata } from '../../../../shared/aiModels.ts'
-import { INCIDENTS, recordAiUsage, appendTranscriptLine, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
+import { INCIDENTS, recordAiUsage, appendTranscriptLine, replaceTranscriptLine, type TranscriptEntry, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { checkCameraFrame } from './photoVision.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
@@ -97,14 +97,23 @@ export async function startLiveCall(
     const quoted = [...text.slice(at).matchAll(/(?:spoken text|speech)\s*:?\s*\*?\s*["“]([^"”]{3,})["”]/gi)].at(-1)?.[1]
     return quoted ?? text.slice(0, at)
   }
+  // Code-like output (fences, statements, function definitions) never belongs in a phone call.
+  const CODE_LIKE = /```|\bfunction\s+\w+\s*\(|\b(let|const|var)\s+\w+\s*=|[;{}]\s*\n|\bconsole\.log\(|=>\s*\{/
+  let derailed = false
   const written: number[] = []
+  const savedEntries: (TranscriptEntry | undefined)[] = []
   const writeLine = (i: number) => {
     const line = transcriptLines[i]
     const text = (line.speaker === 'Mia' ? spokenPart(line.text) : line.text).replace(/[<{[(]\s*(no speech( detected)?|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]/gi, '').trim()
     if (!text || (written[i] ?? 0) >= line.text.length) return
     written[i] = line.text.length
     const speaker = line.speaker === 'Mia' ? 'Mia' : 'Caller'
-    enqueueWrite(() => appendTranscriptLine(db, incidentId, speaker, text))
+    // A line already saved part-way is replaced by its full text: appending showed every long line twice
+    // ("Is this order for" and then the full question) on the dashboard.
+    enqueueWrite(async () => {
+      const prev = savedEntries[i]
+      savedEntries[i] = prev ? await replaceTranscriptLine(db, incidentId, prev, text) : await appendTranscriptLine(db, incidentId, speaker, text)
+    })
   }
   const flushTranscript = (includeLast = false) => {
     const upTo = includeLast ? transcriptLines.length : transcriptLines.length - 1
@@ -188,9 +197,13 @@ export async function startLiveCall(
       setTimeout(() => { if (!finished && emailConfirmedAt < yesAt) nudge('(System note, not the caller: the caller confirmed the email you read back. Call send_case_report with confirmed=true and exactly that address in name@domain.tld syntax, then carry on.)') }, 2_500)
     }
   }
-  const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it).{0,25}(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
+  const SAFE_NOW = /reached|i'?m safe|i am safe|safe now|(car|they|he|she|him|them|it)\b.{0,25}\b(gone|left|lost)|lost (him|her|them|the car)|(at|inside|in) the (police|station|hospital)/i
   let sceneDue = false
   let lastAddressSaved: string | null = null
+  let addressSpellAsked = false
+  let emailSpellAsked = false
+  // The caller spelled something letter by letter in one of their last 3 lines ("J E E V A N", "j, e, e").
+  const callerSpelled = () => transcriptLines.filter((l) => l.speaker === 'Caller').slice(-3).some((l) => /(?:\b[A-Za-z0-9]\b[\s,.-]*){3,}/.test(l.text))
   // Once they're on the move, start the route straight away so it's ready when Mia asks for it.
   const markMoving = () => {
     if (!movementReported) console.info('[QuickBite call] caller is on the move: starting the route')
@@ -199,7 +212,7 @@ export async function startLiveCall(
   }
   const SILENT_TAG = 'caller silent after danger - line kept open'
   let silentTagged = false
-  const MOVEMENT = /(followed|chased|chasing|stalked|stalking|fleeing|escaping)|following (me|her|him|them|the caller)|on the move|moving around|abduct|taken somewhere|running away|in the road|leaving the (house|home|room|building)/i
+  const MOVEMENT = /\b(followed|chased|chasing|stalked|stalking|fleeing|escaping)\b|following (me|her|him|them|the caller)|on the move|moving around|abduct|taken somewhere|running away|in the road|leaving the (house|home|room|building)/i
   // True once anything dangerous has been reported this call (a weapon, a gunshot/scream heard, high urgency).
   // Silence after that point is a reason to stay connected, not the ordinary "no answer, end the call" case —
   // see the silence timer below and persona.ts's SILENCE section.
@@ -284,7 +297,7 @@ export async function startLiveCall(
   }
   const spellingSources = () => {
     const mia = [...transcriptLines].reverse().find((l) => l.speaker === 'Mia')?.text ?? ''
-    const caller = transcriptLines.filter((l) => l.speaker === 'Caller').slice(-6).map((l) => l.text).join(' | ')
+    const caller = transcriptLines.filter((l) => l.speaker === 'Caller').map((l) => l.text).join(' | ')
     return `${mia} | ${caller}`
   }
   const saveAddress = (address: string) => {
@@ -320,6 +333,24 @@ export async function startLiveCall(
       })
       .replace(/\u0000[A-Za-z]+\u0000/g, '').replace(/\s+,/g, ',').replace(/,(\s*,)+/g, ',').replace(/\s{2,}/g, ' ').replace(/[\s,]+$/, '').trim()
 
+  // An email Mia spelled out loud ("j, e, e, v, a, n at gmail com") from one of her lines, or null.
+  const spokenEmail = (text: string): string | null => {
+    const toks = text.toLowerCase().replace(/@/g, ' at ').split(/[\s,—–\-]+/).map((t: string) => t.replace(/[^a-z0-9._]/g, '')).filter(Boolean)
+    let best: string | null = null
+    for (let i = 0; i < toks.length; i++) {
+      if (toks[i] !== 'at') continue
+      let j = i - 1, local = ''
+      while (j >= 0 && (toks[j].length === 1 || toks[j] === 'dot' || toks[j] === 'underscore')) { local = (toks[j] === 'dot' ? '.' : toks[j] === 'underscore' ? '_' : toks[j]) + local; j-- }
+      if (local.replace(/[._]/g, '').length < 3) continue
+      const dom: string[] = []
+      for (let k = i + 1; k < toks.length && dom.length < 4; k++) { const t = toks[k]; if (['is', 'that', 'right', 'correct'].includes(t)) break; dom.push(t === 'dot' ? '.' : t) }
+      let domain = dom.join(' ').replace(/\s*\.\s*/g, '.').trim().replace(/\s+/g, '.')
+      if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain)) continue
+      best = `${local}@${domain}`
+    }
+    return best
+  }
+
   // Returns the tool response text for calls whose answer matters to the model; undefined means plain "ok".
   const handleToolCall = (call: FunctionCall): string | undefined => {
     const args = (call.args ?? {}) as Record<string, unknown>
@@ -341,7 +372,7 @@ export async function startLiveCall(
       case 'send_case_report': {
         // Location comes before the email, always (INC-MUXPXKUJ asked the email and never the address).
         if (lastAddressSaved === null && !movementReported) {
-          return 'Not yet: you have not taken their address. Ask the delivery address now (covert: "And the delivery address, so the rider finds you?"), read it back and confirm it, call confirm_address, and only then ask for the email again.'
+          return 'Not yet: you have not taken their address. Ask the delivery address now and ask them to spell it (covert: "And the delivery address, so the rider finds you? Please spell the house name and area for me."), read it back and confirm it, call confirm_address, and only then ask for the email again.'
         }
         emailAsked = true
         // Mia decides the address: she heard the caller spell it and corrections. Parsing transcripts ourselves
@@ -360,13 +391,21 @@ export async function startLiveCall(
         }
         if (args.confirmed === true && (pendingEmail || emailSavedAs)) {
           emailConfirmedAt = Date.now()
-          const confirmed = email
+          // What the caller said yes to is the address Mia SPOKE in her read-back, which can differ from her tool argument
+          // (INC-MUXX7G18: read back "j, e, e, v, a, n, v, s, a, n", passed "jeevanvsn" from the transcript).
+          const spoken = [...transcriptLines].reverse().filter((l) => l.speaker === 'Mia').slice(0, 3).map((l) => spokenEmail(l.text)).find(Boolean)
+          const confirmed = spoken ?? email
           if (confirmed !== emailSavedAs) saveReportEmail(confirmed)
           return `Confirmed and saved: ${confirmed}. Tell them in one short line that the full case report with a reference number will be emailed there after the call.`
         }
         pendingEmail = email
         pendingEmailAt = Date.now()
         emailReadBack = false
+        // Mandatory: the caller spells it. Asked once (speech-to-text sometimes joins spelled letters into a word).
+        if (!emailSpellAsked && !callerSpelled()) {
+          emailSpellAsked = true
+          return 'Not saved yet. MANDATORY: the caller has not spelled the email. Ask them now to spell it letter by letter (covert: "Can you spell that for me, letter by letter, so the receipt reaches you?"). Then call send_case_report with exactly their letters and read it back.'
+        }
         return `Not saved yet. Read exactly this address back, letter by letter for the part before the @: ${email}. Then ask "Is that right?". If they say yes, call send_case_report again with confirmed=true and this same address. If they correct anything, FIRST call send_case_report with the corrected address (their spelled letters are final), then read that back; repeat until they say yes.`
       }
       case 'confirm_address': {
@@ -379,8 +418,13 @@ export async function startLiveCall(
         // Saved straight away (latest version wins) so responders have a location even before the read-back.
         // One lookup per distinct address; a failed one is retried once after 3 s (free map server rate limit).
         if (address !== lastAddressSaved) saveAddress(address)
+        // Mandatory: the caller spells the address. Asked once; never while they are on the move.
+        if (args.confirmed !== true && !movementReported && !addressSpellAsked && !callerSpelled()) {
+          addressSpellAsked = true
+          return 'Saved for now. MANDATORY: the caller has not spelled it. Ask them now to spell the house name and the area letter by letter (covert: "Can you spell the house name and area for me, so the rider finds it?"). Then call confirm_address with exactly their spelling and read it back.'
+        }
         if (args.confirmed !== true) {
-          return `Saved for now. If the caller spelled any name letter by letter, use exactly their letters (e.g. "N I V A S" is "Nivas", not "Niwas") and call confirm_address again with that spelling first. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Niwas — J, E, E, V, A, N, N, I, W, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
+          return `Saved for now. If the caller spelled any name letter by letter, use exactly their letters (e.g. "N I V A S" is "Nivas", not "Niwas") and call confirm_address again with that spelling first. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Nivas — J, E, E, V, A, N, N, I, V, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
         }
         return movementReported
           ? 'Saved. They are on the move — call get_route_guidance now and guide them to the police station/hospital it gives.'
@@ -523,7 +567,7 @@ export async function startLiveCall(
   }
   // After danger, Mia is told in advance to ask for the report email in the same reply where the caller says they
   // are safe: a prompt sent after that reply came too late (INC-MUWN5ZK9 ended on "take care").
-  const EMAIL_NOTE = " (When the caller says they are safe or have arrived, in that same reply ask once for an email address to send their case report to, with a reference number for the police; covert mode: offer to email the order receipt. Call send_case_report with it, read the address back and ask if it is right; only after they say yes call send_case_report again with confirmed=true.)"
+  const EMAIL_NOTE = " (When the caller says they are safe or have arrived, in that same reply ask once for an email address (and ask them to spell it letter by letter) to send their case report to, with a reference number for the police; covert mode: offer to email the order receipt. Call send_case_report with it, read the address back and ask if it is right; only after they say yes call send_case_report again with confirmed=true.)"
   const factsWithMode = (data: Omit<Incident, 'id'>) =>
     (dangerReported && !emailAsked ? EMAIL_NOTE : '') + (openMode ? "(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO food words, NO menu codes, NO 'rider', 'order' or sizes. Switch back only if they say they can't talk or someone is coming.) " : '') + knownFactsNote(data)
   let lastIncident: Omit<Incident, 'id'> | undefined
@@ -574,7 +618,18 @@ export async function startLiveCall(
       }
     }
     const miaText = message.serverContent?.outputTranscription?.text
-    if (miaText) {
+    // Rarely the model derails into unrelated text (INC-MUXXR8TP read out a whole p5.js Tic-Tac-Toe program
+    // mid-call). Code-like output is cut at once: playback stopped, not saved, and Mia asked to repeat her question.
+    if (miaText && !derailed && CODE_LIKE.test(`${transcriptLines.at(-1)?.speaker === 'Mia' ? transcriptLines.at(-1)?.text.slice(-200) : ''}${miaText}`)) {
+      derailed = true
+      player.clearQueue()
+      const last = transcriptLines.at(-1)
+      if (last?.speaker === 'Mia') { const cut = last.text.search(CODE_LIKE); if (cut >= 0) last.text = last.text.slice(0, cut) }
+      console.warn('[QuickBite call] model output derailed into code: cut off')
+      setTimeout(() => { derailed = false; if (!finished) nudge('(System note, not the caller: your last reply was garbled and did not reach the caller. Say again, briefly, only your last question to the caller, as Mia. Say only the words meant for the caller.)') }, 1_500)
+    }
+    if (miaText && derailed) { /* dropped: part of the derailed output */ }
+    else if (miaText) {
       appendTranscript('Mia', miaText)
       if (/e-?mail/i.test(miaText)) emailAsked = true
     }
@@ -970,7 +1025,7 @@ export async function startLiveCall(
     if (callerSafe && !emailAsked && spokeSinceCaller && routesPending === 0 && !player.isPlaying() && Date.now() - modelActiveAt > 600) {
       emailAsked = true
       console.info('[QuickBite call] caller safe: asking for the case report email')
-      nudge("(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address to send their full case report to, with a reference number they can show the police (covert mode: offer to email the order receipt). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)")
+      nudge("(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address, spelled letter by letter, to send their full case report to, with a reference number they can show the police (covert mode: offer to email the order receipt). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)")
       return
     }
     if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return

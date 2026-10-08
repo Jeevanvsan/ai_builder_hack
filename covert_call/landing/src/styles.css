@@ -662,3 +662,50 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
   .manual-side-menu[open] summary b::after { content: ' ▴'; }
   .manual-side-menu .manual-side-links { border: 0; border-top: 1px solid var(--border); border-radius: 0 0 14px 14px; max-height: 60vh; overflow-y: auto; }
 }
+
+/* Mandatory permissions notice (manual overview + every topic) */
+.manual-permissions { margin: 26px 0 8px; padding: 20px 22px; border-radius: 18px; background: #fff7ed; border: 2px solid var(--accent); }
+.manual-permissions-head { display: flex; gap: 12px; align-items: flex-start; font-size: 22px; }
+.manual-permissions-head b { font-size: 18px; color: var(--text); }
+.manual-permissions-head p { margin: 4px 0 0; font-size: 15px; color: var(--muted); }
+.manual-permissions-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.manual-permissions-list li { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.manual-permissions-list li > span:first-child { font-size: 20px; }
+.manual-permissions-list b { color: var(--text); }
+.manual-permissions-list em { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(43, 108, 176, .1); color: var(--low); margin-left: 4px; }
+.manual-permissions-list em.req { background: rgba(217, 42, 63, .12); color: var(--high); }
+.manual-permissions-help { margin-top: 14px; font-size: 14px; color: var(--muted); line-height: 1.55; }
+.manual-permissions-help p { margin: 0 0 4px; color: var(--text); }
+.manual-permissions-help ul { margin: 0; padding-left: 20px; }
+@media (max-width: 720px) { .manual-permissions-list { grid-template-columns: 1fr; } }
+
+/* Gallery of real screens */
+.gallery-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 26px 0 22px; }
+.gallery-tabs button { padding: 9px 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; transition: all .2s; }
+.gallery-tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+.gallery-item { display: flex; flex-direction: column; text-align: left; padding: 0; border-radius: 18px; overflow: hidden; background: var(--surface); border: 1px solid var(--border); cursor: zoom-in; font: inherit; color: inherit; transition: transform .25s, box-shadow .25s, border-color .25s; }
+.gallery-item:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--accent); }
+.gallery-img { display: block; height: 210px; overflow: hidden; background: #eef2f7; }
+.gallery-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform .4s; }
+.gallery-item:hover .gallery-img img { transform: scale(1.04); }
+.gallery-item.gallery-phone .gallery-img { display: flex; justify-content: center; background: linear-gradient(160deg, #fff1e8, #eef2f7); }
+.gallery-item.gallery-phone .gallery-img img { width: auto; height: 100%; object-fit: contain; }
+.gallery-text { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px 16px; }
+.gallery-text b { font-size: 16px; }
+.gallery-text small { font-size: 13.5px; line-height: 1.5; color: var(--muted); }
+.gallery-full { margin: 0; }
+.gallery-full img { display: block; max-width: 100%; max-height: 78vh; margin: 0 auto; border-radius: 12px; }
+.gallery-full figcaption { margin-top: 12px; font-size: 15px; color: var(--muted); text-align: center; }
+@media (max-width: 720px) { .gallery-grid { grid-template-columns: 1fr; } .gallery-img { height: 190px; } }
+
+/* "Use the web app" recommendation */
+.web-note { margin: 12px 0 0; font-size: 13.5px; color: var(--muted); }
+.rec-pill { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(11, 158, 87, .12); color: var(--live); margin-left: 6px; vertical-align: middle; }
+
+/* Web app first: the primary download option stands out, Android is a small text link */
+.dl-opt.dl-primary { padding: 24px 22px; background: rgba(255, 122, 61, .16); border-color: var(--accent-glow); }
+.dl-opt.dl-primary b { font-size: 19px; }
+.dl-sub { background: none; border: none; color: rgba(255, 255, 255, .62); font: inherit; font-size: 14px; text-align: left; padding: 6px 4px; cursor: pointer; }
+.dl-sub b { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.dl-sub:hover b { color: var(--accent-glow); }

@@ -4,9 +4,12 @@
 
 Covert Call helps people who are in danger but can't be seen asking for help: someone being watched, followed, threatened or held. It hides a way to reach a response team inside **QuickBite**, an app that looks and works like an ordinary food-delivery app. Anyone glancing at the screen, or listening nearby, sees and hears someone ordering dinner.
 
+- **Try QuickBite (recommended: the web app, nothing to install):** https://quickbite-5cde0.web.app
 - **Website:** https://quickbite-5cde0-landing.web.app
-- **Try QuickBite:** https://quickbite-5cde0.web.app
+- **User manual:** https://quickbite-5cde0-landing.web.app/manual
 - **Privacy Policy:** https://quickbite-5cde0-landing.web.app/privacy
+
+An Android app (APK) with the same disguise is also available from the website.
 
 ---
 
@@ -27,6 +30,18 @@ Every way in starts from the QuickBite home screen, so the person can choose wha
 
 Whichever way is used, leaving the app returns to the normal home screen with nothing suspicious left behind.
 
+### What Mia does on a call
+
+- **Speaks the caller's language.** Malayalam, Hindi, Tamil, mixed speech like Manglish and Hinglish, and more; the whole call switches the moment the caller does.
+- **Asks only what matters, fast.** What is happening, how many people, where they are and whether the person is still there; a call is designed to finish in about three minutes.
+- **Confirms every detail.** The address, email and any name or number plate are spelled back letter by letter and repeated until the caller says yes.
+- **Guides people to safety.** If someone is being followed or is on the move, Mia gives turn-by-turn directions to the nearest police station or hospital, with landmarks, and keeps them calm until they arrive.
+- **Watches and listens.** The phone camera and background sound are checked continuously for a person, a weapon, a vehicle, an injury, fire, shouting or a gunshot, and any number plate she can read.
+- **Notices when something is wrong.** A different voice taking over, a sudden scripted "cancel it", or the phone being grabbed, dropped or the caller running (motion sensors) is flagged to responders without a word said aloud.
+- **Passes on responder messages** as ordinary delivery chat ("your rider is five minutes away, keep the door locked").
+- **Sends a case report.** After a dangerous call the person can get an email with a reference number to show the police, including the scene sketch, a map and camera snaps.
+- **Alerts trusted contacts** by email if a call turns high severity.
+
 ## What the response team sees
 
 Trained responders use a separate, sign-in-only dashboard. As the person answers, it fills in a clear picture of the situation in real time:
@@ -39,6 +54,19 @@ Trained responders use a separate, sign-in-only dashboard. As the person answers
 
 Responders can guide the person to safety through Mia, who passes directions on as ordinary delivery chat.
 
+The dashboard also includes:
+
+- a **live queue** ranked by severity, with an **Ask AI** search ("woman attacked with a weapon near Vazhicherry")
+- an **AI recommendation** for each incident (for example, immediate police dispatch because a weapon was reported)
+- a hand-drawn style **scene sketch** of who is where, and **linked cases** for the same place, person or vehicle
+- the **route to safety** being followed, the nearest police, hospital and fire station, and the caller's live position
+- a **case file** with the full summary, evidence recordings and a dispatch bulletin ready for radio
+- **case history, analytics** (hotspot map, trends, time of day) and **responder performance**
+
+## Permissions
+
+QuickBite asks the browser for the **microphone** (required for calls), the **camera** and **location** (recommended), and on iPhone **motion sensors**. If no permission box appears, open the link in Chrome or Safari rather than inside another app; the call screen and the [user manual](https://quickbite-5cde0-landing.web.app/manual) show the exact steps to allow them.
+
 ## Privacy
 
 The microphone, cameras and location are used **only after someone starts one of the four ways to ask for help**. Information goes only to signed-in responders and is never sold or used for advertising. Read the full [Privacy Policy](https://quickbite-5cde0-landing.web.app/privacy).
@@ -49,7 +77,7 @@ Covert Call supports, and does not replace, emergency services. If it is safe to
 
 ## Team
 
-Built by **Jeevan** and **Ameen**.
+Built by **Team NexMind**.
 
 ## License
 

@@ -52,7 +52,7 @@ const SECTIONS: { h: string; body: ReactNode }[] = [
     h: 'Where data is stored and who can see it',
     body: (
       <ul>
-        <li>Incident reports are stored in <b>Google Cloud Firestore</b> (region: asia-south1, Mumbai).</li>
+        <li>Incident reports are stored in <b>Google Cloud</b> (region: asia-south1, Mumbai).</li>
         <li>Call and SOS video recordings are uploaded to the <b>response team's Google Drive</b>.</li>
         <li>Only <b>signed-in, authorised responders</b> can view incidents, video and recordings. Accounts are created by an administrator, and access can be disabled at any time.</li>
         <li>We do not sell data, share it with advertisers or use it for marketing. We share it with emergency services only where that is needed to get the person help.</li>
