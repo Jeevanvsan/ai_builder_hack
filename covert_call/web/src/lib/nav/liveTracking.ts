@@ -10,6 +10,7 @@ const WRITE_EVERY_M = 30
 const REROUTE_MIN_GAP_MS = 20_000
 const ROUTE_STALE_MS = 60_000
 const TURN_NOTICE_M = 150
+const ARRIVED_M = 40
 
 export type LiveTracker = {
   // What Mia says next: computes a route to the best-fit station if none exists, then describes the next step.
@@ -120,6 +121,15 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       route = { ...route, stepIndex: prog.stepIndex }
       void setSafeRoute(db, incidentId, route)
     }
+    // Arrival: one clear note, and no more turn notes after it (they were still telling a caller who had arrived
+    // to "turn right in 100 m", INC-MUZJ14B7).
+    if (prog.toDestinationM < ARRIVED_M) {
+      if (!arrivedNoted) {
+        arrivedNoted = true
+        onTurnNote(`ARRIVED: the caller has reached ${route.destination.name}. Stop giving directions. Ask them to confirm they are at the ${route.destination.kind === 'police' ? 'station' : 'entrance'} and safe now.`)
+      }
+      return
+    }
     if (prog.next && prog.toNextM < TURN_NOTICE_M && notedStep !== prog.stepIndex) {
       notedStep = prog.stepIndex
       const r0 = route, next = prog.next, toNext = prog.toNextM, toDest = prog.toDestinationM
@@ -127,6 +137,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     }
   }
 
+  let arrivedNoted = false
   const watchId = navigator.geolocation?.watchPosition(onFix, () => {}, { enableHighAccuracy: true, maximumAge: 3_000, timeout: 20_000 })
 
   // A responder can pick a different station on the dashboard; follow it.

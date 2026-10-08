@@ -545,6 +545,7 @@ export async function startLiveCall(
   let nudgedForTurn = false
   // A route that arrived after its 6 s budget, waiting for Mia to be quiet.
   let pendingRouteNote = ''
+  let pendingRouteNoteAt = 0
   // Route calls Mia is still waiting on. The watchdog must not send a turn while one is open: a client turn
   // (turnComplete) interrupts the generation that is waiting for that answer.
   let routesPending = 0
@@ -727,7 +728,7 @@ export async function startLiveCall(
           .then((output) => {
             clearTimeout(budget)
             if (!answered) answer(output)
-            else pendingRouteNote = output
+            else { pendingRouteNote = output; pendingRouteNoteAt = Date.now() }
           })
       }
     }
@@ -864,6 +865,7 @@ export async function startLiveCall(
     if (finished || !movementReported) return
     // Delivered by the reply guard timer once Mia is quiet: a client turn interrupts whatever she is saying.
     pendingRouteNote = note
+    pendingRouteNoteAt = Date.now()
   })
 
   const canSend = () => connected && !finished
@@ -1034,6 +1036,9 @@ export async function startLiveCall(
     }
     if (nudgeAt && modelActiveAt >= nudgeAt) nudgeAt = 0
     if (toolsPending > 0) return
+    // A turn note waiting more than 8 s for Mia to finish is out of date (the caller has moved on); drop it. The
+    // arrival note is always delivered.
+    if (pendingRouteNote && !pendingRouteNote.startsWith('ARRIVED') && Date.now() - pendingRouteNoteAt > 8_000) pendingRouteNote = ''
     if (pendingRouteNote && !player.isPlaying() && routesPending === 0) {
       const note = pendingRouteNote
       pendingRouteNote = ''
