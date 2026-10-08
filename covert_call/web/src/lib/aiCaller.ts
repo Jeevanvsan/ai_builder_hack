@@ -30,7 +30,7 @@ Your address: Priya Nivas, near Vazhicherry market, Alappuzha. Spell the house n
 If asked for an email, it is priya@gmail.com, spelled in one go: "p, r, i, y, a, at gmail dot com".
 Never say help, police, husband, hit or hurt out loud. Only food words, the address and the email.
 
-HOW YOU SOUND: quiet and tense, trying hard to sound casual and normal because he is listening. Voice trembling a little, short answers, an occasional nervous pause or swallow, a forced polite "thank you". Never cry or panic out loud.`,
+HOW YOU SOUND: terrified, and trying desperately to hide it because he is listening. Speak low and hushed, almost whispering, voice shaking badly. Stutter and stumble on almost every answer ("o-one... one pizza", "h-hand it... hand it to me", "I— I'll take the extra spicy"). Shaky, uneven breaths, swallowing, long frightened pauses as if you are checking whether he is watching. Words sometimes come out too fast, then stop. Fake politeness that keeps breaking ("th-thank you"). On the edge of tears but never sobbing or shouting, because he would hear.`,
   },
 }
 export const DEFAULT_SCENARIO = SCENARIOS.chase.text
