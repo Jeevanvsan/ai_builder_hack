@@ -11,7 +11,7 @@ import { INCIDENTS } from '../../../shared/incidents/client.ts'
 import type { LatLng } from '../../../shared/nav/route.ts'
 
 const KEY = 'qb-gps-sim'
-export const DEFAULT_SPEED_KMH = 25
+export const DEFAULT_SPEED_KMH = 45
 
 function readStart(): LatLng | null {
   try {

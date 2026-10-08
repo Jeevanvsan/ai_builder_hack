@@ -10,7 +10,7 @@ export const DEFAULT_SCENARIO = `You can talk freely: when Mia first asks, say "
 A man on a black motorbike has been following you for about ten minutes and is now chasing you while you run along the road. One man, dark jacket, black helmet; you could not read the number plate.
 You are on CCSB Road near Vazhicherry market in Alappuzha.
 You are not hurt. You have your phone and nothing else.
-If asked for an email for the case report, it is priya.demo@gmail.com (spell it letter by letter when asked).`
+If asked for an email for the case report, it is priya@gmail.com (spell it letter by letter when asked).`
 
 const persona = (scenario: string) => `You are role-playing a frightened CALLER on a live phone call, for a demo recording.
 You are Priya, a young woman in Alappuzha, Kerala, speaking Indian English.

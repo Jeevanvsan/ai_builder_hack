@@ -92,7 +92,12 @@ export async function startLiveCall(
   // view keeps only the words meant for the caller: the quoted spoken text if the leak names it, otherwise
   // everything before the leak starts.
   const LEAK_START = /\*+\s*\*?\s*(constraint checklist|confidence score|mental sandbox|key learnings?)|\bconstraint checklist\b|\bconfidence score\b/i
+  // Tool calls the model sometimes speaks into its own transcript ("<sink>caller_estimate{ageGroup:adult,...}",
+  // "<call>report_caller_estimate{...}", INC-MUZIQHK8): never part of what Mia said, cut from there on.
+  const TOOL_LEAK = /<\/?(sink|call|function_call|tool_code|tool)\b[^>]*>|\b[a-z]+(_[a-z]+)+\s*\{/i
   const spokenPart = (text: string) => {
+    const cut = text.search(TOOL_LEAK)
+    if (cut >= 0) text = text.slice(0, cut).trim()
     const at = text.search(LEAK_START)
     if (at < 0) return text
     const quoted = [...text.slice(at).matchAll(/(?:spoken text|speech)\s*:?\s*\*?\s*["“]([^"”]{3,})["”]/gi)].at(-1)?.[1]
