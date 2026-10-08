@@ -347,11 +347,20 @@ export async function startLiveCall(
     for (let i = 0; i < toks.length; i++) {
       if (toks[i] !== 'at') continue
       let j = i - 1, local = ''
-      while (j >= 0 && (toks[j].length === 1 || toks[j] === 'dot' || toks[j] === 'underscore')) { local = (toks[j] === 'dot' ? '.' : toks[j] === 'underscore' ? '_' : toks[j]) + local; j-- }
+      // Digits may be spoken as words ("one, six, six, one").
+      const DIGIT: Record<string, string> = { zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' }
+      while (j >= 0 && (toks[j].length === 1 || toks[j] === 'dot' || toks[j] === 'underscore' || DIGIT[toks[j]])) { local = (toks[j] === 'dot' ? '.' : toks[j] === 'underscore' ? '_' : DIGIT[toks[j]] ?? toks[j]) + local; j-- }
       if (local.replace(/[._]/g, '').length < 3) continue
+      // The domain may be a word ("gmail dot com") or spelled ("y, o, p, m, a, i, l, dot com"): spelled letters join
+      // into one word, and two words with no "dot" between them get one ("gmail com").
       const dom: string[] = []
-      for (let k = i + 1; k < toks.length && dom.length < 4; k++) { const t = toks[k]; if (['is', 'that', 'right', 'correct'].includes(t)) break; dom.push(t === 'dot' ? '.' : t) }
-      let domain = dom.join(' ').replace(/\s*\.\s*/g, '.').trim().replace(/\s+/g, '.')
+      for (let k = i + 1; k < toks.length && dom.length < 16; k++) { const t = toks[k]; if (['is', 'that', 'right', 'correct', 'please'].includes(t)) break; dom.push(t === 'dot' ? '.' : t) }
+      let domain = ''
+      dom.forEach((t, n) => {
+        const prev = dom[n - 1]
+        if (n > 0 && t !== '.' && prev !== '.' && (t.length > 1 || prev.length > 1) && !(t.length === 1 && prev.length === 1)) domain += '.'
+        domain += t
+      })
       if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain)) continue
       best = `${local}@${domain}`
     }

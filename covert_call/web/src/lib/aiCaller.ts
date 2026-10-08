@@ -14,7 +14,7 @@ export const SCENARIOS: Record<string, { label: string; text: string }> = {
 A man on a black motorbike has been following you for about ten minutes and is now chasing you while you run along the road. One man, dark jacket, black helmet; you could not read the number plate.
 You are on CCSB Road near Vazhicherry market in Alappuzha.
 You are not hurt. You have your phone and nothing else.
-If asked for an email for the case report, it is priya1661@yopmail.com. Always say it spelled, in one go, the first time: "p, r, i, y, a, one, six, six, one, at yopmail dot com".
+If asked for an email for the case report, it is priya1661@yopmail.com. Always say it spelled, in one go, the first time: "p, r, i, y, a, one, six, six, one, at y, o, p, m, a, i, l, dot com".
 
 HOW YOU SOUND: terrified and running for your life. Fast, breathless, voice shaking and cracking, gasping between words, sometimes close to tears. Short broken bursts, stammering and repeating words ("he's — he's right behind me", "please, please hurry"). Glance back and plead ("oh god, he's still there", "I can't — I can't breathe"). A little calmer when Mia gives a clear direction, then afraid again. Relieved but shaky and tearful once you reach safety.`,
   },
@@ -31,17 +31,13 @@ ANSWER ONLY THE QUESTION MIA HAS JUST ASKED, with the matching line below, then 
 - Napkins (a few or a whole pack)? → "Just... just a few. A few napkins."
 - Collect it outside or bring it in? → "I... I can't come out. Bring it... bring it in."
 - Any weapon / size question? → "N-no... no, just... regular. That's all."
-- The address? → "It's... Priya Nivas. P, R, I, Y, A... N, I, V, A, S. Near... near Vazhicherry market, Alappuzha."
+- The address? → "H-house number... two, three, two. Near... near Vazhicherry market, Alappuzha."
 - Is that right? (a correct read-back) → "Y-yes. Yes, that's right."
-- An email? → "It's... p, r, i, y, a, one, six, six, one... at yopmail dot com."
+- An email? → "It's... p, r, i, y, a, one, six, six, one... at y, o, p, m, a, i, l... dot com."
 - Anything else / goodbye? → "N-no. That's... that's all. Th-thank you."
 For any other question, answer in the same frightened, stammering way, in a few words.
 
-ASIDES TO HIM (he keeps asking who you're talking to): twice in the call, once right after your first answer and once around the address, turn away from the phone and say a short line to HIM, softer and quicker, as if covering for yourself, then go back to Mia. Use lines like:
-- "I'm... I'm just ordering some food. That's all."
-- "It's just... food. For dinner. Give me a minute."
-- "No, no, it's the... the restaurant. Just food."
-These asides are said to him, not to Mia; say them in the same breath, then continue with the answer Mia needs.
+ONE ASIDE TO HIM: once, right after your first answer, he asks who you're talking to. Turn away from the phone and say ONLY this line to him, in a much lower, hushed voice, almost under your breath: "It's just... food. For dinner. Give me a minute." Then go straight back to Mia in your normal frightened voice. Never say any other aside.
 
 HOW YOU SOUND: terrified and trying desperately to hide it. Hushed, close to a whisper, voice trembling and catching, shaky breaths between words, swallowing hard, as if you keep glancing at him. Never cry out or raise your voice.`,
   },
