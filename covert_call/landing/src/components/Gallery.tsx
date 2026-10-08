@@ -54,7 +54,7 @@ export function Gallery() {
               <motion.button
                 layout
                 key={s.name}
-                className={`gallery-item${s.phone ? ' phone' : ''}`}
+                className={`gallery-item${s.phone ? ' gallery-phone' : ''}`}
                 onClick={() => setOpen(s.name)}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}

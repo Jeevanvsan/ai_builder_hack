@@ -689,8 +689,8 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
 .gallery-img { display: block; height: 210px; overflow: hidden; background: #eef2f7; }
 .gallery-img img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; transition: transform .4s; }
 .gallery-item:hover .gallery-img img { transform: scale(1.04); }
-.gallery-item.phone .gallery-img { display: flex; justify-content: center; background: linear-gradient(160deg, #fff1e8, #eef2f7); }
-.gallery-item.phone .gallery-img img { width: auto; height: 100%; object-fit: contain; }
+.gallery-item.gallery-phone .gallery-img { display: flex; justify-content: center; background: linear-gradient(160deg, #fff1e8, #eef2f7); }
+.gallery-item.gallery-phone .gallery-img img { width: auto; height: 100%; object-fit: contain; }
 .gallery-text { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px 16px; }
 .gallery-text b { font-size: 16px; }
 .gallery-text small { font-size: 13.5px; line-height: 1.5; color: var(--muted); }
