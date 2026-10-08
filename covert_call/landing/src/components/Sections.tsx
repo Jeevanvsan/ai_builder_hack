@@ -2,7 +2,7 @@ import { animate, motion, useInView, useMotionValueEvent, useScroll } from 'moti
 import { useEffect, useRef, useState } from 'react'
 import { LINKS, Phone, QuickBiteScreen, Reveal, Shot, SwipeDots } from './ui'
 
-export function Nav({ onDownload }: { onDownload: () => void }) {
+export function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const { scrollY, scrollYProgress } = useScroll()
   useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 30))
@@ -23,7 +23,7 @@ export function Nav({ onDownload }: { onDownload: () => void }) {
         <div className="nav-cta">
           <a className="nav-manual-mobile" href="/manual">Manual</a>
           <a className="btn btn-ghost" href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a>
-          <button className="btn btn-primary" onClick={onDownload}>Get the app</button>
+          <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open the web app</a>
         </div>
       </div>
     </nav>
@@ -421,13 +421,13 @@ export function Download({ onDownload }: { onDownload: () => void }) {
             <div className="blob" style={{ width: 400, height: 400, background: 'var(--accent)', right: -100, top: -150, opacity: 0.35 }} />
             <div style={{ position: 'relative' }}>
               <span className="eyebrow">Get Covert Call</span>
-              <h2>Try it now, in your browser or on Android.</h2>
-              <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app runs live in the browser with nothing to install. The Android build carries the same disguise as a real app icon.</p>
+              <h2>Try it now, in your browser.</h2>
+              <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app is the recommended way in: it runs live in any phone or laptop browser, with nothing to install and every feature.</p>
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
-              <a className="dl-opt" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🍕</span><span><b>Open QuickBite web app <em className="rec-pill">Recommended</em></b><small>Quickest access, nothing to install · quickbite-5cde0.web.app</small></span><span className="go">↗</span></a>
-              <button className="dl-opt" onClick={onDownload}><span className="ico">🤖</span><span><b>Download APK</b><small>Android · about 150 MB</small></span><span className="go">⬇</span></button>
+              <a className="dl-opt dl-primary" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🍕</span><span><b>Open QuickBite web app <em className="rec-pill">Recommended</em></b><small>Quickest access, nothing to install · quickbite-5cde0.web.app</small></span><span className="go">↗</span></a>
               <a className="dl-opt" href={LINKS.github} target="_blank" rel="noreferrer"><span className="ico">💻</span><span><b>Source on GitHub</b><small>Public repository</small></span><span className="go">↗</span></a>
+              <button className="dl-sub" onClick={onDownload}>Prefer an Android app? <b>Download the APK</b> (about 150 MB)</button>
             </div>
           </div>
         </Reveal>

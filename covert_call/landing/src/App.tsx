@@ -28,7 +28,7 @@ export default function App() {
     document.title = 'User manual · Covert Call'
     return (
       <MotionConfig reducedMotion="user">
-        <Nav onDownload={openApk} />
+        <Nav />
         <Manual path={path} onNavigate={setPath} />
         <Footer />
         <ApkModal open={apkOpen} onClose={() => setApkOpen(false)} />
@@ -46,9 +46,9 @@ export default function App() {
   }
   return (
     <MotionConfig reducedMotion="user">
-      <Nav onDownload={openApk} />
+      <Nav />
       <main>
-        <Hero onDownload={openApk} />
+        <Hero />
         <Problem />
         <Disguise />
         <HowItWorks />

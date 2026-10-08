@@ -702,3 +702,10 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
 /* "Use the web app" recommendation */
 .web-note { margin: 12px 0 0; font-size: 13.5px; color: var(--muted); }
 .rec-pill { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(11, 158, 87, .12); color: var(--live); margin-left: 6px; vertical-align: middle; }
+
+/* Web app first: the primary download option stands out, Android is a small text link */
+.dl-opt.dl-primary { padding: 24px 22px; background: rgba(255, 122, 61, .16); border-color: var(--accent-glow); }
+.dl-opt.dl-primary b { font-size: 19px; }
+.dl-sub { background: none; border: none; color: rgba(255, 255, 255, .62); font: inherit; font-size: 14px; text-align: left; padding: 6px 4px; cursor: pointer; }
+.dl-sub b { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.dl-sub:hover b { color: var(--accent-glow); }
