@@ -6,6 +6,7 @@ import { usageFromMetadata } from '../../../../shared/aiModels.ts'
 import { INCIDENTS, recordAiUsage, appendTranscriptLine, replaceTranscriptLine, type TranscriptEntry, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { checkCameraFrame } from './photoVision.ts'
+import { setMiaAudio } from '../demoInject.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
 import { ALL_CODES } from '../../../../shared/codes.ts'
@@ -973,6 +974,7 @@ export async function startLiveCall(
   micStop = mic.stop
 
   const recorder: CallRecorder | null = startCallRecording(mic.stream, player.recordingStream)
+  setMiaAudio(player.recordingStream) // demo recording only: lets /demo-control's AI caller hear Mia
 
   // Epic 10.1: stream ~1 fps camera frames to Gemini so it can see the scene, ask about it, and flag what it sees.
   let frameSampler: FrameSampler | null = null

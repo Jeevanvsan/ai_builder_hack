@@ -8,6 +8,7 @@ import { initializeApp, getApps } from 'firebase/app'
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth'
 import { collection, doc, getFirestore, onSnapshot, query, setDoc, where } from 'firebase/firestore'
 import { DEMO_CONTROL, type DemoControl } from '../lib/demoInject'
+import { DEFAULT_SCENARIO } from '../lib/aiCaller'
 
 declare const __DEMO_V__: string
 const APP_NAME = 'demo-control'
@@ -87,6 +88,9 @@ export default function DemoControlPage() {
   // Chase demo: the call's route to safety and the caller's latest position, to watch the simulated GPS move.
   const [routeInfo, setRouteInfo] = useState<{ dest: string; kind: string; leftM: number | null; lat: number | null; lng: number | null; speed: number | null } | null>(null)
   const [setPos, setSetPos] = useState('')
+  const [scenario, setScenario] = useState(DEFAULT_SCENARIO)
+  const [voice, setVoice] = useState('Aoede')
+  const [muteMic, setMuteMic] = useState(true)
   useEffect(() => {
     if (!selected || !selectedCall) { setRouteInfo(null); return }
     return onSnapshot(doc(db, selectedCall.collection, selected), (s) => {
@@ -186,6 +190,24 @@ export default function DemoControlPage() {
             {routeInfo.lat != null && <><br />Caller at {routeInfo.lat.toFixed(5)}, {routeInfo.lng?.toFixed(5)}{routeInfo.speed ? ` · ${Math.round(routeInfo.speed * 3.6)} km/h` : ''}</>}
           </p>
         )}
+      </section>
+
+
+      <section style={{ ...box, opacity: selected ? 1 : 0.5, pointerEvents: selected ? 'auto' : 'none' }}>
+        <h2 style={{ fontSize: 16, marginTop: 0 }}>5. AI caller voice {control.aiCallerOn && <span style={{ color: '#047857', fontWeight: 600 }}>· talking</span>}</h2>
+        <p style={{ color: '#6b7280', marginTop: 0, fontSize: 14 }}>
+          A second AI voice plays the caller: it hears Mia and answers her out loud into the call, so the whole scene runs by itself
+          (with section 4's simulated GPS, Mia's directions move the caller too). Fully automatic: open the phone once with
+          <code> ?demoInject=1&amp;aiCaller=1&amp;gpsSim=LAT,LNG</code> and just tap "Call to order"; it uses the default scenario below. Turn off with <code>?aiCaller=0</code>.
+        </p>
+        <textarea value={scenario} onChange={(e) => setScenario(e.target.value)} rows={7} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', font: 'inherit', fontSize: 14 }} />
+        <div style={{ margin: '8px 0' }}>
+          <b style={{ fontSize: 14, marginRight: 8 }}>Voice</b>
+          {['Aoede', 'Kore', 'Leda', 'Zephyr'].map((v) => <button key={v} style={btn(voice === v)} onClick={() => setVoice(v)}>{v}</button>)}
+          <label style={{ marginLeft: 8, fontSize: 14 }}><input type="checkbox" checked={muteMic} onChange={(e) => setMuteMic(e.target.checked)} /> Mute the phone's real mic</label>
+        </div>
+        <button style={btn(true)} onClick={() => void send({ aiCallerAt: Date.now(), aiCallerOn: true, aiScenario: scenario, aiVoice: voice, aiMuteMic: muteMic }, `AI caller on (${voice})`)}>🎙 Start AI caller</button>
+        <button style={btn()} onClick={() => void send({ aiCallerAt: Date.now(), aiCallerOn: false }, 'AI caller off')}>■ Stop AI caller</button>
       </section>
 
       {sent && <p style={{ color: '#047857' }}>✓ {sent}</p>}
