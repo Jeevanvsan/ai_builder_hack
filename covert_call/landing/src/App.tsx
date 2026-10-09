@@ -17,6 +17,15 @@ export default function App() {
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
+  // A link like /#demo opened from outside: the sections render after the browser's own hash jump, so scroll there
+  // once they exist, and again as images above it load and push it down.
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1))
+    if (!id) return
+    const go = () => document.getElementById(id)?.scrollIntoView({ block: 'start' })
+    const timers = [50, 400, 1200].map((ms) => setTimeout(go, ms))
+    return () => timers.forEach(clearTimeout)
+  }, [])
   // Starts the APK download (GitHub serves release files as attachments, so the page stays put), then shows how
   // to install it, since Android asks to allow installs from the browser.
   const openApk = () => {

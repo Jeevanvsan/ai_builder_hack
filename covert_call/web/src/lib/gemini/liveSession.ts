@@ -6,6 +6,8 @@ import { usageFromMetadata } from '../../../../shared/aiModels.ts'
 import { INCIDENTS, recordAiUsage, appendTranscriptLine, replaceTranscriptLine, type TranscriptEntry, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
 import { checkCameraFrame } from './photoVision.ts'
+import { setMiaAudio } from '../demoInject.ts'
+import { gpsSimEnabled } from '../gpsSim.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
 import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
 import { ALL_CODES } from '../../../../shared/codes.ts'
@@ -91,14 +93,21 @@ export async function startLiveCall(
   // view keeps only the words meant for the caller: the quoted spoken text if the leak names it, otherwise
   // everything before the leak starts.
   const LEAK_START = /\*+\s*\*?\s*(constraint checklist|confidence score|mental sandbox|key learnings?)|\bconstraint checklist\b|\bconfidence score\b/i
+  // Tool calls the model sometimes speaks into its own transcript ("<sink>caller_estimate{ageGroup:adult,...}",
+  // "<call>report_caller_estimate{...}", INC-MUZIQHK8): never part of what Mia said, cut from there on.
+  const TOOL_LEAK = /<\/?(sink|call|function_call|tool_code|tool)\b[^>]*>|\b[a-z]+(_[a-z]+)+\s*\{/i
   const spokenPart = (text: string) => {
+    const cut = text.search(TOOL_LEAK)
+    if (cut >= 0) text = text.slice(0, cut).trim()
     const at = text.search(LEAK_START)
     if (at < 0) return text
     const quoted = [...text.slice(at).matchAll(/(?:spoken text|speech)\s*:?\s*\*?\s*["“]([^"”]{3,})["”]/gi)].at(-1)?.[1]
     return quoted ?? text.slice(0, at)
   }
   // Code-like output (fences, statements, function definitions) never belongs in a phone call.
-  const CODE_LIKE = /```|\bfunction\s+\w+\s*\(|\b(let|const|var)\s+\w+\s*=|[;{}]\s*\n|\bconsole\.log\(|=>\s*\{/
+  // Also the model's own reasoning read out instead of staying quiet ("**Step 1: Understand the Goal** The user
+  // wants…", INC-MUZNEL3B).
+  const CODE_LIKE = /```|\bfunction\s+\w+\s*\(|\b(let|const|var)\s+\w+\s*=|[;{}]\s*\n|\bconsole\.log\(|=>\s*\{|\*\*\s*step\s*\d|\bstep\s*\d+\s*:|\bthe user (wants|is asking|said|has)\b|\baccording to (the|my) (rules|instructions)\b|\bi should (not )?(say|respond|stay)\b|\bmy (task|goal) is\b/i
   let derailed = false
   const written: number[] = []
   const savedEntries: (TranscriptEntry | undefined)[] = []
@@ -127,7 +136,7 @@ export async function startLiveCall(
   // whole line happens to be only one, since consecutive fragments get merged into the same line before this
   // would otherwise be checked. Previously leaked straight into the responder-facing conversation view looking
   // like Mia or the caller had spoken gibberish.
-  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]|-{2,}/gi
+  const NON_SPEECH_TOKEN = /[<{[(]\s*(no speech|pause|silen(ce|t)|inaudible|(background )?noise|static|music|breathing|coughs?|laughs?|sighs?)\s*[>}\])]|-{2,}|\bno speech( detected| to)?\b\.?/gi
   const appendTranscript = (speaker: string, rawText: string) => {
     const text = rawText.replace(NON_SPEECH_TOKEN, '')
     if (!text) return
@@ -340,11 +349,20 @@ export async function startLiveCall(
     for (let i = 0; i < toks.length; i++) {
       if (toks[i] !== 'at') continue
       let j = i - 1, local = ''
-      while (j >= 0 && (toks[j].length === 1 || toks[j] === 'dot' || toks[j] === 'underscore')) { local = (toks[j] === 'dot' ? '.' : toks[j] === 'underscore' ? '_' : toks[j]) + local; j-- }
+      // Digits may be spoken as words ("one, six, six, one").
+      const DIGIT: Record<string, string> = { zero: '0', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7', eight: '8', nine: '9' }
+      while (j >= 0 && (toks[j].length === 1 || toks[j] === 'dot' || toks[j] === 'underscore' || DIGIT[toks[j]])) { local = (toks[j] === 'dot' ? '.' : toks[j] === 'underscore' ? '_' : DIGIT[toks[j]] ?? toks[j]) + local; j-- }
       if (local.replace(/[._]/g, '').length < 3) continue
+      // The domain may be a word ("gmail dot com") or spelled ("y, o, p, m, a, i, l, dot com"): spelled letters join
+      // into one word, and two words with no "dot" between them get one ("gmail com").
       const dom: string[] = []
-      for (let k = i + 1; k < toks.length && dom.length < 4; k++) { const t = toks[k]; if (['is', 'that', 'right', 'correct'].includes(t)) break; dom.push(t === 'dot' ? '.' : t) }
-      let domain = dom.join(' ').replace(/\s*\.\s*/g, '.').trim().replace(/\s+/g, '.')
+      for (let k = i + 1; k < toks.length && dom.length < 16; k++) { const t = toks[k]; if (['is', 'that', 'right', 'correct', 'please'].includes(t)) break; dom.push(t === 'dot' ? '.' : t) }
+      let domain = ''
+      dom.forEach((t, n) => {
+        const prev = dom[n - 1]
+        if (n > 0 && t !== '.' && prev !== '.' && (t.length > 1 || prev.length > 1) && !(t.length === 1 && prev.length === 1)) domain += '.'
+        domain += t
+      })
       if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(domain)) continue
       best = `${local}@${domain}`
     }
@@ -539,6 +557,7 @@ export async function startLiveCall(
   let nudgedForTurn = false
   // A route that arrived after its 6 s budget, waiting for Mia to be quiet.
   let pendingRouteNote = ''
+  let pendingRouteNoteAt = 0
   // Route calls Mia is still waiting on. The watchdog must not send a turn while one is open: a client turn
   // (turnComplete) interrupts the generation that is waiting for that answer.
   let routesPending = 0
@@ -552,12 +571,42 @@ export async function startLiveCall(
     nudgeAt = Date.now()
     session.sendClientContent({ turns })
   }
+  // Demo recording only: /demo-control's "Start chase & route" (via demoInject) tells Mia the caller is on the move,
+  // so the route is planned at once and the simulated GPS can follow it. Sent when she is quiet.
+  const onDemoChase = () => {
+    markMoving()
+    const send = () => {
+      if (finished) return
+      if (player.isPlaying() || toolsPending > 0 || !canSend()) { setTimeout(send, 800); return }
+      nudge('(System note, not the caller: the caller is being chased and is moving right now. Call report_situation (e.g. "being chased", urgency high) and get_route_guidance now, then give the first direction to safety. Say only the words meant for the caller.)')
+    }
+    send()
+  }
+  window.addEventListener('qb-demo-chase', onDemoChase)
   // A tool response that starts Mia's reply restarts the watchdog clock, so it never nudges while that reply is
   // being generated (generation takes 1-2 s before the first audio arrives).
   const replyStarted = () => { if (callerSpokeAt && !spokeSinceCaller) callerSpokeAt = Date.now() }
   let callerHeard = ''
   const OPEN_SIGNAL = /\b(talk|speak)\b[^.?!]{0,15}\bfreely\b|\bi can (talk|speak)\b|\bi'?m alone\b|\bno one(?:'s| is) (here|around)\b|^\s*talk\b/i
   const COVERT_SIGNAL = /\b(can'?t|cannot) (talk|speak)\b|\bsomeone(?:'s| is) coming\b|\b(he|she|they)(?:'s|'re| is| are) (here|back|close|coming)\b/i
+  // Someone else in the room questioning or controlling the caller ("who are you talking to?", "give me the phone")
+  // is picked up by the caller's mic and transcribed as the caller. A caller never says these to the order line, so
+  // the app records them itself as another person's voice and a coercion sign, and tells Mia, instead of relying on
+  // her to notice. Each distinct line is recorded once.
+  const THIRD_PARTY = /\b(who (are|r) you (talking|speaking) to|who(?:'s| is) (it|that|on the phone)|who are you\b(?! (?:going|getting|sending))|give me (the|that|your) phone|hang up|put (the|that) phone down|what are you doing|who did you call)\b/i
+  const thirdPartySeen = new Set<string>()
+  const noteThirdParty = () => {
+    const line = transcriptLines.at(-1)
+    if (!line || line.speaker !== 'Caller') return
+    const m = THIRD_PARTY.exec(line.text)
+    if (!m || thirdPartySeen.has(m[0].toLowerCase())) return
+    thirdPartySeen.add(m[0].toLowerCase())
+    const sentence = (line.text.slice(m.index).match(/^[^.?!]*[.?!]?/)?.[0] ?? m[0]).trim()
+    console.info('[QuickBite call] another person in the room:', sentence)
+    handleToolCall({ name: 'report_scene_observation', args: { source: 'sound', kind: 'second voice', category: 'sound_event', confidence: 80, detail: `Another person near the caller (likely the abuser) said: "${sentence}"` } } as FunctionCall)
+    handleToolCall({ name: 'report_coercion_signal', args: { kind: 'second voice', confidence: 80, detail: `Someone else in the room questioned the caller: "${sentence}"` } } as FunctionCall)
+    extraNotes.push(`(Background, not the caller: another person in the room just said "${sentence}". Someone may be controlling the caller and listening. Stay fully in character, never react to it out loud, keep the order normal and short.)`)
+  }
   const noteMode = (text: string) => {
     callerHeard = `${callerHeard} ${text}`.slice(-160)
     const before = openMode
@@ -603,6 +652,7 @@ export async function startLiveCall(
       callerSpokeAt = Date.now()
       nudgedForTurn = false
       noteMode(callerText)
+      noteThirdParty()
       confirmEmailIfYes(transcriptLines.at(-1)?.text ?? callerText)
       fixAddressOnYes(transcriptLines.at(-1)?.text ?? callerText)
       if (dangerReported && !callerSafe && SAFE_NOW.test(transcriptLines.at(-1)?.text ?? callerText)) {
@@ -631,6 +681,7 @@ export async function startLiveCall(
     if (miaText && derailed) { /* dropped: part of the derailed output */ }
     else if (miaText) {
       appendTranscript('Mia', miaText)
+      if (gpsSimEnabled) window.dispatchEvent(new CustomEvent('qb-mia-said', { detail: miaText })) // demo GPS legs
       if (/e-?mail/i.test(miaText)) emailAsked = true
     }
 
@@ -709,7 +760,7 @@ export async function startLiveCall(
           .then((output) => {
             clearTimeout(budget)
             if (!answered) answer(output)
-            else pendingRouteNote = output
+            else { pendingRouteNote = output; pendingRouteNoteAt = Date.now() }
           })
       }
     }
@@ -846,6 +897,7 @@ export async function startLiveCall(
     if (finished || !movementReported) return
     // Delivered by the reply guard timer once Mia is quiet: a client turn interrupts whatever she is saying.
     pendingRouteNote = note
+    pendingRouteNoteAt = Date.now()
   })
 
   const canSend = () => connected && !finished
@@ -961,6 +1013,7 @@ export async function startLiveCall(
   micStop = mic.stop
 
   const recorder: CallRecorder | null = startCallRecording(mic.stream, player.recordingStream)
+  setMiaAudio(player.recordingStream) // demo recording only: lets /demo-control's AI caller hear Mia
 
   // Epic 10.1: stream ~1 fps camera frames to Gemini so it can see the scene, ask about it, and flag what it sees.
   let frameSampler: FrameSampler | null = null
@@ -1015,6 +1068,9 @@ export async function startLiveCall(
     }
     if (nudgeAt && modelActiveAt >= nudgeAt) nudgeAt = 0
     if (toolsPending > 0) return
+    // A turn note waiting more than 8 s for Mia to finish is out of date (the caller has moved on); drop it. The
+    // arrival note is always delivered.
+    if (pendingRouteNote && !pendingRouteNote.startsWith('ARRIVED') && Date.now() - pendingRouteNoteAt > 8_000) pendingRouteNote = ''
     if (pendingRouteNote && !player.isPlaying() && routesPending === 0) {
       const note = pendingRouteNote
       pendingRouteNote = ''
@@ -1059,6 +1115,14 @@ export async function startLiveCall(
     }
     if (Date.now() - lastActivityAt < SILENCE_MS || toolsPending > 0 || routesPending > 0) return
     lastActivityAt = Date.now()
+    // The caller spoke last and Mia never answered (INC-MUZIAK8T: she ran the route tools after "he's chasing me" and
+    // went quiet): that is Mia owing a reply, not the caller going silent. Treating it as "silent after danger" told
+    // her to say nothing, and the call froze with both sides waiting.
+    if (callerSpokeAt && !spokeSinceCaller) {
+      console.info('[QuickBite call] silence while Mia owes a reply: nudging her')
+      nudge('(System note, not the caller: the caller spoke and is waiting for your reply. Reply now to what they last said; if you have a route to safety, give the first direction. Say only the words meant for the caller.)')
+      return
+    }
     silentNudges += 1
     // After danger, silence usually means the caller is hiding or the attacker is right there. Nudging Mia to
     // re-ask made her say "Still there? I'm still listening" out loud over and over during an armed attack,
@@ -1123,6 +1187,7 @@ export async function startLiveCall(
       tracker?.stop()
       clearInterval(transcriptFlushTimer)
       frameSampler?.stop()
+      window.removeEventListener('qb-demo-chase', onDemoChase)
       clearInterval(missedTimer)
       if (frameCheckTimer) clearInterval(frameCheckTimer)
       micStop?.()

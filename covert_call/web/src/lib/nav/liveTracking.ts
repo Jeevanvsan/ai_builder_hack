@@ -3,12 +3,14 @@ import { appendTrackPoint, INCIDENTS, setSafeRoute } from '../../../../shared/in
 import type { Incident } from '../../../../shared/incidents/types.ts'
 import { bestSafeRoute, distanceM, kindForSituation, progressOnRoute, type LatLng, type SafeRoute } from '../../../../shared/nav/route.ts'
 import { landmarkNear, locateLandmark } from '../../../../shared/nav/nearbyServices.ts'
+import { gpsSimEnabled } from '../gpsSim.ts'
 
 const WRITE_EVERY_MS = 10_000
 const WRITE_EVERY_M = 30
 const REROUTE_MIN_GAP_MS = 20_000
 const ROUTE_STALE_MS = 60_000
 const TURN_NOTICE_M = 150
+const ARRIVED_M = 40
 
 export type LiveTracker = {
   // What Mia says next: computes a route to the best-fit station if none exists, then describes the next step.
@@ -119,6 +121,15 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       route = { ...route, stepIndex: prog.stepIndex }
       void setSafeRoute(db, incidentId, route)
     }
+    // Arrival: one clear note, and no more turn notes after it (they were still telling a caller who had arrived
+    // to "turn right in 100 m", INC-MUZJ14B7).
+    if (prog.toDestinationM < ARRIVED_M) {
+      if (!arrivedNoted) {
+        arrivedNoted = true
+        onTurnNote(`ARRIVED: the caller has reached ${route.destination.name}. Stop giving directions. Ask them to confirm they are at the ${route.destination.kind === 'police' ? 'station' : 'entrance'} and safe now.`)
+      }
+      return
+    }
     if (prog.next && prog.toNextM < TURN_NOTICE_M && notedStep !== prog.stepIndex) {
       notedStep = prog.stepIndex
       const r0 = route, next = prog.next, toNext = prog.toNextM, toDest = prog.toDestinationM
@@ -126,6 +137,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     }
   }
 
+  let arrivedNoted = false
   const watchId = navigator.geolocation?.watchPosition(onFix, () => {}, { enableHighAccuracy: true, maximumAge: 3_000, timeout: 20_000 })
 
   // A responder can pick a different station on the dashboard; follow it.
@@ -188,7 +200,8 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       if (landmark && anchor) {
         // Capped: a slow lookup (Photon took 7 s once) made the whole answer miss its 6 s budget.
         const hit = await Promise.race([locateLandmark(landmark, anchor).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2_500))])
-        if (hit && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
+        // The simulated GPS (demo recording) is exact: a landmark the caller names never moves it.
+        if (hit && !gpsSimEnabled && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
           // The dashboard follows a trail of 2+ points, so the first reported landmark also records where they
           // started — from the anchor (what the caller confirmed), not a possibly-wrong GPS/rough fix.
           if (!latestIncident?.location.track?.length) void appendTrackPoint(db, incidentId, { ...anchor, speed: null })
