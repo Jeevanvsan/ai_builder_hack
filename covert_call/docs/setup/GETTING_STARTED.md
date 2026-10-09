@@ -1,5 +1,7 @@
 # Getting Started with QuickBite
 
+> **Planning-era guide, partly superseded.** There is no FastAPI backend or WebSocket server; the apps talk to Firestore and Gemini directly. For the system as built, see [../architecture/](../architecture/README.md).
+
 ## Quick Overview
 
 This is a 4-week hackathon prototype with **separate responsibility areas**:

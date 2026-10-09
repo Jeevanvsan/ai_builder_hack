@@ -15,6 +15,8 @@ Always read `../status/person_b_jeevan.md` and `../status/person_a_ameen.md` bef
 
 **`docs/quickbite_diagrams.html`** — a saved, version-controlled copy of the visual reference (mock UI screens, Monitoring Dashboard mockup, user flow diagram, architecture diagram). Open it directly in a browser (no server needed) to view. Canonical source of truth for the diagrams is the plan/backlog docs — this file is a visual companion, kept in sync manually when the plan changes meaningfully. Live version (may drift ahead of this saved copy): https://claude.ai/artifact/WdmyUMRKkDarV3vV8pAWb2
 
+**`docs/architecture/`** — the code-verified architecture of the deployed system (README with Mermaid, interactive HTML, slide image), drawn from `main` @ 3893f4e on 2026-10-09. Where it disagrees with the architecture tab of `quickbite_diagrams.html` or the "Tech stack quick reference" below (no backend, no websocket server, no Cloud Run, Leaflet/OSM maps), the architecture folder is correct.
+
 ## What QuickBite is, in one paragraph
 A food-delivery-disguised web/mobile app. A person under coercion or observation uses it to covertly summon help. Gemini Live API plays a restaurant-employee persona in a live call, teaching every coded question's real meaning live in the same breath it's asked (zero prior memorization required — this rule has no exceptions). A silent tap-only mode (long-press reveals meaning) covers no-connectivity/no-safe-sound cases. Structured incident data streams to a responder dashboard live, field-by-field, starting the instant the call begins — not batched until it ends.
 
