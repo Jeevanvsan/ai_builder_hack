@@ -93,6 +93,13 @@ function measure(id: string, scenario: string, x: any) {
     highUrgencyS: firstHigh ? sec(t(firstHigh.at) - start) : null,
     coercionVsLineS: coercion && third ? sec(t(coercion.at) - t(third.at)) : null,
     firstRouteS: advice[0] ? sec(t(advice[0].at) - start) : null,
+    // Chase: when "followed" first reached the dashboard, then the first turn instruction after it.
+    followedS: (() => { const f = hist.find((h) => (h.fields?.dangerIndicators ?? []).some((d: string) => /follow|chas/i.test(d))); return f ? sec(t(f.at) - start) : null })(),
+    routeAfterFollowedS: (() => { const f = hist.find((h) => (h.fields?.dangerIndicators ?? []).some((d: string) => /follow|chas/i.test(d))); const a = f && advice.find((v) => t(v.at) >= t(f.at)); return a ? sec(t(a.at) - t(f.at)) : null })(),
+    routeTurns: advice.length,
+    turnGapMedianS: advice.length > 1 ? sec(median(advice.slice(1).map((v, i) => t(v.at) - t(advice[i].at))) ?? NaN) : null,
+    gpsFixes: (x.location?.track ?? []).length,
+    metresMoved: (() => { const tr: any[] = x.location?.track ?? []; let m = 0; for (let i = 1; i < tr.length; i++) m += Math.hypot((tr[i].lat - tr[i - 1].lat) * 111000, (tr[i].lng - tr[i - 1].lng) * 111000 * Math.cos(tr[i].lat * Math.PI / 180)); return Math.round(m) })(),
     reportEmailAfterHangupS: x.reportEmailStatus?.at ? sec(t(x.reportEmailStatus.at) - end) : null,
     acknowledgedAfterStartS: x.response?.acknowledgedAt ? sec(t(x.response.acknowledgedAt) - start) : null,
     linkedCases: (x.correlatedIncidentIds ?? []).length,
