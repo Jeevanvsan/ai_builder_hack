@@ -222,7 +222,7 @@ export function Compare() {
 // Paste a Google Drive share link's file ID into `drive` (file shared as "Anyone with the link")
 // to stream that slide from Drive; otherwise /videos/<file>.mp4 is used.
 const VIDEOS: { file: string; drive?: string; title: string; d: string }[] = [
-  { file: 'call', drive: '1Hz3AdMlejh7fRyXvmhb1W4MvzTiJRCqd', title: 'Covert Call', d: 'The whole idea: a food-delivery app that hides a call for help.' },
+  { file: 'call', drive: '1qbD2s1cqTlPZI9gDnLh30P5kUVEMRK_k', title: 'Covert Call', d: 'The whole idea: a food-delivery app that hides a call for help.' },
   { file: 'chased-call', drive: '1uBdzXwyzJghvpMSNXqDNOqFgilbk9s8X', title: 'Someone chasing, free to speak', d: 'Open mode: the caller says "talk", Mia drops the food cover and acts as a calm dispatcher, guiding them to safety while responders track them live.' },
   { file: 'sos', title: 'Heart double-tap SOS', d: 'The screen goes black, both cameras stream, and the AI observes silently.' },
   { file: 'click-order', title: 'Tap and order', d: 'A coded cart is placed and arrives as a decoded incident.' },
