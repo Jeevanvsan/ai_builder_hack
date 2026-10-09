@@ -1,7 +1,7 @@
 import { AI_MODELS } from '../../../../shared/aiModels.ts'
 import { AI_FEATURES } from '../../../../shared/aiFeatures.ts'
 import { FunctionResponseScheduling, MediaResolution, Modality, StartSensitivity, ThinkingLevel, type FunctionCall, type LiveServerMessage, type Session } from '@google/genai'
-import { addDoc, arrayRemove, arrayUnion, collection, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
+import { addDoc, arrayRemove, collection, doc, onSnapshot, updateDoc, type Firestore } from 'firebase/firestore'
 import { usageFromMetadata } from '../../../../shared/aiModels.ts'
 import { INCIDENTS, recordAiUsage, appendTranscriptLine, replaceTranscriptLine, type TranscriptEntry, confirmAddress, markMessageDelivered, recordAdvice, recordCoercionSignal, recordVehicleNumber, subscribeResponderMessages, recordCallerEstimate, recordVoiceStress, reportSceneObservation, updateLiveFields } from '../../../../shared/incidents/client.ts'
 import { createAudioPlayer, startMicCapture } from './audio.ts'
@@ -68,13 +68,6 @@ export async function startLiveCall(
   opts: { micStream?: MediaStream; videoStream?: MediaStream } = {},
 ): Promise<LiveCallHandle> {
   if (!geminiConfigured) throw new Error('Gemini Live is not configured')
-  // Measured latency, saved on the incident (latency.greetingMs, latency.turns): the call starts here, a caller turn
-  // ends when the mic last heard them, and Mia's reply starts with her first audio chunk. The transcript's own
-  // timestamps can't be used for this: lines are saved on a speaker switch or a 5 s flush, not when they're spoken.
-  const tapAt = Date.now()
-  let voiceEndAt = 0
-  let latencyVoiceSeen = 0
-  let greetingTimed = false
   // Epic 27: with Firebase AI Logic on, the call goes through Firebase's proxy (App Check protected) and no Gemini
   // key is in the bundle; otherwise the original key-based connection is used.
   // Live GPS + route to safety; started once the session is open (turn notes are sent into it).
@@ -694,15 +687,6 @@ export async function startLiveCall(
 
     const audioPart = message.serverContent?.modelTurn?.parts?.find((p) => p.inlineData?.mimeType?.startsWith('audio/'))
     if (audioPart?.inlineData?.data) {
-      if (!greetingTimed) {
-        greetingTimed = true
-        const ms = Date.now() - tapAt
-        enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { 'latency.greetingMs': ms }))
-      } else if (!spokeSinceCaller && callerSpokeAt && voiceEndAt > latencyVoiceSeen) {
-        latencyVoiceSeen = voiceEndAt
-        const ms = Date.now() - voiceEndAt
-        if (ms > 0 && ms < 30_000) enqueueWrite(() => updateDoc(doc(db, INCIDENTS, incidentId), { 'latency.turns': arrayUnion({ ms, at: new Date().toISOString() }) }))
-      }
       player.play(audioPart.inlineData.data)
       spokeSinceCaller = true
       if (pendingEmail) emailReadBack = true
@@ -1020,7 +1004,7 @@ export async function startLiveCall(
 
   const mic = await startMicCapture((base64Pcm, level) => {
     // The caller is speaking (transcripts arrive late, after they finish): don't treat a long answer as silence.
-    if (level > SPEAKING_LEVEL && !player.isPlaying()) { lastActivityAt = Date.now(); lastVoiceAt = Date.now(); voiceEndAt = lastVoiceAt }
+    if (level > SPEAKING_LEVEL && !player.isPlaying()) { lastActivityAt = Date.now(); lastVoiceAt = Date.now() }
     // Previously gated only on !muted, with no check that the socket was actually alive — the same class of bug
     // just fixed in silentSession.ts (SOS): if the connection drops and can't reconnect, every mic frame kept
     // hitting a dead socket for the rest of the call, spamming "WebSocket is already in CLOSING or CLOSED state".
