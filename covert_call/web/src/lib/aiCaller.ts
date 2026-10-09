@@ -155,6 +155,9 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     ? record(o.voice, 'You are a frightened young Indian woman covering for yourself in front of your angry husband, voicing one line for a film. Say the line exactly as written, quickly and nervously, voice shaking, trying to sound casual. Say nothing else.', asideLine)
     : Promise.resolve([] as AudioBuffer[])
   let held: string[] | null = null // her second answer, held back while the interlude plays
+  // Until the interlude and the answer after it have played, a sound from Mia must not cut them: her "…" at his
+  // shout counted as an interruption and dropped the aside and the answer, so the caller went silent (INC-MV0R949N).
+  let protectUntil = 0
 
   // Joins a recorded line into one clip and shortens every pause longer than 0.2 s to 0.15 s.
   const squeeze = (bufs: AudioBuffer[]): AudioBuffer | null => {
@@ -182,7 +185,9 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
 
   const play = (b64: string) => {
     if (held) { held.push(b64); return }
+    const extend = ctx.currentTime < protectUntil
     schedule(toBuffer(b64))
+    if (extend) protectUntil = nextAt
   }
   const startInterlude = (first: string) => {
     interludeDone = true
@@ -200,6 +205,7 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
       const rest = held ?? []
       held = null
       rest.forEach((x) => schedule(toBuffer(x)))
+      protectUntil = nextAt
     })
   }
 
@@ -223,7 +229,7 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
           else play(p.inlineData.data)
         }
         // Mia started talking over the caller: drop what is still queued, like a person stopping mid-sentence.
-        if (m.serverContent?.interrupted) { playing.forEach((s) => { try { s.stop() } catch { /* ended */ } }); playing.clear(); nextAt = 0 }
+        if (m.serverContent?.interrupted && !held && ctx.currentTime >= protectUntil) { playing.forEach((s) => { try { s.stop() } catch { /* ended */ } }); playing.clear(); nextAt = 0 }
       },
       onerror: (e: unknown) => console.warn('[QuickBite demo] AI caller error', e),
       onclose: () => console.info('[QuickBite demo] AI caller closed'),
@@ -241,6 +247,11 @@ export async function startAiCaller(o: { ctx: AudioContext; out: AudioNode; spea
     const ratio = ctx.sampleRate / IN_RATE
     const n = Math.floor(input.length / ratio)
     const out = new Int16Array(n)
+    // While the interlude plays, the caller hears silence from Mia so her own answer is not cut off mid-sentence.
+    if (held || ctx.currentTime < protectUntil) {
+      try { session.sendRealtimeInput({ audio: { data: toBase64(out.buffer), mimeType: `audio/pcm;rate=${IN_RATE}` } }) } catch { /* closed */ }
+      return
+    }
     for (let i = 0; i < n; i++) out[i] = Math.max(-1, Math.min(1, input[Math.floor(i * ratio)])) * 0x7fff
     try { session.sendRealtimeInput({ audio: { data: toBase64(out.buffer), mimeType: `audio/pcm;rate=${IN_RATE}` } }) } catch { /* closed */ }
   }
