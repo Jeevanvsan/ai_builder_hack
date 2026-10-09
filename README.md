@@ -80,7 +80,7 @@ The dashboard also includes:
 - **Firebase** Hosting serves the web app, dashboard and website; **Firebase Auth** secures responders with role-based access.
 - **Next:** Gemini keys server-side and ADK dispatch and verification agents on **Cloud Run**.
 
-Architecture diagrams, drawn from the code: [covert_call/docs/architecture](covert_call/docs/architecture/).
+Architecture diagrams: [covert_call/docs/architecture](covert_call/docs/architecture/).
 
 ## Tested on real calls
 
