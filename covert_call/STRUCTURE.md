@@ -1,5 +1,7 @@
 # QuickBite Project Structure — Complete Map
 
+> **Planning-era document, superseded.** The FastAPI backend, Next.js apps and WebSocket server described here were never built. For the system as built, see [docs/architecture/](docs/architecture/README.md).
+
 ## Overview
 
 All folders are created and ready. No code implementation yet — structure-only, with `.gitkeep` files to preserve empty directories.

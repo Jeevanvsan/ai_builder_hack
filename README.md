@@ -80,6 +80,8 @@ The dashboard also includes:
 - **Firebase** Hosting serves the web app, dashboard and website; **Firebase Auth** secures responders with role-based access.
 - **Next:** Gemini keys server-side and ADK dispatch and verification agents on **Cloud Run**.
 
+Architecture diagrams: [covert_call/docs/architecture](covert_call/docs/architecture/).
+
 ## Tested on real calls
 
 8 real voice calls on the deployed app (4 covert, 4 chase): danger and coercion tags reached the dashboard 2–3.5 s before the caller's words were transcribed, every chase run tracked the full ~535 m route to the police station, and AI cost was about **$0.35 per call**.

@@ -764,3 +764,17 @@ Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
 - Deck v2: claims aligned with what's deployed (no BigQuery/App Check/Android/in-progress items), cost slide rebuilt (59 real calls, $0.20/call AI), slide 12 rebuilt from the real calls, slide 15 judges box + links + team, Priya as the caller, NCRB 2022 figure matching the video.
 - Landing: new Drive videos, #demo links scroll to the section. README: QuickBite title, judge access + steps, how it's built, test results, team.
 - **Notes for Ameen:** please don't delete INC-MUZNKM7N / INC-MUZKKVL1 (linked from the deck and README), and keep Gemini keys and Firestore quota alive through evaluation (Oct 19 – Nov 6).
+
+### 2026-10-09 21:21 IST: architecture diagrams, code-verified (done from Ameen's side)
+- New `covert_call/docs/architecture/`, drawn from the code on `main` @ 3893f4e and showing the deployed system only (no Android, AI Logic/App Check, BigQuery, Cloud Run, eval or demo tooling):
+  - `README.md`: Mermaid diagrams (system overview, live-call sequence, Gemini agent loop, Firestore data and access, deployment) plus component, guard and access tables. GitHub renders it in the folder view.
+  - `quickbite-architecture-slide.svg` / `.png` (4800×1980): the overview sized for deck slide 7's diagram box (left 0.40 in, top 1.45 in, width 9.20 in), in the slide's Arial and colours. The deck itself was not edited.
+  - `quickbite-architecture.html`: interactive version (click a box for details, light/dark). Also published as a private claude.ai Artifact.
+- Pointer lines added: root `README.md` ("How it's built" → the architecture folder), "planning-era, superseded" notes in `covert_call/STRUCTURE.md`, `docs/setup/GETTING_STARTED.md` and the architecture tab of `docs/quickbite_diagrams.html`, and one line in `covert_call/CLAUDE.md`.
+- Docs only, nothing to port to native. Not committed.
+- **Found while checking the code (no changes made):**
+  - The local `deck/QuickBite_Submission_Deck_NexMind_v2.pptx` working copy (19:34) is older than the committed aligned deck (20:02) and still has the App Check / BigQuery content; committing it would undo the alignment.
+  - Speaker notes on deck slides 7 and 9 still describe Firebase AI Logic + App Check, Android and BigQuery.
+  - The deck says "Maps JS"; the console's maps are Leaflet + OpenStreetMap tiles (Google Maps only if a key is set).
+  - The landing Privacy page and `README.md` say only signed-in responders can view incidents; `firestore.rules` allows open reads of incidents, messages, camera snaps and the WebRTC handshake.
+  - The console's "AI recommends" and the report email's "AI reasoning" come from the severity rules in `shared/incidents/severity.ts`, not from Gemini.

@@ -783,6 +783,7 @@
   <section class="tabpanel" data-tab="arch" data-active="false" role="tabpanel">
     <div class="panel-shell">
       <div class="panel-head"><h2>System architecture — what talks to what</h2></div>
+      <p style="margin:0 0 12px;font-size:14px"><strong>Planning-era diagram, superseded.</strong> The Cloud Run backend, websocket hub and LiveKit shown here were never built. For the system as built, see <code>docs/architecture/</code>.</p>
       <div class="svg-scroll">
         <svg viewBox="0 0 1360 1180" role="img" aria-label="Architecture diagram: QuickBite web app and native app both connect to Gemini Live API for the disguised conversation and to a Cloud Run backend over a websocket for real-time streaming; the backend writes to Firestore, calls Gemini for consolidation and leakage checks, and calls Google Maps APIs for geocoding; the separately-deployed Monitoring Dashboard subscribes to the same websocket channel and reads Firestore for case history. A stretch-goal band shows two independent sub-goals for back-camera video on the native app only: sub-goal A streams continuous video to the dashboard via a WebRTC signaling service, unrelated to Gemini; sub-goal B samples the same feed at roughly one frame per second through the existing Gemini Live path into structured signal, capped at a two-minute session when video is attached.">
           <defs>
