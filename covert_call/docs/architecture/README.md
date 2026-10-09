@@ -4,7 +4,7 @@ QuickBite has no backend server. The phone talks to Gemini Live directly, runs e
 
 ![QuickBite system overview](quickbite-architecture-slide.png)
 
-This page shows the system that is deployed today, drawn from the code on `main` at commit `3893f4e` (9 Oct 2026). Files in this folder:
+This page shows the system that is deployed today.
 
 | File | What it is |
 |---|---|
