@@ -778,3 +778,17 @@ Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
   - The deck says "Maps JS"; the console's maps are Leaflet + OpenStreetMap tiles (Google Maps only if a key is set).
   - The landing Privacy page and `README.md` say only signed-in responders can view incidents; `firestore.rules` allows open reads of incidents, messages, camera snaps and the WebRTC handshake.
   - The console's "AI recommends" and the report email's "AI reasoning" come from the severity rules in `shared/incidents/severity.ts`, not from Gemini.
+
+### 2026-10-09 22:31 IST: deck slides 7 and 8 rebuilt as native shapes (done from Ameen's side)
+- `deck/QuickBite_Submission_Deck_NexMind_v2.pptx`, slides 7 and 8 only. The template frame (bands, title, takeaway style) is untouched and no images are used: every block, arrow and label is an editable PowerPoint shape.
+- **Slide 7 (architecture):** the deployed system as in `covert_call/docs/architecture/`: caller's phone, Gemini API (3.8-live, 3.5 and 3.1 Flash-Lite), Firestore + Auth/rules, responder console, plus location, Drive recordings, case report + alerts mail, and P2P live video. No App Check, BigQuery, Android or Cloud Run boxes. **Jeevan:** this answers your slide 7 comment ("big query onnum illannu"); the comment is still on the slide for you to resolve.
+- **Slide 8 (how Gemini powers QuickBite):** new takeaway "Not a chatbot: every answer becomes a function call that the app turns into live data". One answer followed end to end ("garlic bread" → `report_situation` → rule-based HIGH + route → console 2–3.5 s ahead of the transcript → known facts back to Mia), the 12 tools grouped by what they do, and four reliability points.
+- Speaker notes for slides 7 and 8 rewritten to match (they no longer mention Firebase AI Logic / App Check).
+- Checked: the skill's validator shows no new errors (only the existing duplicate comment-author ID in another slide's comment), and python-pptx opens the deck. There is no LibreOffice here, so the visual check used a preview drawn from the same shape geometry; please open both slides in PowerPoint or Google Slides once.
+- 2026-10-09 22:44 IST: slide 7 now has a clickable "Full architecture docs on GitHub →" link (below the footer line) to https://github.com/Jeevanvsan/ai_builder_hack/tree/main/covert_call/docs/architecture#readme, also in the speaker notes. That URL points at `main`, so it only works once the `docs/architecture-diagrams` branch is merged.
+- Not committed.
+
+### 2026-10-12 IST: removed "no backend server" wording (done from Ameen's side)
+- Reworded to present Firebase (Firestore, Auth, security rules) as the managed backend, in `README.md`, `covert_call/docs/architecture/` (README, HTML, slide SVG), `covert_call/CLAUDE.md`, `covert_call/docs/quickbite_plan.md`, and deck v2 slide 7 + its speaker notes. Facts unchanged; only the framing.
+- `quickbite-architecture-slide.png` re-exported from the updated SVG (4800x1980). Developer code comments saying "no backend needed" were left as they are.
+- Not committed.
