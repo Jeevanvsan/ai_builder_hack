@@ -1,6 +1,6 @@
 # QuickBite architecture
 
-QuickBite has no backend server. The phone talks to Gemini Live directly, runs every tool call itself and writes each result to Cloud Firestore. The responder console listens to Firestore, so a fact Mia hears appears on the console within seconds. Recordings, mail, maps and live video use free services around that core.
+QuickBite runs on a managed Firebase backend (Cloud Firestore, Auth and security rules). The phone talks to Gemini Live directly, runs every tool call itself and writes each result to Cloud Firestore. The responder console listens to Firestore, so a fact Mia hears appears on the console within seconds. Recordings, mail, maps and live video use free services around that core.
 
 ![QuickBite system overview](quickbite-architecture-slide.png)
 
@@ -13,7 +13,7 @@ This page shows the system that is deployed today.
 
 ## 1. System overview
 
-Four groups do all the work: the caller's phone, the Gemini API, Firebase, and the responder console. The phone is the only component that talks to Gemini Live, and Firestore's realtime listeners replace a server between the phone and the console. The numbers on the arrows match the overview picture.
+Four groups do all the work: the caller's phone, the Gemini API, Firebase, and the responder console. The phone is the only component that talks to Gemini Live, and Firestore's realtime listeners carry data between the phone and the console. The numbers on the arrows match the overview picture.
 
 ```mermaid
 flowchart LR
@@ -168,7 +168,7 @@ Reconnects are capped at 3 per drop and 8 per call. Each task uses the smallest 
 
 ## 4. Data and security
 
-Firestore is both the database and the realtime channel. Its security rules (`covert_call/dashboard/firestore.rules`) do the job a server would: every write is checked against a fixed schema and the allowed transitions.
+Firestore is both the database and the realtime channel. Its security rules (`covert_call/dashboard/firestore.rules`) act as the backend's validation layer: every write is checked against a fixed schema and the allowed transitions.
 
 ```mermaid
 flowchart TB

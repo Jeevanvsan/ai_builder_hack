@@ -76,7 +76,7 @@ The dashboard also includes:
 
 - **Gemini Live (gemini-3.8-live)** powers Mia in real time: she hears the caller, sees camera frames and uses 12 function-calling tools to turn food codes into structured danger, coercion, address and route fields.
 - **Gemini Flash-Lite** writes the case summary and dispatch bulletin, redacts third-party details and links related cases.
-- **Cloud Firestore** streams every field, GPS point, transcript line and responder message to the dashboard as it happens, with no backend server.
+- **Cloud Firestore** streams every field, GPS point, transcript line and responder message to the dashboard as it happens, through Firebase's managed backend.
 - **Firebase** Hosting serves the web app, dashboard and website; **Firebase Auth** secures responders with role-based access.
 - **Next:** Gemini keys server-side and ADK dispatch and verification agents on **Cloud Run**.
 
