@@ -32,7 +32,10 @@ export function CheckoutPage() {
   const [deliveryUrgency, setDeliveryUrgency] = useState<Severity>('low')
   const [placing, setPlacing] = useState(false)
 
-  if (cart.count === 0) return <Navigate to="/" replace />
+  // placeOrder() clears the cart right after navigating to /order-placed. React Router runs that navigation as a
+  // transition, so the cleared cart renders first: redirecting home here would replace the order-placed screen.
+  // Native's checkout has the same !placing guard.
+  if (cart.count === 0) return placing ? null : <Navigate to="/" replace />
 
   const total = computeBill(cart.subtotal).total
 

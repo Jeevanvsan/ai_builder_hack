@@ -8,6 +8,7 @@ QuickBite helps people who are in danger but can't be seen asking for help: some
 - **Responder dashboard:** https://quickbite-5cde0-dashboard.web.app (judge login: `judge@quickbite.com` / `judge@Quickbite123`)
 - **Website and demo videos:** https://quickbite-5cde0-landing.web.app/#demo
 - **User manual:** https://quickbite-5cde0-landing.web.app/manual
+- **Guided tour for judges (what to say to Mia, where to look on the dashboard, screenshots):** https://quickbite-5cde0-landing.web.app/manual/tour
 - **Privacy Policy:** https://quickbite-5cde0-landing.web.app/privacy
 
 ### Try it in two minutes
