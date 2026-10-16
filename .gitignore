@@ -40,6 +40,9 @@ skills-lock.json
 covert_call/landing/public/videos/*.mp4
 *.tsbuildinfo
 
+# Remotion pitch video: keep source, ignore rendered output (large MP4s)
+video/out/
+
 # Anonymised analytics exports (Epic 26), uploaded to BigQuery by hand
 covert_call/dashboard/exports/
 
