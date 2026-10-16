@@ -105,7 +105,3 @@ QuickBite supports, and does not replace, emergency services. If it is safe to d
 ## Team
 
 Built by **Team NexMind**: Al Ameen N and Jeevan V.
-
-## License
-
-[MIT](LICENSE)
