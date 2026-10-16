@@ -792,3 +792,48 @@ Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
 - Reworded to present Firebase (Firestore, Auth, security rules) as the managed backend, in `README.md`, `covert_call/docs/architecture/` (README, HTML, slide SVG), `covert_call/CLAUDE.md`, `covert_call/docs/quickbite_plan.md`, and deck v2 slide 7 + its speaker notes. Facts unchanged; only the framing.
 - `quickbite-architecture-slide.png` re-exported from the updated SVG (4800x1980). Developer code comments saying "no backend needed" were left as they are.
 - Not committed.
+
+## 2026-10-16 (IST, 11:36) — Deck: Opportunities slide (slide 3) comparison table made readable cold
+Edited `deck/QuickBite_Submission_Deck_NexMind_COMPLIANT_DRAFT.pptx`, slide 3 only:
+- Columns grouped under two labels: "Stays hidden from the abuser" | "Still gets real help".
+- Headers rewritten in plain English: Looks harmless → Screen looks innocent; Works while watched → Usable with abuser in the room (moved next to it, dots moved with it); Nothing to memorise → No code word to learn first; Two-way guidance → Responder can guide the caller; Live structured data → Responder sees location & details live; Live AI conversation → Live AI talks with the caller.
+- Legend (yes / partly / no) moved from below the table into the table's empty top-left corner. Every dot value is unchanged.
+
+## 2026-10-16 (IST, 15:25) — User manual rebuilt for judges and checked against the live app (done from Ameen's side)
+https://quickbite-5cde0-landing.web.app/manual is **deployed** (landing only). Not committed.
+- **New pages:**
+  - `/manual/tour` "Guided tour & scripts": the test login with copy buttons, a QR code for the phone, a 5-minute path, Script A (covert call), Script B (open call, being followed), and step-by-step click & order, delivery instructions, heart SOS and practice call. Each script is a "When Mia asks / You say / On the dashboard" table, quoting Mia's real lines with their meanings.
+  - `/manual/dashboard`: an annotated Live queue and incident page, the side panel, a table of what each way in shows, and the severity rules.
+- **Corrected pages:**
+  - Every feature page was rewritten to match the code and gained an "On the responder dashboard" box, a "Try it" link and screenshots.
+  - The code table is now generated from `shared/codes.ts` + `web/src/data/menu.ts`, so it can't drift. The old table had 5 of 11 meanings wrong and called the item "Family Combo".
+  - Wording is neutral ("Guided tour"); the only "judge" text is the login email. The root README links the tour.
+- **Screenshots and checks:** new `covert_call/landing/scripts/capture-manual-shots.mjs` (`npm run shots` in landing; adds the `puppeteer-core@25.11.0` devDependency). It takes the screenshots (into `public/shots/manual/`) and checks what the manual says against production:
+  - all 11 coded-item meanings, labels and gestures;
+  - the coded order, silent tap, SOS, practice call and mic-help flows;
+  - two full AI-caller calls (covert and open chase), including Message caller relay and the case-report email.
+  - Steps that create incidents need `--with-incidents`; `cleanup` resolves them. All 14 test incidents from today are resolved.
+- **Notes for Ameen / Jeevan (found while checking):**
+  - **BUG, fixed in code but NOT deployed:** on production, "Place order" goes straight back to the home screen instead of "Order placed!". React Router 7 runs the navigation as a transition, `cart.clear()` renders first, and checkout's empty-cart `<Navigate to="/">` wins. The coded incident is still created, but the order-status mirroring is never seen.
+    - Fix (1 line, uncommitted): `web/src/pages/CheckoutPage.tsx`: `if (cart.count === 0) return placing ? null : <Navigate to="/" replace />`. It mirrors native's `!placing` guard, so nothing to port to native.
+    - Verified on a local build of the fix: Order placed! shows, then Rider assigned → On the way → Delivered follow the dashboard.
+    - **Jeevan: please deploy production web from your machine.** This machine's web env file lacks both Gemini keys and one of the two Apps Script URLs, so a deploy from here would break calls. Production is also an older `main` (the Oct 9 AI-caller fix is staging-only).
+    - **The manual already describes the fixed behaviour.**
+  - **`?gpsSim=…` calls never connect on production** ("Connecting…" forever, nothing written). The manual doesn't use simulated GPS: Script B uses the phone's real location.
+  - **Live chase test call (INC-MVAQRKVY):**
+    - Mia told a caller on foot to "keep driving".
+    - She relayed a responder message in covert wording ("please wait inside") during an open-mode chase.
+    - With headless Chrome's test-pattern camera she reported "Seen: black scooter" (hallucination).
+  - **Live covert test call:** the spelled "y" in yopmail was transcribed as "iiopmail" and the email went to the wrong address. The manual tells testers to check the read-back and say "no".
+  - **The Subjects tile only appears if Mia reports a headcount;** she didn't in the covert test ("1 subject" was only in the bulletin).
+  - **Someone else is using the `judge@quickbite.com` login today:** they acknowledged/resolved test incidents within a minute (11:24 and 13:12).
+  - **The practice-call labels still say "not sent to responders",** but the dashboard lists demo calls with a DEMO tag. The manual explains this.
+  - **For Jeevan (dashboard text):** "Runs when the call ends" (credibility) and "Refreshes itself once a day automatically" (AI Insights) are untrue while those features are paused.
+  - **Headless SOS runs were flaky:** 2 of 5 never reached Firestore. The Firestore write channel aborted in one; the other 3 worked. Worth one real-phone SOS check.
+- 2026-10-16 (IST, ~15:40): at Ameen's request, removed the "hands-free call" section (AI caller link) from the tour so judges don't use it. Landing redeployed; the live bundle no longer mentions `aiCaller`.
+- 2026-10-16 (IST, ~15:55): at Ameen's request, removed the practice (demo) call from the manual entirely:
+  - removed the tour section and the "Practice call (demo)" feature page (`/manual/demo` now says the page doesn't exist);
+  - removed the "Demo limit reached" troubleshooting line;
+  - removed the logo "hold for a practice call" badge, and recaptured the home screenshot with badges for the heart, account, chips, Delivery instructions and Call to order;
+  - the dashboard page no longer mentions DEMO-tagged cases (removed at Ameen's request).
+  Landing redeployed and verified live.
