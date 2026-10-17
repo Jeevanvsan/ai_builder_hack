@@ -871,3 +871,6 @@ The public repo goes to judges, so every tracked doc, deck and spreadsheet file 
   - `docs/prototype_build_plan.md`: the competitor-table row.
 - Deleted `docs/external_ref.md`, which held only that project's links.
 - `deck/` was not touched.
+
+### 2026-10-17 ~12:35 IST: README cost per call now $0.20
+The deck was corrected to $0.20 per call, the 59-call average from the cost sheet; Ameen confirmed that's the right figure. The root `README.md` "Tested on real calls" section now says "Across 59 real calls, AI cost averaged about $0.20 per call" instead of $0.35. The 8-call test results in the same sentence are unchanged.

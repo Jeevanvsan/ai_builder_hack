@@ -85,7 +85,7 @@ Architecture diagrams: [covert_call/docs/architecture](covert_call/docs/architec
 
 ## Tested on real calls
 
-8 real voice calls on the deployed app (4 covert, 4 chase): danger and coercion tags reached the dashboard 2–3.5 s before the caller's words were transcribed, every chase run tracked the full ~535 m route to the police station, and AI cost was about **$0.35 per call**.
+8 real voice calls on the deployed app (4 covert, 4 chase): danger and coercion tags reached the dashboard 2–3.5 s before the caller's words were transcribed, and every chase run tracked the full ~535 m route to the police station. Across 59 real calls, AI cost averaged about **$0.20 per call**.
 
 - [Performance test: 8 real calls (Google Sheets)](https://docs.google.com/spreadsheets/d/1fUVyPzAyDgvhrUJFWH-G35BiqVEt-5Tz/edit?usp=sharing)
 - [AI cost per call and cost estimate (Google Sheets)](https://docs.google.com/spreadsheets/d/19s3mMe2nNcZM_Z_tzK-qhx9iXAsQteTn/edit?usp=sharing)
