@@ -37,9 +37,6 @@ Submission for **AI Builder Cup 2026 | Google Cloud JAPAC Hackathon**, theme "Su
 - **Other five themes exist** (BFSI, Retail & Commerce, Manufacturing, Media/Content, Future of Work) — irrelevant to this project's chosen theme, noted here only so a future session doesn't need to re-fetch the page to confirm Sustainability & Social Impact is one of six, not the only option.
 - **Submission deliverables (confirmed from FAQ page)**: (1) a working **deployed link** of the prototype (live, clickable — must actually run on Cloud Run/Firebase), (2) a **video demo** under 3 minutes, (3) a **public GitHub repository**, (4) a **solution deck**. The live deployed link is mandatory, not optional — judges click into a real running app, not just watch the video.
 
-## Prior art reviewed
-Haven ([Devpost](https://devpost.com/software/haven-w7mj9g)), a domestic-violence reporting project built on steganographic SOS and case matching, was reviewed as prior art during early planning. QuickBite targets a different problem (a disguised live call for people who are being watched) through a different channel.
-
 ## Current chosen direction
 Dual-channel Gen AI safety platform in the environmental-whistleblower and accident-SOS domain:
 

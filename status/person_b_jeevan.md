@@ -838,7 +838,7 @@ https://quickbite-5cde0-landing.web.app/manual is **deployed** (landing only). N
 
 ### 2026-10-17 ~11:55 IST: pre-evaluation repo cleanup (branch `chore/pre-evaluation-cleanup`, at Ameen's request)
 The public repo goes to judges, so every tracked doc, deck and spreadsheet file was audited. No files were deleted and history was not rewritten. Only the damaging sentences were reworded.
-- **Prior-art wording:** Haven is now described neutrally as "prior art reviewed". Changed in root `CLAUDE.md`, `docs/external_ref.md`, `docs/brainstorming_discussion.txt`, `docs/prototype_build_plan.md`, `docs/initial_plan.txt`, `covert_call/docs/quickbite_plan.md` and `covert_call/docs/standalone_covert_call_plan.md`. The "only one novelty claim" and "honestly commodity" lines are now a neutral competitive landscape.
+- **Prior-art wording:** references to an earlier hackathon project were reworded. Changed in root `CLAUDE.md`, `docs/external_ref.md`, `docs/brainstorming_discussion.txt`, `docs/prototype_build_plan.md`, `docs/initial_plan.txt`, `covert_call/docs/quickbite_plan.md` and `covert_call/docs/standalone_covert_call_plan.md`. The "only one novelty claim" and "honestly commodity" lines are now a neutral competitive landscape.
 - **Tooling and history notes:** removed the commit-trailer and history-rewrite notes and the private claude.ai artifact links, here and in both `CLAUDE.md` files.
 - **Personal data scrubbed:** the personal Gmail address and house name in this file and in `web/src/lib/gemini/liveSession.ts`, which got comment-only changes. Also removed the "someone else is using the judge login" and "unlicensed stock clips" remarks.
 - **Removed** the empty `.gitkeep` placeholder folders, which implied a FastAPI `backend/` that doesn't exist. Kept `landing/public/videos/.gitkeep`.
@@ -863,3 +863,11 @@ The public repo goes to judges, so every tracked doc, deck and spreadsheet file 
   - The `LICENSE` removal in `e786cd8` is left as is.
   - The 15 stale remote branches (`ep-*`, `phase-*`, `extended-brainstorming`, …) are still on GitHub. Delete them if you want a tidy branch list for judges (your repo, your call).
   - Before judging: confirm production web is built with `VITE_USE_AI_LOGIC=true`, or the Gemini key is in the public JS. Rotate keys and the judge password afterwards.
+
+### 2026-10-17 ~12:20 IST: all mentions of the earlier prior-art project removed (same branch, at Ameen's request)
+- Removed every mention of that project from the tracked docs instead of rewording them:
+  - root `CLAUDE.md`: the "Prior art reviewed" section;
+  - `docs/brainstorming_discussion.txt`: the prompt and the analysis block, plus the comparisons in later paragraphs;
+  - `docs/prototype_build_plan.md`: the competitor-table row.
+- Deleted `docs/external_ref.md`, which held only that project's links.
+- `deck/` was not touched.

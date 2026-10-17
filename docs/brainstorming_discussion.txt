@@ -39,19 +39,6 @@ If I had to pick
 Idea 1 or Idea 2. Both are buildable in four weeks, both have a demo moment a judge remembers, and both serve a stakeholder nobody else in the room will have built for. Idea 1 scores hardest on impact and originality; Idea 2 scores hardest on technical merit because of the on-device Gemma story, and it's the easier one to demo live in Singapore with a physical prop on the table.
 Idea 6 is the contrarian pick. It's less emotionally warm, but if your team is stronger at backend and retrieval than at computer vision, it's the one where you can build something genuinely sophisticated in the time available.
 Tell me which two or three pull at you and I'll go deep on architecture, the specific Google Cloud services to name in the deck, and how to structure the 3-minute video so the first 20 seconds land.
-Analyse this idea: https://devpost.com/software/haven-w7mj9g
-as prior art; we want a different social-impact idea, not a replica of this one
-Fetched: Haven
-I read the full Devpost. Here's the breakdown, then ideas that share its DNA without touching its domain.
-What Haven actually is
-Three modules for women in abusive relationships: a steganographic SOS (keywords → LLM expands to a full distress message → AI generates an innocent image → message hidden in pixels → posted publicly with a hashtag → authority-side cron job scrapes, decodes, severity-ranks), an avatar therapy bot, and a RAG law bot over the Indian Constitution. Plus culprit matching via vector similarity to link repeat offenders across cases. Won 1st at MongoDB's "Code for a Cause."
-Why it won
-It solved a constraint, not an information gap. Almost every social-impact hackathon project assumes the user's problem is that they don't know something, so the answer is a chatbot. Haven identified that the woman knows exactly what she needs and is physically prevented from asking. Everything else follows from that reframe.
-One sentence a judge can repeat. "A hidden cry for help inside a photo of a flower." Judges deliberate after seeing 40 projects. The one they can restate to each other wins.
-Two-sided, not one-sided. Victim app and responder console with triage. Most teams build only the first half, which reads as a demo. Building the second half reads as a system.
-Cross-case intelligence that compounds. Culprit matching turns isolated reports into a network. That's the "gets more valuable with scale" story, and it's what convinces a judge this isn't a weekend toy.
-Where Haven is weak
-Steganography over social media is fragile in reality; platforms recompress images and destroy LSB payloads. A public hashtag known to authorities is also known to abusers. Two of the three modules are commodity RAG chatbots. And there's no escalation path past a MongoDB row, no consent model, no false-positive handling. Also, Render and Vercel wouldn't qualify for this cup at all.
 The general pattern: a population blocked from acting by a constraint (surveillance, illiteracy, retaliation, distance, no data) + a channel that fits their actual physical reality + a responder console that triages and links cases + Gen AI doing the translation between the two.
 Five ideas on that skeleton
 1. The environmental whistleblower who can't be traced
@@ -77,7 +64,7 @@ Why it's strong: Cheapest to demo convincingly and the easiest to get real data 
 Constraint: Workers can't prove hours worked or deductions taken, and the record lives entirely in the employer's app.
 The mechanic: A worker speaks their day into the phone in their own language. Gemini builds a structured, timestamped work log from unstructured speech, and photographs of payslips or app screenshots are parsed into the same ledger. Over months this becomes an evidentiary record, with the AI computing the gap against the applicable minimum wage and generating a labour-department filing when the discrepancy crosses a threshold.
 My pick
-Idea 1. It is entirely different in content from Haven, it's unambiguously the Sustainability theme rather than a general social-good project, and the adversarial anonymisation loop gives you something Haven never had: a Gen AI mechanic that is technically hard and also the emotional centre of the demo. Haven's steganography was clever narrative wrapped around a fragile engineering choice. Yours would be clever narrative where the AI is the engineering.
+Idea 1. It's unambiguously the Sustainability theme rather than a general social-good project, and the adversarial anonymisation loop gives you a Gen AI mechanic that is technically hard and also the emotional centre of the demo. Here the AI is the engineering, not just the narrative.
 Idea 2 is the one with the strongest impact numbers if you want the panel's industry experts leaning forward.
 Want me to build out the full architecture for one of these, with the specific Google Cloud services, the 4-week build plan against your Oct 18 deadline, and the demo script?
 Searched the web
@@ -86,7 +73,7 @@ How today's phone SOS actually works
 The button-press SOS (every smartphone since ~2017). Five clicks of the side button, or holding power+volume, triggers a countdown, then the phone auto-dials the local emergency number and can fire an SMS with GPS coordinates to your pre-set emergency contacts. This is a personal panic button. It requires cellular or WiFi calling to exist at that moment, requires the phone to be unlocked and physically accessible to you, and sends to your contacts, not to any public authority or NGO.
 Satellite Emergency SOS (iPhone 14+, and Pixel/Android equivalents). When there's zero cell and zero WiFi, the phone connects directly to a low-earth-orbit satellite fleet (Apple uses Globalstar). The connection works under exceptional circumstances when no other means of reaching emergency services are available, requires you to be outside with a clear view of sky and horizon, and the phone starts a structured text conversation sharing Medical ID, emergency contacts, questionnaire answers, location with elevation, and battery life. It's genuinely impressive engineering, and it's the single closest thing to what you're building. att
 Automatic crash/fall detection. If the phone or watch detects a severe car crash or hard fall and the person is unresponsive, it can trigger the satellite SOS automatically even without the person acting. apple
-Why none of this is Haven's problem, or yours
+Why none of this solves your problem
 Every one of these systems shares three assumptions that break for a victim being monitored:
 The user must be free to act openly. Pressing a side button five times, or holding the phone up to the sky visibly texting "911," is an unmistakable, loud action. A woman under surveillance, a worker with a confiscated phone, a villager afraid of being identified as the person who reported the factory — none of them can perform an obvious SOS gesture without consequences worse than the emergency itself.
 It goes to the wrong recipient. Button SOS goes to your personal contacts or the general police line. It has no concept of "this needs a domestic violence caseworker," "this needs an environmental regulator," or "this needs to be clustered with thirteen other anonymous reports before anyone acts." It's a single alarm, not a system that reasons about the report.
@@ -96,7 +83,7 @@ The actual difference, stated cleanly
 Built-in phone SOS is: a visible, one-shot alarm from a free person to their contacts, when infrastructure is fully broken.
 Your system is: a covert or low-signal report from a constrained person, routed through Gen AI triage to the right responder, correlated with other reports over time, sent over whichever degraded channel is actually available.
 Concretely, three things phones don't do that you do:
-Covert capture. Haven used steganography so the act of reporting looks like nothing happened. Your disaster variant uses a missed call or a background-compressed report so the act of reporting is invisible to anyone watching the phone.
+Covert capture. Your disaster variant uses a missed call or a background-compressed report so the act of reporting is invisible to anyone watching the phone.
 AI-mediated triage before it ever reaches a human. Apple's satellite flow is a raw conversation forwarded to a relay center. Yours classifies severity, deduplicates, and clusters before a responder ever sees it — that's the Gen AI doing real work, not just moving bytes.
 Cross-report intelligence. One iPhone SOS call is one call. Your system's value compounds: report 40 lines up with reports 12 and 27 on the same location and becomes a case, not a ping.
 That comparison — "phones already solve the alarm problem for a free person with working satellite hardware; we solve the reporting problem for a constrained person with none of that" — is a clean, honest line for your deck, and it preempts the first question a Google Cloud judge will ask.
