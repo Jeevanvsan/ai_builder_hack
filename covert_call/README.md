@@ -3,7 +3,7 @@
 **An AI that lets a person in danger ask for help when asking out loud isn't safe.**
 
 QuickBite looks like an ordinary food-delivery app. It is actually a covert channel to an emergency response team,
-built on **Gemini** + **Firebase/Cloud Run**. A person who is coerced, watched, or held uses the disguised app to
+built on **Gemini** + **Firebase**. A person who is coerced, watched, or held uses the disguised app to
 summon help without anyone nearby noticing, and a responder dashboard receives structured incident data **live**.
 
 - **Theme:** Sustainability & Social Impact — societal impact via *resilience strengthening* and *community
@@ -17,7 +17,7 @@ summon help without anyone nearby noticing, and a responder dashboard receives s
 ## What it does
 Four ways to raise a report, one shared AI/real-time backbone:
 1. **Live call** — Gemini Live plays a restaurant employee ("Mia") who asks coded menu questions and states each
-   code's real meaning in the same breath. It extracts incident data live, sees the back camera (~1 fps), hears the
+   code's real meaning in the same breath. It extracts incident data live, sees the camera (one frame every 2 s), hears the
    background (a gunshot/shouting escalates severity), and gives the caller disguised safety advice.
 2. **Silent tap** — a no-sound "delivery instructions" screen; long-press reveals meanings; attach a photo that
    Gemini reads into structured signal.
@@ -34,7 +34,7 @@ The **dashboard** is a separate ops console: live queue with severity ranking, c
   camera + background-sound understanding, session resumption.
 - **Gemini API (structured output)** — post-call consolidation, third-party leakage check, photo vision.
 - **Firestore** — incident documents + real-time listeners (the live pipeline).
-- **Firebase Hosting** — both web apps. **Cloud Run** is the deployment target for any server piece.
+- **Firebase Hosting** — the web app, dashboard and landing site. **Next:** Gemini keys server-side on **Cloud Run**.
 - **Google Maps / Geocoding** — dashboard location (free OpenStreetMap fallback when no key).
 - **Free peer-to-peer WebRTC** (Firestore carries the handshake) — live video, no media server, no billing.
 
@@ -43,7 +43,7 @@ The **dashboard** is a separate ops console: live queue with severity ranking, c
 covert_call/
 ├── web/         QuickBite web app (React + Vite) — the live-deployed disguise app
 ├── dashboard/   Monitoring Dashboard (React + Vite) — the responder console
-├── native/      React Native (Expo) app — UNTESTED scaffold, see native/README.md
+├── native/      React Native (Expo) Android port of the web app, see native/README.md
 ├── shared/      Code shared by all three:
 │   ├── incidents/   the incident data model + write client + severity
 │   ├── video/       WebRTC publisher + signaling
@@ -68,7 +68,8 @@ fill in:
   (see [`docs/setup/drive-uploader.md`](docs/setup/drive-uploader.md)).
 - `VITE_GOOGLE_MAPS_API_KEY` (dashboard) — optional; OpenStreetMap is used when unset.
 
-**No secrets are committed** — only `.env.example` templates are tracked. Real keys live in `.env.local`.
+**No secrets are committed** — only the `.env.example` templates and the dashboard's `.env.emulator` (local
+emulator settings, no keys) are tracked. Real keys live in `.env.local`.
 
 ## Deploy
 ```bash
@@ -84,9 +85,9 @@ another folder.
 - [`docs/deck.md`](docs/deck.md) · [`docs/demo-script.md`](docs/demo-script.md) · [`docs/theme-fit.md`](docs/theme-fit.md)
 - [`docs/collaboration.md`](docs/collaboration.md) — the two-person ownership split and workflow.
 
-## Honesty notes (for judges and future us)
-- The **web app + dashboard** are the live-deployed deliverable. The **native app is an untested scaffold** — its
-  Gemini audio/camera + WebRTC transport is stubbed (see `native/README.md`).
-- Individual capabilities (mesh SOS, anonymisation, crash detection) exist in other products; the **novel part is
-  the combination** — disguised persona + in-breath code-teaching + real-time mid-call extraction (plan §8).
+## Scope notes
+- The **web app + dashboard** are the live-deployed deliverable. The **native Android app** is a port of the web
+  app; its current status is in `native/README.md`.
+- The novel part is the **combination**: a disguised persona, in-breath code-teaching and real-time mid-call
+  extraction (plan §8).
 - "Response" in this prototype means the dashboard incident, not integration with real emergency services.

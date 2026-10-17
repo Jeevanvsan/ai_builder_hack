@@ -67,7 +67,7 @@ Responders can guide the person to safety through Mia, who passes directions on 
 The dashboard also includes:
 
 - a **live queue** ranked by severity, with an **Ask AI** search ("woman attacked with a weapon near Vazhicherry")
-- an **AI recommendation** for each incident (for example, immediate police dispatch because a weapon was reported)
+- a **recommended action** for each incident (for example, immediate police dispatch because a weapon was reported)
 - a hand-drawn style **scene sketch** of who is where, and **linked cases** for the same place, person or vehicle
 - the **route to safety** being followed, the nearest police, hospital and fire station, and the caller's live position
 - a **case file** with the full summary, evidence recordings and a dispatch bulletin ready for radio
@@ -85,7 +85,7 @@ Architecture diagrams: [covert_call/docs/architecture](covert_call/docs/architec
 
 ## Tested on real calls
 
-8 real voice calls on the deployed app (4 covert, 4 chase): danger and coercion tags reached the dashboard 2–3.5 s before the caller's words were transcribed, every chase run tracked the full ~535 m route to the police station, and AI cost was about **$0.35 per call**.
+8 real voice calls on the deployed app (4 covert, 4 chase): danger and coercion tags reached the dashboard 2–3.5 s before the caller's words were transcribed, and every chase run tracked the full ~535 m route to the police station. Across 59 real calls, AI cost averaged about **$0.20 per call**.
 
 - [Performance test: 8 real calls (Google Sheets)](https://docs.google.com/spreadsheets/d/1fUVyPzAyDgvhrUJFWH-G35BiqVEt-5Tz/edit?usp=sharing)
 - [AI cost per call and cost estimate (Google Sheets)](https://docs.google.com/spreadsheets/d/19s3mMe2nNcZM_Z_tzK-qhx9iXAsQteTn/edit?usp=sharing)
@@ -96,7 +96,7 @@ QuickBite asks the browser for the **microphone** (required for calls), the **ca
 
 ## Privacy
 
-The microphone, cameras and location are used **only after someone starts one of the four ways to ask for help**. Information goes only to signed-in responders and is never sold or used for advertising. Read the full [Privacy Policy](https://quickbite-5cde0-landing.web.app/privacy).
+The microphone, cameras and location are used **only after someone starts one of the four ways to ask for help**. The responder dashboard is sign-in only, and the information is never sold or used for advertising. Read the full [Privacy Policy](https://quickbite-5cde0-landing.web.app/privacy).
 
 ## Important
 

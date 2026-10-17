@@ -262,8 +262,8 @@ export async function startLiveCall(
     return words.length < 2 ? !/[A-Z]/.test(a) || GENERIC_PLACE.test(a) : !a.includes(',') && words.length <= 3 && GENERIC_PLACE.test(a)
   }
 
-  // An email address in spoken text: "jeevan dot v at gmail dot com", "J e e v a n v s a n at gmail.com",
-  // "jeevanvsan@gmail.com". Spelled-out letters are joined back together. Null if there is no complete address.
+  // An email address in spoken text: "asha dot k at gmail dot com", "A s h a k at gmail.com",
+  // "ashak@gmail.com". Spelled-out letters are joined back together. Null if there is no complete address.
   const emailIn = (raw: string): string | null => {
     const t = raw.toLowerCase()
       .replace(/(?<![\w'’])[a-z0-9](?:[\s,]+[a-z0-9](?![\w'’]))+/g, (run) => run.replace(/[\s,]+/g, ''))
@@ -410,7 +410,7 @@ export async function startLiveCall(
         if (args.confirmed === true && (pendingEmail || emailSavedAs)) {
           emailConfirmedAt = Date.now()
           // What the caller said yes to is the address Mia SPOKE in her read-back, which can differ from her tool argument
-          // (INC-MUXX7G18: read back "j, e, e, v, a, n, v, s, a, n", passed "jeevanvsn" from the transcript).
+          // (INC-MUXX7G18: read back the full spelling, passed a shortened name from the transcript).
           const spoken = [...transcriptLines].reverse().filter((l) => l.speaker === 'Mia').slice(0, 3).map((l) => spokenEmail(l.text)).find(Boolean)
           const confirmed = spoken ?? email
           if (confirmed !== emailSavedAs) saveReportEmail(confirmed)
@@ -428,7 +428,7 @@ export async function startLiveCall(
       }
       case 'confirm_address': {
         if (typeof args.address !== 'string') break
-        // Mia put her letter-by-letter read-back into the address (INC-MUXNKEBP: "Jeevan Niwas, J, E, E, V…").
+        // Mia put her letter-by-letter read-back into the address (INC-MUXNKEBP: "Asha Niwas, A, S, H, A…").
         const address = applySpelling(cleanSpelled(args.address), `${args.address} | ${spellingSources()}`)
         if (tooVague(address)) {
           return `NOT saved: "${address}" is too vague to locate. Ask the caller (once, simply) for their area or road and town, then call confirm_address with all of it, e.g. "Indian Oil pump, CCSB Road, Alappuzha".`
