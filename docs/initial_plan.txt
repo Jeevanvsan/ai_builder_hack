@@ -17,7 +17,7 @@ Shared backbone
 Both features feed one Gemini triage/clustering layer — de-identify-and-cluster for reports, locate-and-prioritize for rescue. This shared architecture, not either feature alone, is your technical-merit story.
 The one line that reconciles the whole system
 "Reporting is anonymous by design; rescue-relay participation is identified by design — same AI backbone, different threat models."
-Competitive honesty slide (name these yourself)
+Competitive landscape slide
 SOS GPS Rescue (fall/crash detection, duress mode) and Life Signal (mesh blackout relay) already exist — acknowledge them, then say: "detection and transport are solved; the AI triage layer — anonymization, adversarial re-ID checking, cross-report clustering — is what neither has."
 Roadmap slide (scoped honestly, not built)
 Coverage today = app users only; density scales with adoption

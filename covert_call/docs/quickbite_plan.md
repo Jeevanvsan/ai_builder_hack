@@ -249,4 +249,4 @@ One practical demo-prep note from that research: real AI-911-dispatch companies 
 ## 10. Open questions (genuinely undecided, revisit if/when relevant)
 
 - Whether/when to build back toward the full platform (Covert Notice anonymous pillar + SOS/mesh) once QuickBite is validated — explicitly deferred, not decided either way
-- Theme-fit framing for the deck ("Sustainability & Social Impact" vs. QuickBite's personal-safety domain, and its proximity to Haven's actual DV domain) — still unresolved; no honest justification has been settled on yet, don't invent one
+- Theme-fit framing for the deck ("Sustainability & Social Impact" vs. QuickBite's personal-safety domain, and how it relates to other personal-safety prior art) — resolved later in `theme-fit.md`

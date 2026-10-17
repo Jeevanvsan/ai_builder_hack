@@ -67,7 +67,7 @@ Responders can guide the person to safety through Mia, who passes directions on 
 The dashboard also includes:
 
 - a **live queue** ranked by severity, with an **Ask AI** search ("woman attacked with a weapon near Vazhicherry")
-- an **AI recommendation** for each incident (for example, immediate police dispatch because a weapon was reported)
+- a **recommended action** for each incident (for example, immediate police dispatch because a weapon was reported)
 - a hand-drawn style **scene sketch** of who is where, and **linked cases** for the same place, person or vehicle
 - the **route to safety** being followed, the nearest police, hospital and fire station, and the caller's live position
 - a **case file** with the full summary, evidence recordings and a dispatch bulletin ready for radio
@@ -96,7 +96,7 @@ QuickBite asks the browser for the **microphone** (required for calls), the **ca
 
 ## Privacy
 
-The microphone, cameras and location are used **only after someone starts one of the four ways to ask for help**. Information goes only to signed-in responders and is never sold or used for advertising. Read the full [Privacy Policy](https://quickbite-5cde0-landing.web.app/privacy).
+The microphone, cameras and location are used **only after someone starts one of the four ways to ask for help**. The responder dashboard is sign-in only, and the information is never sold or used for advertising. Read the full [Privacy Policy](https://quickbite-5cde0-landing.web.app/privacy).
 
 ## Important
 

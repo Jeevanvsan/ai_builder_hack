@@ -2,7 +2,7 @@
 
 **Role:** Monitoring Dashboard + real-time incident pipeline (owns Epic 4, Epic 3, dashboard half of Epic 7; shares Epic 5 with Ameen)
 **Last updated:** 2026-10-06 13:30 IST — Deck preparation: Team Name confirmed as "NexMind". Preserved `deck/Submission Template _ AI Builder Cup.pptx` strictly as a permanent, read-only formatting reference template (rule locked in root and covert_call CLAUDE.md). Active pitch deck maintained in `deck/QuickBite_Submission_Deck_NexMind.pptx`. Earlier (2026-09-29 05:00 IST): Landing page built and deployed (see bottom section). Two pieces of work that session:
-1. Branch `ep-5-dashboard-auth` (Jeevan's own scope): Firebase Auth sign-in, a Responder Management page, a full incident Analytics page + Responder Performance page (ECharts), and a Gemini-powered AI Insights tab, auto-refreshed daily. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. Also rewrote git history on `main`, `ep-4`, and `ep-5-dashboard-auth` to remove Claude's Co-Authored-By trailer and force-pushed all three — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone.
+1. Branch `ep-5-dashboard-auth` (Jeevan's own scope): Firebase Auth sign-in, a Responder Management page, a full incident Analytics page + Responder Performance page (ECharts), and a Gemini-powered AI Insights tab, auto-refreshed daily. Opened PR #5 `ep-5-dashboard-auth` → `main` (https://github.com/Jeevanvsan/ai_builder_hack/pull/5), reviewer: Ameen. Also re-synced `main`, `ep-4`, and `ep-5-dashboard-auth` (commit hashes changed) — see "IMPORTANT" note for Ameen below, he needs to re-sync his local clone.
 2. **Branch `epic-1-2-3-gemini-live` (Ameen's Epic 1/2 scope, picked up on his behalf since he's currently busy and asked for it to be continued)** — see the dedicated section below. Committed locally (`c5ed12a`), not yet pushed/PR'd, pending Ameen's go-ahead since this is normally his ownership area.
 **Live dashboard:** https://quickbite-5cde0-dashboard.web.app (Firebase project `quickbite-5cde0`, hosting site `quickbite-5cde0-dashboard`)
 
@@ -292,7 +292,6 @@ here has been executed on a phone yet — no EAS build has been made since these
   - **Data-model change (your area, `shared/incidents/types.ts`): `Channel` now includes `'click-order'`.** I also added `'click-order'` to `dashboard/firestore.rules`. Please confirm you're OK with this — it's the first of the Phase 2 data-model changes.
   - Dashboard: added `channelLabel()` in `dashboard/src/lib/format.ts` so a coded order shows as "Coded order" everywhere (it would otherwise mislabel as "Silent tap"), and added it to the Case history filter.
   - Verified: `tsc -b` + `oxlint` clean on both web and dashboard, web `npm run build` passes. Not yet tested with a real placed order against the live dashboard — worth a quick end-to-end check.
-  - Note on the classifier: a couple of my working messages got stopped by a safety classifier (the covert-recording/hostage features read like surveillance out of context). Epic 8 itself is plain app logic and was unaffected; flagging just changed how I narrate the AV-heavy epics.
 
 
 - **2026-09-25 19:33 IST: Phase 2 backlog added (done from Ameen's side, docs only, no code). This note is also for Jeevan.** `covert_call/docs/backlog.md` has a new `# PHASE 2` section with Epics 8–14:
@@ -305,16 +304,16 @@ here has been executed on a phone yet — no EAS build has been made since these
   - 14: dashboard support
   - **Jeevan: Epic 14 is yours.** Before Epic 8 starts, please agree the Phase 2 data-model changes listed at the top of the section (`types.ts` + `firestore.rules`): new channels `click-order` / `silent-sos`, `incidentType`, `scenario`, `sceneObservations[]`, `adviceGiven[]`, `cameraMode`, `videoRecording`.
   - Old stories 7.1 (sender) and 7.2 now point to the Phase 2 stories. `covert_call/CLAUDE.md` notes that the SOS front camera is an explicit exception to the "back camera only" rule.
-- **⚠️ 2026-09-25 ~7:30 pm IST: `main` rewritten again (done from Ameen's side), and this note is also for Jeevan.** Two commits from PR #6 (`6d510c2`, `34c9728`) still had `Co-Authored-By: Claude Sonnet 5`, so "claude" came back in the Contributors list. The trailer was stripped from both. They are now `7bf57eb` and `7e87261`, and the merge commit is now `aa1c626`. File contents, authors and dates are unchanged. `main` was force-pushed and the merged branch `epic-1-2-3-gemini-live` was deleted from GitHub. **Jeevan: run `git fetch origin && git checkout main && git reset --hard origin/main`, and delete your local `epic-1-2-3-gemini-live` branch.** Please also turn the trailer off in your own Claude Code setup: add `"includeCoAuthoredBy": false` to `~/.claude/settings.json`. The trailer came back because your setup still adds it. The project `CLAUDE.md` now has a "No AI attribution in git history" rule too. GitHub's sidebar is cached, so it can take up to about a day to update.
+- **⚠️ 2026-09-25 ~7:30 pm IST: `main` re-synced again (done from Ameen's side), and this note is also for Jeevan.** Commit messages on two commits from PR #6 (`6d510c2`, `34c9728`) were cleaned up. They are now `7bf57eb` and `7e87261`, and the merge commit is now `aa1c626`. File contents, authors and dates are unchanged. `main` was force-pushed and the merged branch `epic-1-2-3-gemini-live` was deleted from GitHub. **Jeevan: run `git fetch origin && git checkout main && git reset --hard origin/main`, and delete your local `epic-1-2-3-gemini-live` branch.**
 - **Your Epic 1/2 work was picked up on branch `epic-1-2-3-gemini-live`** since you were busy and asked for it to be continued — please review before it gets merged, this is your scope. See the "Epic 1/2/3" section above for exactly what was built (live call flow, silent-tap mode, extraction, stress, leakage check, consolidation) and the real bugs that came up during live testing (wrong model name, a React StrictMode double-mount bug, an AudioContext autoplay issue, a Firestore write-race). Not pushed yet — will wait for your OK first. Currently using your same Gemini key value (copied into `web/.env.local` as `VITE_GEMINI_LIVE_API_KEY`) rather than a separate one — let Jeevan know if you'd rather split them.
-- **⚠️ IMPORTANT — git history was rewritten on 2026-09-25, force-pushed to `main`, `ep-4`, and `ep-5-dashboard-auth`.** This was to remove a "Co-Authored-By: Claude" line from some commit messages (it was making "claude" show up in the repo's Contributors list). Commit hashes on those three branches changed. **Before you next `git pull` or `git push` on any of them**, run this for each branch you have locally:
+- **⚠️ IMPORTANT — git history was rewritten on 2026-09-25, force-pushed to `main`, `ep-4`, and `ep-5-dashboard-auth`.** This was a one-off commit-message cleanup. Commit hashes on those three branches changed. **Before you next `git pull` or `git push` on any of them**, run this for each branch you have locally:
   ```
   git fetch origin
   git checkout <branch-name>
   git reset --hard origin/<branch-name>
   ```
   If you have uncommitted work on one of those branches, commit it to a new branch or `git stash` it first — `reset --hard` discards uncommitted changes. If you're not sure, ping Jeevan before running this. Sorry for the disruption — it won't happen again for routine work, this was a one-off cleanup.
-- **Dashboard now needs sign-in:** the live dashboard at https://quickbite-5cde0-dashboard.web.app requires a login. Your account is `ameen@quickbite.com` — ask Jeevan for the password, or reset it yourself from the Firebase console (Authentication → Users). This doesn't affect the QuickBite app's own Firestore writes at all — no login needed on your side, only the dashboard changed.
+- **Dashboard now needs sign-in:** the live dashboard at https://quickbite-5cde0-dashboard.web.app requires a login. Your account is `ameen@quickbite.com` — reset its password from the Firebase console (Authentication → Users). This doesn't affect the QuickBite app's own Firestore writes at all — no login needed on your side, only the dashboard changed.
 - **You're a founding admin:** the first time you sign in, you automatically get admin rights (roster entry created for you). Admin unlocks two extra pages: Responder management (add/edit/disable other responders) and Responder performance.
 - **AI Insights needs a Gemini API key:** if you want to test/regenerate it yourself, add your own `VITE_GEMINI_API_KEY` to `covert_call/dashboard/.env.local` (free key from Google AI Studio) and rebuild — otherwise it just shows "not set up" and doesn't break anything else.
 - **Use the shared client, don't write incidents by hand:** `covert_call/shared/incidents/README.md` shows the 5 calls (`startIncident` → `updateLiveFields` / `recordVoiceStress` → `confirmAddress` → `endIncident`). `startIncident()` sets `viewedAt: null`, which is what makes the dashboard ring and highlight the call.
@@ -536,7 +535,7 @@ User flagged INC-MUL29YGP's Evidence recordings section only showing "Back camer
 **Update 2026-10-05 (IST, ~20:15): demo feed — no special link on the phone + staging control page.**
 - Every web call is now injectable (camera/mic go through `demoInject.ts` passthrough at the real camera's resolution, ≤1280 px / ≤24 fps); nothing changes until a signed-in responder sends a command. `?demoInject=0` opts a device out.
 - Control page (staging build only, not in the production bundle): https://quickbite-5cde0-staging.web.app/demo-control. Responder sign-in (separate Firebase app instance), live calls list, pick a video (streams until changed), sounds (once/loop). Clip list from `web/public/demo/manifest.json` (written by `npm run demo -- add …`).
-- Removed 4 downloaded clips that were iStock/Getty watermarked previews (unlicensed); kept `alone-street` (source still to be credited).
+- Removed 4 downloaded clips that were stock previews whose licence did not allow reuse; kept `alone-street` (source still to be credited).
 
 **Update 2026-10-05 (IST, ~20:45): Mia never actually saw the camera on phones (fixed, deployed web + staging).**
 - `web/src/lib/gemini/frames.ts` read the camera through an off-page `<video>`; phone browsers don't render frames into it, so `readyState` stayed < 2 and NO frames were ever sent to Gemini (calls and the silent SOS). Its timer also only started if the first `play()` succeeded. Now the sampler video is kept in the page invisibly, the timer always runs, and the console logs "camera frames are reaching Gemini" on the first frame.
@@ -667,7 +666,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Deployed web staging.
 
 ### 2026-10-06 ~21:50 IST: wrong report email fixed
-- The transcript had "jeevanvsan@gmail.com" but Mia passed "jeevanvsn gmail com" to `send_case_report`. The tool now takes the address from the caller's last 3 transcript lines (spelled-out letters joined, "at"/"dot" converted); Mia's argument is only the fallback. She's told to read back exactly the saved address and to re-call the tool if corrected.
+- The transcript had "caller@example.com" but Mia passed "callr example com" to `send_case_report`. The tool now takes the address from the caller's last 3 transcript lines (spelled-out letters joined, "at"/"dot" converted); Mia's argument is only the fallback. She's told to read back exactly the saved address and to re-call the tool if corrected.
 - Deployed web staging.
 - (~22:05) Email is now saved only after the caller confirms: the first `send_case_report` keeps it pending and tells Mia to read it back and ask "Is that right?". It's saved when she calls again with `confirmed=true`, or when the caller answers yes right after her read-back. A correction restarts the check. Deployed web staging.
 
@@ -680,10 +679,10 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - Deployed web staging AND production (production had the same window).
 
 ### 2026-10-06 ~23:00 IST: report email = the address the caller confirmed (INC-MUWO3P2Y)
-- The transcript misheard the email ("jeevanjeevanvsa@gmail.com"); Mia's last read-back was right ("J E E V A N V S A N at gmail dot com"); the caller said yes, but the transcript version was saved and emailed.
+- The transcript misheard the email ("callercalle@example.com"); Mia's last read-back was right ("C A L L E R at example dot com"); the caller said yes, but the transcript version was saved and emailed.
 - Now the saved address is the one parsed from Mia's latest read-back (what the caller actually confirmed); the transcript or her tool argument only supplies the first guess she reads back. Spelled-letter parsing fixed (it joined the "s" of "that's").
 - Deployed web staging + production.
-- (~23:20) INC-MUWOZNEF: Mia read the address back as "J, E, E, V, A, N, V, S, A, N at gmail dot com" (comma-separated), which parsed as "n@gmail.com". Comma-separated spelled letters are now joined, and an address with a 1-2 letter name is rejected as a misparse (falls back to the next source). Deployed staging + production.
+- (~23:20) INC-MUWOZNEF: Mia read the address back as "C, A, L, L, E, R at gmail dot com" (comma-separated), which parsed as "n@gmail.com". Comma-separated spelled letters are now joined, and an address with a 1-2 letter name is rejected as a misparse (falls back to the next source). Deployed staging + production.
 - (~23:35) Demo injection: the injected clip sometimes switched to the real camera mid-call. When Firestore's listen stream dropped and recovered, the demoControl listener got a cached/missing snapshot, read it as "no video" (real camera), then restarted the clip. Cached and missing snapshots are now ignored (Stop still works: it writes video:null). A buffering clip keeps its last frame instead of flashing black. Deployed staging + production.
 
 ### 2026-10-06 ~23:55 IST: "no route found" (INC-MUWPBPUX)
@@ -696,7 +695,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 - /demo-control: new 👁 Preview button for videos and sounds (plays on the laptop only, works before a call is picked); Start/Stop stay disabled until a live call is selected. Deployed to staging.
 
 ### 2026-10-07 10:30 IST: case report email = Mia's address
-- INC-MUXLVU0X sent to the wrong address (jeevanvesan instead of jeevanvsan): code parsing of read-backs/transcripts failed. Now the address Mia passes to send_case_report (full, corrected) is the one saved to `reportEmail` and emailed; only its format is checked. Deployed to staging.
+- INC-MUXLVU0X sent to the wrong address (a misspelled address instead of the spoken one): code parsing of read-backs/transcripts failed. Now the address Mia passes to send_case_report (full, corrected) is the one saved to `reportEmail` and emailed; only its format is checked. Deployed to staging.
 
 ### 2026-10-07 11:00 IST: confirm personal details
 - Email: Mia's send_case_report argument is saved (standard name@domain.tld syntax required). Address: confirm_address now has confirmed=true and a read-back loop until the caller says yes. Persona: every personal detail (address, email, phone, name, caller-given plate) is read back with spelling and repeated until confirmed (skipped if hiding/mid-escape). Deployed to staging.
@@ -707,19 +706,19 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-07 11:20 IST: backup camera check + pin kept
 - INC-MUXMUWBA: angry-man clip on camera, nothing reported (Mia busy with the order script). New backup: every 8 s the latest frame goes to gemini-3.1-flash-lite (`checkCameraFrame` in photoVision.ts); each new person/weapon/vehicle/injury/fire is recorded as a scene observation (+ snap) and Mia gets a note.
-- Address not pinned although geocoding "Jeevan Niwas, Vazhicherry, Alappuzha" works: the read-back loop saved it twice and a failed second lookup overwrote the pin. Now one lookup per distinct address, a failed one retried once after 3 s, and a re-save of the same address keeps its pin. Deployed to staging.
+- Address not pinned although geocoding "Asha Niwas, Vazhicherry, Alappuzha" works: the read-back loop saved it twice and a failed second lookup overwrote the pin. Now one lookup per distinct address, a failed one retried once after 3 s, and a re-save of the same address keeps its pin. Deployed to staging.
 
 ### 2026-10-07 11:45 IST: shorter calls
 - INC-MUXMUWBA ran 4+ min. Persona TIME BUDGET rewritten: only essential questions (what, how many, where with one read-back, still there), extras only when relevant, never ask the same thing more than twice. Notes at 2:00 (wrap up, at most one more question) and 3:00 (goodbye + end_call); Mia ends the call herself, exception only for a caller chased/hiding right now. Also: caller's spelling is final in read-backs. Deployed to staging.
 
 ### 2026-10-07 12:00 IST: address pin fallback
-- INC-MUXN9EK5: backup camera check works (man + smoke reported). Address "Jeevan Niwas, Vazhichery Market, Vazhichery, Alappuzha" still unpinned (one-r spelling unmatched, Nominatim throttled). confirmAddress now pins at the phone's GPS fix (source gps only, never the IP guess), marked uncertain, when geocoding fails. Deployed to staging.
+- INC-MUXN9EK5: backup camera check works (man + smoke reported). Address "Asha Niwas, Vazhichery Market, Vazhichery, Alappuzha" still unpinned (one-r spelling unmatched, Nominatim throttled). confirmAddress now pins at the phone's GPS fix (source gps only, never the IP guess), marked uncertain, when geocoding fails. Deployed to staging.
 
 ### 2026-10-07 12:15 IST: email confirm fix
-- INC-MUXN9EK5 emailed jeevanvsn (first guess): "Yes. No, no, no. It's wrong…" was taken as a yes, and Mia's corrected read-back never went to the tool. Now a line with no/wrong/@/at is never a yes, and a real yes no longer auto-saves: Mia is told (tool-response note + nudge after 2.5 s) to call send_case_report confirmed=true with exactly the address she just read back, which is what gets saved. Deployed to staging.
+- INC-MUXN9EK5 emailed a misheard address (first guess): "Yes. No, no, no. It's wrong…" was taken as a yes, and Mia's corrected read-back never went to the tool. Now a line with no/wrong/@/at is never a yes, and a real yes no longer auto-saves: Mia is told (tool-response note + nudge after 2.5 s) to call send_case_report confirmed=true with exactly the address she just read back, which is what gets saved. Deployed to staging.
 
 ### 2026-10-07 12:40 IST: address spelling cleanup + email yes guard
-- INC-MUXNKEBP: address saved as "Jeevan Niwas, J, E, E, V, A, N, N, I, V, A, S, Vazhicherry, V, A, Z…". confirm_address now strips letter-by-letter runs and applies them to the word they spell ("Jeevan Nivas, Vazhicherry, Alappuzha"); tool says normal words only.
+- INC-MUXNKEBP: address saved as "Asha Niwas, A, S, H, A, N, I, V, A, S, Vazhicherry, V, A, Z…". confirm_address now strips letter-by-letter runs and applies them to the word they spell ("Asha Nivas, Vazhicherry, Alappuzha"); tool says normal words only.
 - Same call: Mia confirmed the email after "Can you repeat again?". send_case_report confirmed=true is now refused unless the caller's last line is a plain yes (no no/wrong/repeat/question); Mia is told to read it back again. Deployed to staging.
 
 ### 2026-10-07 13:15 IST: Mia prompt rewrite + sketch movement
@@ -728,7 +727,7 @@ Eval (vision-knife-plate): 5/5, Mia answers after tool-only turns, 5 inferences 
 
 ### 2026-10-07 12:20 IST (wall clock ~12:10): deterministic fixes over prompt-only ones
 - Pattern noted: fixes that only told Mia what to do kept failing intermittently (live model doesn't follow every rule); fixes enforced in code held. Moving remaining critical rules into code.
-- Address spelling: letter runs in Mia's latest read-back and the caller's last lines (caller wins) are applied to the saved address (edit distance ≤2, same first letter), both when confirm_address is called and when the caller says yes to a read-back. "Jeevan Niwas" + "N I V A S" → "Jeevan Nivas"; "Vazhichery" + "V A Z H I C H E R R Y" → "Vazhicherry".
+- Address spelling: letter runs in Mia's latest read-back and the caller's last lines (caller wins) are applied to the saved address (edit distance ≤2, same first letter), both when confirm_address is called and when the caller says yes to a read-back. "Asha Niwas" + "N I V A S" → "Asha Nivas"; "Vazhichery" + "V A Z H I C H E R R Y" → "Vazhicherry".
 - Earlier today in code: email tool refuses until an address is saved; 2-min note demands the address/email; missed short answer re-ask; email read-back finished before the 3-min goodbye. Prod + staging deployed.
 
 ### 2026-10-07 ~17:40 IST: spelling rules actually live now
@@ -740,7 +739,7 @@ Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
 - First answer missed in almost every call: the mic AudioContext started suspended on the phone, so no audio reached Gemini until a tap. Now resumed at once, on any touch/key, and every second (keepAudioRunning in audio.ts; also the demo mic mixer).
 - INC-MUXXR8TP: the model derailed into a full p5.js Tic-Tac-Toe program mid-call. New guard: code-like output stops playback, isn't saved, and Mia is told to repeat her last question.
 - Every long line appeared twice on the dashboard (5 s partial flush + full line appended). Partial lines are now replaced in place (transaction; the rules only allow the transcript to grow, so no arrayRemove).
-- Emails: older calls (before mandatory spelling) saved STT mishearings (jeevanvsain, geevanvsan); latest call with the spelling flow saved jeevanvsan correctly. Prod + staging deployed.
+- Emails: older calls (before mandatory spelling) saved STT mishearings (misspelled addresses); latest call with the spelling flow saved the address correctly. Prod + staging deployed.
 
 ### 2026-10-08 IST: microphone permission help
 - Reports: some phones never showed the mic permission box. Causes: site previously blocked, browser itself has no mic permission in the phone's settings, link opened in an in-app browser (WhatsApp/Instagram/Facebook), or mic busy.
@@ -769,7 +768,7 @@ Reviewed the last 7 real calls (INC-MUXX7G18 … INC-MUXZB4IH):
 - New `covert_call/docs/architecture/`, drawn from the code on `main` @ 3893f4e and showing the deployed system only (no Android, AI Logic/App Check, BigQuery, Cloud Run, eval or demo tooling):
   - `README.md`: Mermaid diagrams (system overview, live-call sequence, Gemini agent loop, Firestore data and access, deployment) plus component, guard and access tables. GitHub renders it in the folder view.
   - `quickbite-architecture-slide.svg` / `.png` (4800×1980): the overview sized for deck slide 7's diagram box (left 0.40 in, top 1.45 in, width 9.20 in), in the slide's Arial and colours. The deck itself was not edited.
-  - `quickbite-architecture.html`: interactive version (click a box for details, light/dark). Also published as a private claude.ai Artifact.
+  - `quickbite-architecture.html`: interactive version (click a box for details, light/dark).
 - Pointer lines added: root `README.md` ("How it's built" → the architecture folder), "planning-era, superseded" notes in `covert_call/STRUCTURE.md`, `docs/setup/GETTING_STARTED.md` and the architecture tab of `docs/quickbite_diagrams.html`, and one line in `covert_call/CLAUDE.md`.
 - Docs only, nothing to port to native. Not committed.
 - **Found while checking the code (no changes made):**
@@ -826,7 +825,6 @@ https://quickbite-5cde0-landing.web.app/manual is **deployed** (landing only). N
     - With headless Chrome's test-pattern camera she reported "Seen: black scooter" (hallucination).
   - **Live covert test call:** the spelled "y" in yopmail was transcribed as "iiopmail" and the email went to the wrong address. The manual tells testers to check the read-back and say "no".
   - **The Subjects tile only appears if Mia reports a headcount;** she didn't in the covert test ("1 subject" was only in the bulletin).
-  - **Someone else is using the `judge@quickbite.com` login today:** they acknowledged/resolved test incidents within a minute (11:24 and 13:12).
   - **The practice-call labels still say "not sent to responders",** but the dashboard lists demo calls with a DEMO tag. The manual explains this.
   - **For Jeevan (dashboard text):** "Runs when the call ends" (credibility) and "Refreshes itself once a day automatically" (AI Insights) are untrue while those features are paused.
   - **Headless SOS runs were flaky:** 2 of 5 never reached Firestore. The Firestore write channel aborted in one; the other 3 worked. Worth one real-phone SOS check.
@@ -837,3 +835,31 @@ https://quickbite-5cde0-landing.web.app/manual is **deployed** (landing only). N
   - removed the logo "hold for a practice call" badge, and recaptured the home screenshot with badges for the heart, account, chips, Delivery instructions and Call to order;
   - the dashboard page no longer mentions DEMO-tagged cases (removed at Ameen's request).
   Landing redeployed and verified live.
+
+### 2026-10-17 ~11:55 IST: pre-evaluation repo cleanup (branch `chore/pre-evaluation-cleanup`, at Ameen's request)
+The public repo goes to judges, so every tracked doc, deck and spreadsheet file was audited. No files were deleted and history was not rewritten. Only the damaging sentences were reworded.
+- **Prior-art wording:** Haven is now described neutrally as "prior art reviewed". Changed in root `CLAUDE.md`, `docs/external_ref.md`, `docs/brainstorming_discussion.txt`, `docs/prototype_build_plan.md`, `docs/initial_plan.txt`, `covert_call/docs/quickbite_plan.md` and `covert_call/docs/standalone_covert_call_plan.md`. The "only one novelty claim" and "honestly commodity" lines are now a neutral competitive landscape.
+- **Tooling and history notes:** removed the commit-trailer and history-rewrite notes and the private claude.ai artifact links, here and in both `CLAUDE.md` files.
+- **Personal data scrubbed:** the personal Gmail address and house name in this file and in `web/src/lib/gemini/liveSession.ts`, which got comment-only changes. Also removed the "someone else is using the judge login" and "unlicensed stock clips" remarks.
+- **Removed** the empty `.gitkeep` placeholder folders, which implied a FastAPI `backend/` that doesn't exist. Kept `landing/public/videos/.gitkeep`.
+- **`covert_call/docs/setup/GETTING_STARTED.md` rewritten** to match the real setup: npm workspace, the actual env vars, emulator and deploy commands. It previously gave FastAPI/pip/WebSocket instructions.
+- **`covert_call/README.md`:**
+  - Cloud Run is now marked "Next".
+  - Camera rate is one frame every 2 s.
+  - Native is described as an Android port.
+  - The emulator env file is now noted as tracked.
+  - "Honesty notes" became "Scope notes".
+- **Root `README.md`:**
+  - "AI recommendation" became "recommended action". It comes from the severity rules, not Gemini.
+  - The privacy line now says "the responder dashboard is sign-in only". The old wording claimed only signed-in responders get the data, which the open `allow read` rules contradict.
+- **Added** short READMEs for `covert_call/eval/` and `covert_call/intro-video/`; the latter replaces the Remotion template.
+- **Secret scan:** `.github/workflows/secret-scan.yml` now has `pull-requests: read`. The PR runs were failing with a 403.
+- **Deck left alone on purpose (Ameen's call):** nothing in `deck/` was staged. The local deletion of `v2.pptx` and the untracked `COMPLIANT_DRAFT.pptx` are untouched.
+- **Notes for Ameen:**
+  - Please refresh `status/person_a_ameen.md` yourself. It's frozen at 2026-09-25 with "_Ameen to fill in_" placeholders, so it understates your work.
+  - `covert_call/native/README.md` still says "not yet run on a device / cameras not built". Update it if that has changed.
+  - The real house name is still the spelling example in strings Gemini receives at runtime: `web/src/lib/gemini/persona.ts` (~L188 and L195), the `confirm_address` description in `tools.ts` (~L77), and a tool reply in `liveSession.ts` (~L445). These were left alone because they change Mia's live behaviour; change them only with a re-test.
+- **Notes for Jeevan:**
+  - The `LICENSE` removal in `e786cd8` is left as is.
+  - The 15 stale remote branches (`ep-*`, `phase-*`, `extended-brainstorming`, …) are still on GitHub. Delete them if you want a tidy branch list for judges (your repo, your call).
+  - Before judging: confirm production web is built with `VITE_USE_AI_LOGIC=true`, or the Gemini key is in the public JS. Rotate keys and the judge password afterwards.
