@@ -13,9 +13,15 @@ import coldCoffee from '../assets/food/cold-coffee.jpg'
 import lemonade from '../assets/food/lemonade.jpg'
 import hotSauce from '../assets/food/hot-sauce.jpg'
 import cheeseDip from '../assets/food/cheese-dip.jpg'
+import { GROCERY_ITEMS } from './catalog/grocery'
+import { HOME_ITEMS } from './catalog/home'
+import { PHARMACY_ITEMS } from './catalog/pharmacy'
+import type { ServiceId } from './services'
 
-export type CategoryId = 'pizza' | 'burgers' | 'biryani' | 'sides' | 'desserts' | 'drinks' | 'addons'
+// A category id within one service (QuickOne, Epic 33: each service has its own list, see data/services.ts).
+export type CategoryId = string
 
+// The food menu's categories.
 export const CATEGORIES: { id: CategoryId; label: string }[] = [
   { id: 'pizza', label: 'Pizza' },
   { id: 'burgers', label: 'Burgers' },
@@ -32,7 +38,8 @@ export interface MenuItem {
   description: string
   price: number
   image: string
-  veg: boolean
+  // Food only: the green/red veg mark. Grocery, pharmacy and home service items have none.
+  veg?: boolean
   category: CategoryId
   rating?: number
   ratingCount?: string
@@ -40,9 +47,13 @@ export interface MenuItem {
   // Links this item to a coded meaning in lib/codes.ts (Epic 8, click & order). Ordinary customers never notice
   // it; a person in danger long-presses to see what it reports and adds it like any normal item.
   code?: string
+  // QuickOne (Epic 33): which service tab the item belongs to; food when missing.
+  service?: ServiceId
 }
 
-export const MENU: MenuItem[] = [
+export const serviceOf = (item: MenuItem): ServiceId => item.service ?? 'food'
+
+const FOOD_ITEMS: MenuItem[] = [
   {
     id: 'margherita',
     name: 'Margherita Pizza',
@@ -289,10 +300,14 @@ export const MENU: MenuItem[] = [
   },
 ]
 
+// Every service's items. Food comes first, so a lookup of "the item for a code" (the landing page's code table)
+// still finds the food one.
+export const MENU: MenuItem[] = [...FOOD_ITEMS, ...GROCERY_ITEMS, ...PHARMACY_ITEMS, ...HOME_ITEMS]
+
 export const MENU_BY_ID: Record<string, MenuItem> = Object.fromEntries(MENU.map((m) => [m.id, m]))
 
 export const OUTLET = {
-  name: 'QuickBite Kitchen',
+  name: 'QuickOne Kitchen',
   area: 'Indiranagar',
   cuisines: 'Pizzas · Burgers · Biryani',
   rating: 4.4,

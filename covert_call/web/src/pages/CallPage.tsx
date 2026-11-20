@@ -8,7 +8,7 @@ import type { Incident } from '../../../shared/incidents/types.ts'
 import { coverPack, isCoverId, type CoverId } from '../../../shared/covers/index.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
-import { APP_NAME } from '../lib/brand'
+import { APP_INITIALS, APP_NAME } from '../lib/brand'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { findCorrelatedIncidents } from '../lib/gemini/correlate'
@@ -394,7 +394,7 @@ export function CallPage() {
     return (
       <div className="page call-page">
         <div className="call-top">
-          <div className="call-avatar" aria-hidden="true">QB</div>
+          <div className="call-avatar" aria-hidden="true">{APP_INITIALS}</div>
           <h1>Demo limit reached</h1>
           <p className="call-status">Try another demo call in about {minutesUntilNextDemo()} min.</p>
           <Link to="/" className="link-btn" replace>Back to menu</Link>
@@ -416,7 +416,7 @@ export function CallPage() {
     return (
       <div className="page call-page">
         <div className="call-top mic-help">
-          <div className="call-avatar" aria-hidden="true">QB</div>
+          <div className="call-avatar" aria-hidden="true">{APP_INITIALS}</div>
           <h1>{help.title}</h1>
           <p className="mic-help-intro">{help.intro}</p>
           <ol className="mic-help-steps">
@@ -444,7 +444,7 @@ export function CallPage() {
   return (
     <div className="page call-page">
       <div className="call-top">
-        <div className="call-avatar" aria-hidden="true">QB</div>
+        <div className="call-avatar" aria-hidden="true">{APP_INITIALS}</div>
         <h1>{deskTitle}</h1>
         {isDemo && <p className="demo-badge">Demo call · not sent to responders</p>}
         <p className="call-status">

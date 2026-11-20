@@ -129,7 +129,33 @@ export const CheckIcon = (p: IconProps) => (
   </Svg>
 )
 
-export function VegMark({ veg }: { veg: boolean }) {
+// QuickOne service tabs (Epic 33): food, grocery, pharmacy (home services uses HomeIcon).
+export const BowlIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 11h17a8.5 8.5 0 0 1-17 0Z" />
+    <path d="M8.5 7.5c0-1.4 1-1.6 1-3M12 7.5c0-1.4 1-1.6 1-3M15.5 7.5c0-1.4 1-1.6 1-3" />
+  </Svg>
+)
+
+export const BasketIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 10h16l-1.6 9.2a1 1 0 0 1-1 .8H6.6a1 1 0 0 1-1-.8L4 10Z" />
+    <path d="m8.5 10 3.5-6 3.5 6M9.5 14v3M14.5 14v3" />
+  </Svg>
+)
+
+// A medicine bottle with a plus on the label (a rotated capsule read as a chain link at tab size).
+export const PillIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="7" y="2.5" width="10" height="4" rx="1" />
+    <path d="M7.5 6.5h9V19a2 2 0 0 1-2 2h-5a2 2 0 0 1-2-2V6.5Z" />
+    <path d="M10 13.5h4M12 11.5v4" />
+  </Svg>
+)
+
+// Food items only; grocery, pharmacy and home service items have no veg flag and show nothing.
+export function VegMark({ veg }: { veg?: boolean }) {
+  if (veg === undefined) return null
   return (
     <span className={`veg-mark ${veg ? 'is-veg' : 'is-nonveg'}`} aria-label={veg ? 'Vegetarian' : 'Non-vegetarian'} role="img">
       <span />

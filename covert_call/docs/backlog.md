@@ -790,13 +790,13 @@ fields except where noted.*
 - [x] `set_service` tool (`SET_SERVICE`, added through `liveCallTools()`, not to `LIVE_CALL_TOOLS`); the new service's sheet comes back in the tool reply; SERVICE line in the known-facts note
 - [x] Code-side nudge when the caller's words ask for another service (once per service, covert mode only, never switches by itself)
 - [x] Neutral entry in the call: `/call?service=any`; the caller names the service in their first answer
-- [ ] Neutral "Call QuickOne" button on Home (with the service tabs, 33.3)
+- [x] Neutral "Call QuickOne" button: the phone icon in the top bar (`/call?service=any`)
 
 ### User Story 33.3
 **As a caller, I want the app to look like an ordinary multi-service app, so that having it on my phone proves nothing.**
-- [ ] Rename to QuickOne (`brand.ts` and the visible strings)
-- [ ] Service tabs (Food, Grocery, Pharmacy, Home services) with catalogs and a call button per service
-- [ ] Coded items in each catalog (click & order) with the pack's labels
+- [x] Rename to QuickOne (`brand.ts`, page title, mic help, call screen, order ID, case images)
+- [x] Service tabs (Food, Grocery, Pharmacy, Home services) with catalogs, banners, wording and a call button per service (`data/services.ts`)
+- [x] Coded items in each catalog (click & order) with the pack's labels, 13 items per service, CC0/PDM photos (`assets/<service>/CREDITS.md`)
 
 ### User Story 33.4 (Person B)
 **As a responder, I want to see which cover a call used, so that I read the transcript's codes correctly.**

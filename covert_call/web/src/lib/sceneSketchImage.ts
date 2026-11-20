@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Incident } from '../../../shared/incidents/types.ts'
+import { APP_NAME } from './brand'
 // The responder dashboard's own Scene sketch, so the case report shows exactly the drawing a responder saw.
 import SceneSketch from '../../../dashboard/src/components/board/SceneSketch'
 
@@ -60,7 +61,7 @@ export async function buildSceneSketchImage(id: string, incident: Omit<Incident,
   ctx.fillRect(0, 0, W, 46)
   ctx.fillStyle = '#fff'
   ctx.font = 'bold 20px Arial'
-  ctx.fillText(`QuickBite case ${id}: scene sketch`, 16, 30)
+  ctx.fillText(`${APP_NAME} case ${id}: scene sketch`, 16, 30)
   ctx.drawImage(img, 0, 46, W, vh * SCALE)
 
   let y = 46 + vh * SCALE + 12
