@@ -1109,3 +1109,19 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
 - Ameen has no time for the 8 planned real calls; at least one is planned during a finale rehearsal.
 - Includes last night's two-line Gemini key correction (status and backlog), restored from the stash.
 
+### 2026-11-21 ~00:45 IST: QuickOne and Google Maps in one preview; a landmark bug fixed (branch `integration/quickone-maps`, done from Ameen's side)
+- **New branch `integration/quickone-maps`:** QuickOne plus `feature/google-maps` (merge `8653974`).
+  - The code merged on its own. Only the backlog and this file conflicted, because both branches added entries at the end: the backlog keeps Epic 33 then 34, and this file keeps the entries in time order.
+  - Checks on the result: type-checks for all four apps, the cover checks, and the location and Google tests.
+- **Combined preview** on the `maps` addresses, which both keys already allow; expires 21 Dec.
+  - Caller: https://quickbite-5cde0-staging--maps-bgdgk0m7.web.app
+  - Dashboard: https://quickbite-5cde0-dashboard--maps-wf5bdwmv.web.app
+  - The QuickOne-only preview (`quickone`) is unchanged and has no Google key.
+- **Eval on the merged code** with Google and the QuickOne prompt: the chase scored 6/6 and grocery-while-followed 8/8. Both got walking routes to Kadavanthra Police Station, with its phone number.
+- **Bug fixed** (older than tonight; the OSM run did it too): a caller who said "MG Road, Kochi" was moved 3 km, to a business named after the city.
+  - Why: the landmark search kept only "kochi", and that loose match overrode a precise GPS fix. The route was then planned from there.
+  - Now the town part of a landmark is ignored, and a loose match never overrides a precise GPS fix. Without GPS it still moves the caller, and Mia reads it back to confirm.
+  - Re-run: the trail stays on MG Road. The same fix is on `feature/google-maps`.
+- **Go/no-go on 28 Nov:** if both features go, merge this branch into `main`; if only one goes, merge that feature's own branch.
+- **Note for Ameen:** make the one rehearsal call on the combined preview above.
+
