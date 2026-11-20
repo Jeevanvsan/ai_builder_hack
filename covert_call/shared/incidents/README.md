@@ -33,7 +33,8 @@ await endIncident(db, id)
 ```
 
 - **Severity** is computed for you from urgency, danger indicators and voice stress (`severity.ts`). It never drops during a live call.
-- **Address to coordinates** uses Google Geocoding if you pass `{ googleMapsKey }` to `confirmAddress`, and free OpenStreetMap Nominatim otherwise. If geocoding fails, the spoken address is still saved and marked `uncertain`.
+- **Address to coordinates** uses Google Places, then the Geocoding API, once the app has called `setGoogleMaps({ key })` (`shared/google/maps.ts`), and free OpenStreetMap Nominatim otherwise. Only a precise phone fix (100 m or better, `position.ts`) biases the search, never an IP guess. If geocoding fails, the spoken address is still saved, marked `uncertain`, and pinned at that precise fix if there is one.
+- **Location trail.** `location.rough` is the fix from when the session started; it is never overwritten. The live trail goes in `location.track`, each point with its accuracy and source (`gps`, `landmark` for a place the caller named, `sim` for the demo GPS simulator). A live call writes it from `web/src/lib/nav/liveTracking.ts`; screens without a call (silent SOS, silent tap, order placed) use `startLocationTrail(db, id)` from `trail.ts`.
 - **Leakage check and consolidation** (`recordLeakageCheck`, `consolidateIncident`) only write the result — the Gemini calls that produce it run in the QuickBite app itself (`web/src/lib/gemini/leakageCheck.ts` and `consolidate.ts`), client-side, no backend needed.
 
 To try it without the QuickBite app, run `npm run simulate-call` from `covert_call/dashboard/`. It plays a scripted call through these exact functions.

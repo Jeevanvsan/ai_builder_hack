@@ -25,6 +25,7 @@ import {
   recordVoiceStress, reportSceneObservation, setCover, startIncident, updateLiveFields,
 } from '../shared/incidents/client.ts'
 import { affirmed } from '../shared/incidents/severity.ts'
+import { setGoogleMaps } from '../shared/google/maps.ts'
 import { knownFactsNote } from '../shared/incidents/knownFacts.ts'
 import type { Incident } from '../shared/incidents/types.ts'
 import { PERSONA_SYSTEM_INSTRUCTION, SILENT_OBSERVER_INSTRUCTION, buildCoverSheet, buildPersonaInstruction } from '../web/src/lib/gemini/persona.ts'
@@ -87,13 +88,24 @@ if (RESOLVE) {
   console.log('No RESPONDER_EMAIL/RESPONDER_PASSWORD in eval/.env.local: test incidents stay open in the queue.')
 }
 
+// ---- Google Maps web services (Places, Routes), as the caller app uses them: the web app's key, sent with a
+// localhost Referer so its website restriction accepts it. Put that key in eval's own local env file too: Node keeps
+// the first value it reads, even an empty one. Without a key (or GOOGLE_MAPS=off, for an A/B against the free
+// services) addresses, landmarks, stations and routes use OpenStreetMap, as before.
+const mapsKey = process.env.GOOGLE_MAPS === 'off' ? '' : (process.env.VITE_GOOGLE_MAPS_API_KEY ?? '')
+setGoogleMaps({ key: mapsKey, headers: { Referer: 'http://localhost/' } })
+console.log(mapsKey ? 'Maps: Google (Places, Routes).' : 'Maps: OpenStreetMap (no Google Maps key).')
+
 // ---- Fake GPS: one owner at a time (gps scenarios run alone, before the parallel batch)
 type Fix = { lat: number; lng: number }
 let gpsFix: Fix | null = null
 const watchers = new Map<number, (p: GeolocationPosition) => void>()
 let watchSeq = 0
+// Walking pace by default; EVAL_GPS_SPEED (metres per second) makes the same scripted track a vehicle (12 is a car
+// in town), which should give a car route instead of a walking one.
+const GPS_SPEED = Number(process.env.EVAL_GPS_SPEED ?? 1.6)
 const position = (f: Fix) => ({
-  coords: { latitude: f.lat, longitude: f.lng, accuracy: 8, speed: 1.6, altitude: null, altitudeAccuracy: null, heading: null },
+  coords: { latitude: f.lat, longitude: f.lng, accuracy: 8, speed: GPS_SPEED, altitude: null, altitudeAccuracy: null, heading: null },
   timestamp: Date.now(),
 }) as unknown as GeolocationPosition
 Object.defineProperty(globalThis.navigator, 'geolocation', {

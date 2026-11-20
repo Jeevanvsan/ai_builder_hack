@@ -5,7 +5,9 @@ import { SERVICES, isServiceId } from '../data/services'
 import { APP_INITIALS } from '../lib/brand'
 import { db } from '../lib/firebase'
 import { INCIDENTS } from '../../../shared/incidents/client.ts'
+import { startLocationTrail } from '../../../shared/incidents/trail.ts'
 import type { ResponseStatus } from '../../../shared/incidents/types.ts'
+import { gpsSimEnabled } from '../lib/gpsSim'
 import { CheckIcon } from '../components/disguise/icons'
 
 // The confirmation shown after "Place order" (Epic 8, Story 8.3). Deliberately an ordinary order-tracking screen:
@@ -30,6 +32,14 @@ export function OrderPlacedPage() {
       const s = snap.data()?.response?.status as ResponseStatus | undefined
       if (s) setStatus(s)
     })
+  }, [incidentId])
+
+  // After a coded order, keep sending the caller's position while this screen is open (like a delivery app
+  // tracking the drop-off point), so responders can follow them if they move. A real order has no incident.
+  useEffect(() => {
+    if (!incidentId) return
+    const trail = startLocationTrail(db, incidentId, { source: gpsSimEnabled ? 'sim' : 'gps' })
+    return () => trail.stop()
   }, [incidentId])
 
   // Map the responder's real status onto believable delivery milestones.

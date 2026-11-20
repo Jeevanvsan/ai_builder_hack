@@ -29,6 +29,16 @@ export const TURN = {
   credential: process.env.EXPO_PUBLIC_TURN_CREDENTIAL,
 }
 
+// Google Maps web services (Places, Routes), shared with the web through shared/google/maps.ts. In Google
+// Cloud this key is restricted to the Android app (package name + signing-certificate SHA-1), which a direct web
+// request must state in two headers; set EXPO_PUBLIC_ANDROID_CERT_SHA1 to the build's SHA-1. Without a key the free
+// OpenStreetMap services are used, as before.
+const ANDROID_CERT_SHA1 = process.env.EXPO_PUBLIC_ANDROID_CERT_SHA1
+export const GOOGLE_MAPS = {
+  key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
+  headers: ANDROID_CERT_SHA1 ? { 'X-Android-Package': 'com.quickbite.app', 'X-Android-Cert': ANDROID_CERT_SHA1.replace(/:/g, '') } : undefined,
+}
+
 export const FIREBASE_CONFIG = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,

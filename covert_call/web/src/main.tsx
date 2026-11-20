@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.tsx'
 import { CartProvider } from './state/CartProvider.tsx'
 import { configureTurn } from '../../shared/video/signaling.ts'
+import { setGoogleMaps } from '../../shared/google/maps.ts'
 import { setCallerUid } from '../../shared/incidents/client.ts'
 import { callerReady } from './lib/caller.ts'
 import './styles/tokens.css'
@@ -22,6 +23,11 @@ configureTurn({
   username: import.meta.env.VITE_TURN_USERNAME,
   credential: import.meta.env.VITE_TURN_CREDENTIAL,
 })
+
+// Google Maps web services (Places, Routes): spoken addresses and landmarks, nearby stations with phone
+// numbers, and walking or driving routes. The key is public in the bundle, so in Google Cloud it is restricted to
+// this app's own sites and to those APIs. Without one, the free OpenStreetMap services are used, as before.
+setGoogleMaps({ key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? '' })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

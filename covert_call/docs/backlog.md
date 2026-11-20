@@ -813,3 +813,40 @@ fields except where noted.*
 - [ ] Real spoken calls on the staging preview (8 planned: every cover, neutral entry, a mid-call switch, open mode; Ameen has no time, so at least one during a finale rehearsal)
 - [ ] Go/no-go on 28 Nov
 - [ ] Native follow-ups logged: Settings presets → covers, `set_service` handler, native catalogs
+
+## EPIC 34 — Google Maps, exact caller location, Street View and 3D 🔴 (before the 30 Nov freeze)
+
+Branch `feature/google-maps`. Setup: [`setup/google-maps.md`](setup/google-maps.md). Every part falls back to the free
+OpenStreetMap services when there is no key. Epic 33 is QuickOne (branch `feature/quickone-dynamic-cover`).
+
+### User Story 34.1
+**As a responder, I want the Google map to show everything the OSM map does, so that switching maps never hides the route.**
+- [x] `GoogleIncidentMap.tsx` at parity: route with casing, next turn, destination by kind, trail with fading points, live caller with pulse, pin rules, follow, fit-to-route, centre-only zoom on the board
+- [x] Checked with the key, headless, on demo incident INC-MWP7R826 (locally and on the `maps` preview): route, next turn, trail and live caller as on the OSM map
+- [x] Map ID with a light style (`VITE_GOOGLE_MAP_ID`): place icons off except hospitals, police, fire stations and landmarks
+- [ ] Analytics map on Google (second on the cut list)
+
+### User Story 34.2
+**As a responder, I want to see the caller's surroundings, so that I can recognise the place before I arrive.**
+- [x] Map / Satellite / 3D switch on the board map (3D is photorealistic where Google has buildings, such as Singapore, and satellite over terrain elsewhere)
+- [x] Street view tab: a free imagery check within 100 m, then a panorama from the nearest road facing the caller, with the imagery date or a "no imagery" message; re-checked after a 75 m move
+- [x] Kerala checked: Street view 30 m from the caller on MG Road, Ernakulam; 3D draws the route and pins
+- [ ] Singapore (3D buildings, Street view) at the finale venue, during a rehearsal
+
+### User Story 34.3
+**As a responder, I want to know how precise the caller's position is and to follow them on every channel, so that I send help to the right spot.**
+- [x] GPS accuracy stored on the start fix and on every trail point; trail points tagged `gps`, `landmark` or `sim`
+- [x] `location.rough` stays the start fix, so the timeline, case sketch, analytics map and repeat-location linking get the real start
+- [x] Accuracy ring on the map; "GPS ±40 m", "IP estimate" or "a landmark the caller named" on the Location tile; landmark points drawn hollow
+- [x] Silent SOS, silent tap and the order-placed screen keep sending the position, on web and native (closes 22.4's open sub-task)
+- [x] Address search is biased only by a precise phone fix, never an IP guess; the GPS fallback pin needs 100 m accuracy or better
+- [x] A station the dispatcher picked survives the periodic re-route
+
+### User Story 34.4
+**As a caller, I want Mia to find the place I name and route me the way I'm travelling, so that her directions work on foot.**
+- [x] `shared/google/maps.ts`: Places Text and Nearby Search and Routes, set once per app with `setGoogleMaps` (the Geocoding API refuses website-restricted keys, so it is not used)
+- [x] Addresses: Places, then OSM; exact only when the area the caller named is in Google's address. Landmarks: best name match in the 3 km box. Stations: the best-known of each kind, nearest first, with phone numbers. A recognisable place at each turn
+- [x] Travel mode from GPS speed, the running motion signal and Mia's own words (on foot, two-wheeler or car); a car route when unknown, as before
+- [x] Eval with Google: the chase on foot (walking route) and at car speed (`EVAL_GPS_SPEED=12`, car route) 6/6 each; five other calls (four gave an address), 26/28 strict checks, with both misses unrelated to maps; pins compared with the OSM run
+- [x] Instead of the voice calls (no time for them): the eval calls above, and a trail test for the SOS, silent-tap and order-placed screens on a demo incident (passes)
+- [ ] One real walking call during a finale rehearsal, before the 28 Nov go/no-go

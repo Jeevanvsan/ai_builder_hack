@@ -1,10 +1,43 @@
+import { googleMapsEnabled, isAreaPlace, placesTextSearch, type Place } from '../google/maps.ts'
+
 export type Coordinates = { lat: number; lng: number }
 
-async function viaGoogle(address: string, key: string): Promise<Coordinates | null> {
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${key}`
-  const data = await (await fetch(url)).json()
-  const loc = data.status === 'OK' ? data.results?.[0]?.geometry?.location : null
-  return loc ? { lat: loc.lat, lng: loc.lng } : null
+// A Google match further than this from the phone's precise position is likely a same-named place elsewhere: it is
+// kept, but only as 'approximate' (the caller may also be reporting a place they are not at).
+const GOOGLE_FAR_KM = 25
+
+// The parts of the spoken address after the place's own name (area, street, town) that Google's result doesn't
+// contain, judged by one distinctive word per part. An exact match needs none missing: a common house name matched
+// in the wrong area ("Asha Nivas, Vazhicherry, Alappuzha" found an "Asha Nivas" in Pazhaveedu, 2 km away).
+function missingParts(spoken: string, place: Place): string[] {
+  const found = `${place.name} ${place.address ?? ''}`.toLowerCase()
+  return spoken.split(',').slice(1).map((p) => p.trim()).filter((part) => {
+    const words = part.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 4 && !FILLER.test(w))
+    const word = words.sort((a, b) => b.length - a.length)[0]
+    return !!word && !found.includes(word.slice(0, 5))
+  })
+}
+
+// A place this close to the area the caller named is taken to be in it, even if Google's address names the area
+// differently (or the area was misheard: "St George Auditorium, Vaisheri" is the right auditorium).
+const IN_AREA_KM = 1.5
+
+// With a Google key (setGoogleMaps): Places Text Search, which knows house names, shops, landmarks and businesses that
+// a street geocoder doesn't, and copes with garbled speech. (The older Geocoding API isn't used: Google refuses it
+// for website-restricted keys, which is what the apps' public keys are.) Null sends the caller on to OpenStreetMap.
+async function viaGoogle(address: string, near: Coordinates | null): Promise<GeocodeHit | null> {
+  const far = (p: Coordinates) => !!near && distanceKm(near, p) > GOOGLE_FAR_KM
+  const place = (await placesTextSearch(address, { near, radiusM: 10_000, max: 3 }))?.[0]
+  if (!place) return null
+  const missing = missingParts(address, place)
+  if (!missing.length) return { lat: place.lat, lng: place.lng, precision: isAreaPlace(place) || far(place) ? 'approximate' : 'exact' }
+  // Google found the place's name, but not in the area the caller named: often a same-named building elsewhere
+  // ("Flat 2A, Sunrise Apartments, Kaloor" matched a Sunrise Apartments 3.6 km away). Look up the named area itself:
+  // if the place is in it after all, keep the place; otherwise pin the area. Either way only approximate.
+  const town = address.split(',').at(-1)!.trim()
+  const area = (await placesTextSearch([...new Set([...missing, town])].join(', '), { near, radiusM: 10_000, max: 1 }))?.[0]
+  if (!area || distanceKm(area, place) <= IN_AREA_KM) return { lat: place.lat, lng: place.lng, precision: 'approximate' }
+  return far(area) ? null : { lat: area.lat, lng: area.lng, precision: 'approximate' }
 }
 
 // Nominatim's place_rank is coarser the bigger the area: countries/states are ~4-8, districts ~10-12, a
@@ -233,15 +266,13 @@ async function viaNominatim(spoken: string, near: Coordinates | null): Promise<G
   return null
 }
 
-// Google Geocoding when a key with Geocoding access is supplied, otherwise (or on failure) free OpenStreetMap Nominatim.
-export async function geocodeAddress(
-  address: string,
-  opts: { near?: Coordinates | null; googleMapsKey?: string } = {},
-): Promise<GeocodeHit | null> {
+// Google Places when the app has set a Google Maps key, otherwise (or when Google finds nothing) free OpenStreetMap
+// Nominatim. `near` should be a precise phone position, never an IP guess (see confirmAddress()).
+export async function geocodeAddress(address: string, opts: { near?: Coordinates | null } = {}): Promise<GeocodeHit | null> {
   try {
-    if (opts.googleMapsKey) {
-      const hit = await viaGoogle(address, opts.googleMapsKey).catch(() => null)
-      if (hit) return { ...hit, precision: 'exact' }
+    if (googleMapsEnabled()) {
+      const hit = await viaGoogle(officialNames(address), opts.near ?? null).catch(() => null)
+      if (hit) return hit
     }
     return await viaNominatim(address, opts.near ?? null)
   } catch {

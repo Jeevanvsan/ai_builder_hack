@@ -35,7 +35,9 @@ The **dashboard** is a separate ops console: live queue with severity ranking, c
 - **Gemini API (structured output)** — post-call consolidation, third-party leakage check, photo vision.
 - **Firestore** — incident documents + real-time listeners (the live pipeline).
 - **Firebase Hosting** — the web app, dashboard and landing site. **Next:** Gemini keys server-side on **Cloud Run**.
-- **Google Maps / Geocoding** — dashboard location (free OpenStreetMap fallback when no key).
+- **Google Maps Platform** — the dashboard map with Satellite, 3D and Street View; Places and Routes for
+  spoken addresses, landmarks, nearby stations (with phone numbers) and walking or driving routes. Free
+  OpenStreetMap services take over when no key is set.
 - **Free peer-to-peer WebRTC** (Firestore carries the handshake) — live video, no media server, no billing.
 
 ## Repository layout
@@ -66,7 +68,8 @@ fill in:
 - `VITE_GEMINI_API_KEY` (dashboard) — optional, for the AI Insights tab.
 - `VITE_DRIVE_UPLOAD_URL` (web) — optional, the Apps Script endpoint for Drive video
   (see [`docs/setup/drive-uploader.md`](docs/setup/drive-uploader.md)).
-- `VITE_GOOGLE_MAPS_API_KEY` (dashboard) — optional; OpenStreetMap is used when unset.
+- `VITE_GOOGLE_MAPS_API_KEY` (web and dashboard, a separate restricted key for each) and `VITE_GOOGLE_MAP_ID`
+  (dashboard) — optional; OpenStreetMap is used when unset (see [`docs/setup/google-maps.md`](docs/setup/google-maps.md)).
 
 **No secrets are committed** — only the `.env.example` templates and the dashboard's `.env.emulator` (local
 emulator settings, no keys) are tracked. Real keys live in `.env.local`.

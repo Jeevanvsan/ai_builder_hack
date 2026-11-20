@@ -1017,6 +1017,81 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
   - Incidents made from the preview land in the normal live queue (same Firestore), with a cover badge on non-food calls. The production dashboard ignores the field.
   - Please review the dashboard changes above; they're in your area.
 
+### 2026-11-20 ~21:50 IST: Google Maps, exact location, Street View and 3D, code ready (Epic 34, done from Ameen's side)
+- New branch `feature/google-maps` from `main`, separate from QuickOne. Plan: everything lands before the 30 Nov freeze; go/no-go on 28 Nov together with QuickOne. Setup guide: `covert_call/docs/setup/google-maps.md`. Backlog: Epic 34.
+- **No Google Maps key exists yet**, so nothing Google has run for real. With no key, every part falls back to today's OpenStreetMap path. Checks so far: type-checks (dashboard, web, native, strict eval), lint, a dashboard build, and 28 scratch checks with stubbed responses (location logic, request and response parsing, the key never logged). Not committed, not deployed.
+- **Dashboard (your area, please review):**
+  - `GoogleIncidentMap.tsx` was rewritten to match the OSM map. Before, setting a key would have hidden the route and trail.
+  - New: a Map / Satellite / 3D switch at the board's bottom left (`IncidentMap.tsx`, `GoogleIncident3D.tsx`) and a "Street view" tab in the side panel (`board/StreetViewPanel.tsx`), both only with a key.
+  - New: an accuracy ring on the map, "GPS ±40 m" or "IP estimate" on the Location tile, and hollow trail points for places the caller named.
+  - The queue card, fact sheet and credibility check now read the latest position.
+- **Location capture (shared, so native gets it too):**
+  - GPS accuracy and a source are stored.
+  - `location.rough` is no longer overwritten by every trail point, so it stays the start fix.
+  - The silent SOS, silent tap and order-placed screens now keep sending the position (`shared/incidents/trail.ts`), on web and native.
+  - Address search no longer uses an IP fix as a hint.
+  - Fixed: a station you pick with "Route here" was swapped back to the nearest one on the next periodic re-route.
+- **Google lookups (`shared/google/maps.ts`):**
+  - Addresses go to Places, then OSM. (Geocoding was dropped the same night: Google refuses it for website-restricted keys.)
+  - Landmarks are found by best name match.
+  - Stations come with phone numbers, so the route tile's "Call" link finally has numbers.
+  - Routes are on foot, two-wheeler or car, chosen from GPS speed, the running signal or Mia's words; a car route when unknown, as before. Mia's notes add "on foot" only on walking routes.
+  - Each app sets its key once at startup (`setGoogleMaps`) instead of passing it at every call site.
+- **Notes for Ameen:**
+  - Add the new variable names to the example env templates (not edited, because of the env-file hook):
+    - web: `VITE_GOOGLE_MAPS_API_KEY`;
+    - dashboard: `VITE_GOOGLE_MAP_ID`;
+    - native: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` and `EXPO_PUBLIC_ANDROID_CERT_SHA1`.
+  - The landing page's "Leaflet / OSM" chip and deck slides 8, 9 and 12 are left until after the go, so they don't claim Google Maps before it ships.
+- **Note for Jeevan:**
+  - Ameen is doing the Google Cloud setup himself, and the 29 Nov production deploy, since you're busy with another project. If you can, a 10-minute look at the dashboard changes (your area) before 28 Nov would help.
+  - Nearby stations with phone numbers use the Places "Enterprise" SKU (1,000 free a month), so the budget alert matters.
+
+### 2026-11-20 ~23:45 IST: Google Maps keys set up and tested (Epic 34, done from Ameen's side)
+- **Google Cloud (Ameen):**
+  - The keys, Map ID and style live in project `quick-bite-510804` (also named "Quick Bite"). It shares a billing account with the paid Gemini key's project (`gen-lang-client-0441842014`), where the APIs were first enabled. Not the Firebase project.
+  - Budget alert: ₹1,000 a month, whole billing account, emails at 50/90/100%.
+  - APIs enabled: Maps JavaScript, Places (New), Routes. Geocoding was enabled too but isn't used.
+  - Map ID "QuickBite board" with a light style: place icons off except hospital, police, fire and landmarks; pharmacies off.
+  - Two website-restricted keys: dashboard, and caller web. The caller key is also in `eval`'s local env file.
+- **Tested with the real keys (not committed, not deployed):**
+  - Both builds contain a Maps key and use the Map ID.
+  - Dashboard on localhost, headless, on demo incident INC-MWP7R826: the Google map shows the route, next turn, trail and live caller; Satellite and 3D work; the Street view tab shows a panorama 30 m from the caller (MG Road, Dec 2025 imagery). The new map style removes the clutter.
+  - Eval with Google: chase 6/6 (walking route to Kadavanthra Police Station, 1.3 km, Google turn-by-turn with landmarks, the station's phone number stored); covert address 6/7 (same as before; the miss is "domestic" not tagged).
+  - Google against OSM: about 200 ms against 2–4 s per address. They agree on Convent Square, St George Auditorium and Singapore.
+- **Fixed from the tests:**
+  - Nearby stations now take the best-known places of each kind (not the plain nearest, which gave a traffic police cabin, a visa medical agency and a mis-tagged shop), drop closed places, then sort by distance.
+  - An address is exact only when the area the caller named appears in Google's address. "Asha Nivas, Vazhicherry" had matched an "Asha Nivas" in Pazhaveedu, 2 km away.
+  - The Geocoding step is removed: Google refuses it for website-restricted keys.
+- **Notes for Ameen:**
+  - When the `maps` preview channels are deployed, add their two URLs to the keys' website lists, the caller key and the dashboard key.
+  - Untick Geocoding on the caller key if you like; it isn't used.
+
+### 2026-11-21 ~00:10 IST: maps preview deployed, keys locked down (Epic 34, done from Ameen's side)
+- Committed on `feature/google-maps`: `4c503e3` (code) and `9a9737a` (docs). Not pushed.
+- Preview channels `maps`, expiring 20 Dec. The live sites are unchanged.
+  - Caller app (staging build): https://quickbite-5cde0-staging--maps-bgdgk0m7.web.app
+  - Dashboard: https://quickbite-5cde0-dashboard--maps-wf5bdwmv.web.app
+- **Fixed:** the dashboard key had no website restriction while its bundle was public on the preview, for a few minutes. Both keys are now website-restricted. Checked against Places, using the keys from the built bundles:
+  - The caller key works from the staging preview, the live web site and localhost.
+  - The dashboard key works from its preview, the live dashboard and localhost:5174.
+  - Both are refused from any other site or with no referrer.
+- Deployed preview dashboard checked headless (test responder, demo incident INC-MWP7R826): Google map, Satellite, 3D and Street view all work, with no key errors.
+- **Note for Ameen:** next are the five voice calls on the caller preview: on foot, by car, at home, a silent SOS, and a coded order.
+
+### 2026-11-21 ~00:15 IST: automated runs instead of the five voice calls; address pins fixed (Epic 34, done from Ameen's side)
+- Ameen has no time for the voice calls, so the eval stands in, with Google and the free Gemini key:
+  - **Chase on foot:** a walking route to Kadavanthra Police Station (1.3 km), with Google landmarks in Mia's directions.
+  - **Chase at car speed:** a car route (2.2 km, `travelMode=DRIVE`). New eval option `EVAL_GPS_SPEED`, metres per second, default walking pace.
+  - **Five other calls** (accident, fight, house break-in, real order, covert weapon at home): 26/28 strict checks. The two misses are tag wording and "domestic", not maps.
+  - **Trail test** (SOS, silent tap, order placed), on a demo incident that was then resolved: precise fixes written with their accuracy; too-soon, coarse and after-stop fixes skipped; start fix kept. Passes.
+- **Pins, Google against the earlier OSM run:**
+  - "NH 66 near Cherthala bus stand": not pinned before, now pinned.
+  - "Maharaja's College gate": 1.7 km off before, now 50 m.
+  - "Sunrise Apartments, Kaloor": went to a same-named building 3.6 km away. **Fixed:** when the area the caller named isn't in Google's address, the area itself is looked up. The pin goes there, unless the place is within 1.5 km of it, so a misheard area still keeps the right place. After the fix: Kaloor 0.57 km and Vazhicherry 0.18 km from the right area, St George Auditorium exact spot, all approximate. Under 0.8 s each.
+- Committed: `df0f46f` (area fix), `367a9d6` (eval option) and this note. The web preview was refreshed with the fix at ~00:16 IST (same address, now expiring 21 Dec). Not pushed.
+- **Still open:** one real walking call during a finale rehearsal before 28 Nov, and the Singapore checks (3D buildings, Street view) at the venue.
+
 ### 2026-11-21 ~00:30 IST: QuickOne eval results and the cab fix (same branch, done from Ameen's side)
 - **Eval, 2026-11-20** (free key, one run per scenario):
   - Food scenarios: the frozen prompt scored 65/81 strict (67 judged); QuickOne's per-cover prompt (`--quickone`) scored 69/81 (71 judged). Nothing suggests QuickOne broke the food flow.
@@ -1033,3 +1108,4 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
 - **Watch in real calls:** in covert mode Mia sometimes names the destination plainly ("the Central Police Station"), without the persona's "the rider's meeting point" framing. The rule is the same in the old prompt.
 - Ameen has no time for the 8 planned real calls; at least one is planned during a finale rehearsal.
 - Includes last night's two-line Gemini key correction (status and backlog), restored from the stash.
+
