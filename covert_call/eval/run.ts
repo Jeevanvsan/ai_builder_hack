@@ -7,6 +7,8 @@
 // Run (from covert_call/eval/):  npm run test:ai                         (all scenarios), then npm run report
 //                                npm run test:ai -- chase-open-to-covert (just these)
 //                                npm run test:ai -- --no-record          (no Firestore incidents)
+//                                npm run test:ai -- --quickone           (QuickOne, Epic 33: every call with the web's
+//                                  per-cover prompt and set_service; the cover-* scenarios always run that way)
 // Needs GEMINI_API_KEY (or VITE_GEMINI_LIVE_API_KEY) and the Firebase web config (VITE_FIREBASE_*) in
 // eval/.env.local or web/.env.local. Runs locally only; nothing is deployed.
 //
@@ -25,8 +27,10 @@ import {
 import { affirmed } from '../shared/incidents/severity.ts'
 import { knownFactsNote } from '../shared/incidents/knownFacts.ts'
 import type { Incident } from '../shared/incidents/types.ts'
-import { PERSONA_SYSTEM_INSTRUCTION, SILENT_OBSERVER_INSTRUCTION } from '../web/src/lib/gemini/persona.ts'
-import { LIVE_CALL_TOOLS, REPORT_SCENE_OBSERVATION_TOOLS, batchResponses } from '../web/src/lib/gemini/tools.ts'
+import { PERSONA_SYSTEM_INSTRUCTION, SILENT_OBSERVER_INSTRUCTION, buildCoverSheet, buildPersonaInstruction } from '../web/src/lib/gemini/persona.ts'
+import { LIVE_CALL_TOOLS, REPORT_SCENE_OBSERVATION_TOOLS, batchResponses, liveCallTools } from '../web/src/lib/gemini/tools.ts'
+import { APP_NAME } from '../web/src/lib/brand.ts'
+import { COVERS, COVER_IDS, coverPack, coverPhrases, isCoverId, serviceAskedFor, type CoverId } from '../shared/covers/index.ts'
 import { startLiveTracking, type LiveTracker } from '../web/src/lib/nav/liveTracking.ts'
 import { AI_MODELS, usageFromMetadata } from '../shared/aiModels.ts'
 import { CATEGORY_PATTERNS, SCENARIOS, type Category, type MediaCue, type Scenario } from './scenarios.ts'
@@ -53,6 +57,9 @@ const NEGATIVE_ONLY_TURNS = 6 // calls that only check nothing false was raised 
 const TURN_TIMEOUT_MS = 45_000
 const PARALLEL = 1 // one call at a time: stays under the free-tier rate limit
 const RECORD = !process.argv.includes('--no-record')
+// QuickOne (Epic 33): run every scenario with the web app's per-cover prompt and set_service, for an A/B against the
+// frozen food prompt (PERSONA_SYSTEM_INSTRUCTION) on the same branch. Scenarios with a cover/entry always do.
+const QUICKONE = process.argv.includes('--quickone')
 // After each call the test incident is resolved (as a responder, like the dashboard's Resolve) unless --keep-open.
 const RESOLVE = RECORD && !process.argv.includes('--keep-open') && !!process.env.RESPONDER_EMAIL && !!process.env.RESPONDER_PASSWORD
 const MEDIA = new URL('./media/', import.meta.url)
@@ -179,7 +186,12 @@ const normLine = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ')
 async function callerReply(s: Scenario, transcript: Line[]): Promise<string> {
   const convo = transcript.filter((l) => l.who !== 'system').map((l) => `${l.who === 'mia' ? 'MIA' : 'YOU'}: ${l.text}`).join('\n')
   const said = transcript.filter((l) => l.who === 'caller').map((l) => l.text)
-  const prompt = (extra: string) => `You are the CALLER on a phone call to a food-delivery line. "Mia" answers. Play the caller.
+  // The line the caller rang (QuickOne covers); the original food scenarios keep their exact wording.
+  const rang = s.entry === 'any'
+    ? 'a customer line for food, groceries, medicines, home repairs and other bookings'
+    : ({ food: 'a food-delivery line', grocery: 'a grocery delivery line', pharmacy: 'a pharmacy (medicine delivery) line', home: 'a home repair booking line', other: 'a booking line' } as const)[s.cover ?? 'food']
+  const choices = !s.cover && !s.entry ? 'food choices' : 'choices'
+  const prompt = (extra: string) => `You are the CALLER on a phone call to ${rang}. "Mia" answers. Play the caller.
 
 YOUR SITUATION (secret, it is happening to you): ${s.brief}
 LANGUAGE: ${s.language}
@@ -190,7 +202,7 @@ HOW TO ANSWER
 2. Pick from the options Mia gives, in her words, converted to your point of view
    ("for yourself" -> "for myself"). Answer only what she just asked.
 3. Bring in the facts of your situation as her questions allow, one or two per reply (covert: only through
-   her food choices). No small talk.
+   her ${choices}). No small talk.
 4. One short line, 1-2 sentences, spoken words only. No narration, quotes or labels.
 5. Never repeat an earlier line. If she asked nothing new, give your next fact or say "still here".
 6. If she says goodbye or the order is complete, reply exactly: [HANGUP]
@@ -255,6 +267,20 @@ async function runCall(s: Scenario): Promise<Result> {
   let tracker: LiveTracker | null = null
   let unsubFacts: (() => void) | null = null
   const t0 = Date.now()
+
+  // QuickOne (Epic 33), mirroring liveSession.ts: the web app's prompt for the starting cover (or the neutral line),
+  // with set_service; a switch's sheet comes back in the tool reply and every known-facts note names the service.
+  const quickOne = QUICKONE || !!s.cover || !!s.entry
+  const entry = s.entry ?? 'service'
+  const startCover = entry === 'any' ? COVERS.other : coverPack(s.cover)
+  let cover = startCover
+  let serviceName: string | undefined
+  let switched = false
+  let lastData: Omit<Incident, 'id'> | undefined
+  const servicesNudged: CoverId[] = []
+  const factsFor = (data: Omit<Incident, 'id'>) => !quickOne
+    ? knownFactsNote(data)
+    : (switched ? `(SERVICE: ${cover.label.toLowerCase()}${serviceName ? ` (${serviceName})` : ''}. Every covert choice, question, address, receipt and goodbye uses ONLY the words of the ${cover.label.toLowerCase()} sheet from your set_service reply, never the words of the service this call started on.) ` : '') + knownFactsNote(data, cover.address)
 
   // Every write to this incident strictly sequential (same as the app), and timed.
   let writeQueue: Promise<unknown> = Promise.resolve()
@@ -343,6 +369,18 @@ async function runCall(s: Scenario): Promise<Result> {
       case 'end_call':
         ended = true
         return 'ok'
+      case 'set_service': {
+        if (!isCoverId(args.service)) return `Unknown service "${String(args.service)}": use food, grocery, pharmacy, home (a repair) or other (anything else, with the caller's own word as name).`
+        const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim().slice(0, 40) : undefined
+        const nextName = args.service === 'other' ? name : undefined
+        if (args.service !== cover.id || nextName !== serviceName) {
+          cover = COVERS[args.service]
+          serviceName = nextName
+          switched ||= entry === 'any' || args.service !== startCover.id
+          if (lastData) pendingFacts = factsFor(lastData)
+        }
+        return buildCoverSheet(cover, APP_NAME, serviceName)
+      }
       default:
         return 'ok'
     }
@@ -451,6 +489,9 @@ async function runCall(s: Scenario): Promise<Result> {
   let turns = 0
   let error: string | undefined
   const liveTier = tier(LIVE_MODEL)
+  // The web app's QuickOne setup, or the frozen food prompt and the 12 tools (what main and the native app use).
+  const persona = quickOne ? buildPersonaInstruction({ pack: startCover, appName: APP_NAME, entry, switchable: true }) : PERSONA_SYSTEM_INSTRUCTION
+  const callTools = quickOne ? liveCallTools(startCover, true) : LIVE_CALL_TOOLS
   // gemini-3.8-live rejects TEXT-only output (close 1007 "response modalities (TEXT) is not supported"), so every
   // call answers in audio; the harness reads Mia's words from the output transcription.
   const textMode = false
@@ -466,12 +507,12 @@ async function runCall(s: Scenario): Promise<Result> {
             systemInstruction: SILENT_OBSERVER_INSTRUCTION, tools: REPORT_SCENE_OBSERVATION_TOOLS, contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } }, mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
           }
           : textMode
-            ? { responseModalities: [Modality.TEXT], systemInstruction: PERSONA_SYSTEM_INSTRUCTION, tools: LIVE_CALL_TOOLS, contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } }, mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW }
+            ? { responseModalities: [Modality.TEXT], systemInstruction: persona, tools: callTools, contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } }, mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW }
             : {
               responseModalities: [Modality.AUDIO],
               speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
               inputAudioTranscription: {}, outputAudioTranscription: {},
-              systemInstruction: PERSONA_SYSTEM_INSTRUCTION, tools: LIVE_CALL_TOOLS, contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } }, mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
+              systemInstruction: persona, tools: callTools, contextWindowCompression: { triggerTokens: '48000', slidingWindow: { targetTokens: '28000' } }, mediaResolution: MediaResolution.MEDIA_RESOLUTION_LOW,
             },
         callbacks: {
           onopen: () => { connectMs = Date.now() - c0; resolve() },
@@ -497,7 +538,8 @@ async function runCall(s: Scenario): Promise<Result> {
       let last = ''
       unsubFacts = onSnapshot(doc(db, INCIDENTS, incidentId), (snap) => {
         const data = snap.data() as Omit<Incident, 'id'> | undefined
-        const note = data ? knownFactsNote(data) : ''
+        if (data) lastData = data
+        const note = data ? factsFor(data) : ''
         if (note && note !== last) { last = note; pendingFacts = note }
       })
     }
@@ -538,6 +580,16 @@ async function runCall(s: Scenario): Promise<Result> {
         w = waitTurn()
         send(turns, line)
         await w
+        // Mirrors the app's switch nudge (liveSession.ts noteService): the caller asked for another service and Mia
+        // did not call set_service in her reply. Logged, so the report shows when she needed it.
+        const asked = quickOne ? serviceAskedFor(line, cover.id) : null
+        if (asked && !servicesNudged.includes(asked) && !ended) {
+          servicesNudged.push(asked)
+          transcript.push({ who: 'system', text: `[nudge] the caller may want ${asked}; set_service was not called`, at: Date.now() - t0 })
+          w = waitTurn()
+          session.sendClientContent({ turns: `(System note, not the caller: the caller may be asking for ${COVERS[asked].label.toLowerCase()} ("${line.slice(0, 80)}"). If they want that service, call set_service now and carry on in its words; if not, ignore this. Say only the words meant for the caller.)` })
+          await w
+        }
         for (const c of cues(turns)) await playCue(c)
       }
     }
@@ -584,7 +636,7 @@ async function runCall(s: Scenario): Promise<Result> {
     inferences,
     postCall,
   }
-  const result0 = score(s, { transcript, tools, turnTimings, metrics, incidentId, incident, routesServed, durationMs: Date.now() - t0, turns, error })
+  const result0 = score(s, { transcript, tools, turnTimings, metrics, incidentId, incident, routesServed, durationMs: Date.now() - t0, turns, error, nudged: servicesNudged })
   const result = { ...result0, keyTier: liveTier, outputMode: textMode ? 'text' as const : 'audio' as const }
   // Second opinion on content checks a keyword can miss. Evidence = exactly what the dashboard holds.
   const evidence = [
@@ -623,6 +675,7 @@ const norm = (s: string) => s.replace(/[^a-z0-9]/gi, '').toUpperCase()
 function score(s: Scenario, r: {
   transcript: Line[]; tools: ToolEvent[]; turnTimings: Turn[]; metrics: Metrics; incidentId: string | null
   incident: Omit<Incident, 'id'> | undefined; routesServed: number; durationMs: number; turns: number; error?: string
+  nudged?: CoverId[] // QuickOne: services the app had to nudge Mia to switch to
 }): Result {
   const { transcript, tools } = r
   const reports = tools.filter((t) => t.name === 'report_situation')
@@ -664,6 +717,27 @@ function score(s: Scenario, r: {
     checks.push({ name: 'cover kept', pass: leaks.length === 0, detail: leaks.length ? `said "${leaks.join('", "')}"` : 'no giveaway words' })
   }
   if (e.benign) checks.push({ name: 'no false alarm', pass: live.length === 0, detail: live.join('; ') || 'no danger tags' })
+  // QuickOne (Epic 33): the call moved to the service the caller asked for.
+  if (e.service) {
+    const sets = tools.filter((t) => t.name === 'set_service')
+    const hit = sets.find((t) => t.args.service === e.service)
+    const nudged = r.nudged?.includes(e.service) ? ' (after the app nudge)' : ''
+    const calls = sets.map((t) => `set_service(${t.args.service}${t.args.name ? `, ${t.args.name}` : ''}) at ${secs(t.at)}s`).join(' | ')
+    checks.push({ name: `switched to ${e.service}`, pass: !!hit, detail: (calls || 'never called') + nudged, atS: hit ? secs(hit.at) : null })
+  }
+  // QuickOne: from the last switch on, Mia uses only the final service's words (before it, the starting cover's are right).
+  if (e.coverWords) {
+    const last = [...tools].reverse().find((t) => t.name === 'set_service' && isCoverId(t.args.service))
+    const final = last ? COVERS[last.args.service as CoverId] : s.entry === 'any' ? COVERS.other : coverPack(s.cover)
+    const foreign = COVER_IDS.filter((id) => id !== final.id).flatMap((id) => coverPhrases(COVERS[id]).map((c) => c.phrase).filter((p) => p.includes(' ')))
+    const FOOD_WORDS = /\b(pizzas?|pepperoni|garlic bread|napkins|barbecue|ketchup|mayo)\b/i
+    const lines = mia.filter((l) => l.at >= (last?.at ?? 0)).map((l) => l.text)
+    const hits = lines.flatMap((t) => [
+      ...foreign.filter((p) => t.toLowerCase().includes(p.toLowerCase())),
+      ...(final.id !== 'food' && FOOD_WORDS.test(t) ? [t.match(FOOD_WORDS)![0]] : []),
+    ])
+    checks.push({ name: `${final.label.toLowerCase()} words only`, pass: hits.length === 0, detail: hits.length ? `used "${[...new Set(hits)].join('", "')}"` : `${lines.length} line(s) checked` })
+  }
   for (const pattern of e.scene ?? []) {
     const re = new RegExp(pattern, 'i')
     checks.push({ name: `scene: ${pattern.split('|')[0]}`, pass: scenes.some((x) => re.test(x)), detail: scenes.join(' | ') || 'no scene observations' })

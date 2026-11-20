@@ -774,38 +774,40 @@ fields except where noted.*
 
 # PHASE 5 (planned 2026-11-20)
 
-*One meaning set, one vocabulary per service. Branch `feature/quickone-dynamic-cover`. Tested on a staging preview channel; production stays QuickBite until the 28 Nov go/no-go (freeze 30 Nov). Agree the `cover` incident field (`shared/incidents/types.ts`, `dashboard/firestore.rules`) with Person B before writing it. Native imports the persona and tools from web: `PERSONA_SYSTEM_INSTRUCTION` and `LIVE_CALL_TOOLS` stay byte-identical, so native is unchanged until it adopts covers.*
+*One meaning set, one vocabulary per service. Numbered 33 because 28-32 are already used in code comments (28 is the AI test harness). Branch `feature/quickone-dynamic-cover`. Tested on a staging preview channel; production stays QuickBite until the 28 Nov go/no-go (freeze 30 Nov). Agree the `cover` incident field (`shared/incidents/types.ts`, `dashboard/firestore.rules`) with Person B before writing it. Native imports the persona and tools from web: `PERSONA_SYSTEM_INSTRUCTION` and `LIVE_CALL_TOOLS` stay byte-identical, so native is unchanged until it adopts covers.*
 
-## EPIC 28 — QuickOne: dynamic cover 🔴
+## EPIC 33 — QuickOne: dynamic cover 🔴
 
-### User Story 28.1
+### User Story 33.1
 **As a caller, I want to call about whatever fits my situation right now (food, groceries, medicines, a repair, a cab), so that the call sounds normal to whoever is listening.**
 - [x] Cover packs in `shared/covers/` (food = today's wording; grocery, pharmacy, home services, any other service) over the unchanged meanings in `shared/codes.ts`
 - [x] `buildPersonaInstruction()` in `persona.ts`; `PERSONA_SYSTEM_INSTRUCTION` stays the byte-identical food prompt
 - [x] `eval/check-covers.ts`: same-breath meanings, no giveaway words, movement tags, keyword clashes, byte-identical snapshot
-- [ ] Ameen reviews the new packs' wording
+- [x] Ameen reviews the new packs' wording (approved 2026-11-20)
 
-### User Story 28.2
+### User Story 33.2
 **As a caller, I want Mia to follow me if I ask for a different service mid-call, so that I am never stuck with a cover that doesn't fit.**
-- [ ] `SET_SERVICE_TOOL` (separate from `LIVE_CALL_TOOLS`); the new service's sheet comes back in the tool reply; SERVICE line in the known-facts note
-- [ ] Code-side nudge when the caller's words ask for another service
-- [ ] Neutral "Call QuickOne" entry: the caller names the service in their first answer
+- [x] `set_service` tool (`SET_SERVICE`, added through `liveCallTools()`, not to `LIVE_CALL_TOOLS`); the new service's sheet comes back in the tool reply; SERVICE line in the known-facts note
+- [x] Code-side nudge when the caller's words ask for another service (once per service, covert mode only, never switches by itself)
+- [x] Neutral entry in the call: `/call?service=any`; the caller names the service in their first answer
+- [ ] Neutral "Call QuickOne" button on Home (with the service tabs, 33.3)
 
-### User Story 28.3
+### User Story 33.3
 **As a caller, I want the app to look like an ordinary multi-service app, so that having it on my phone proves nothing.**
 - [ ] Rename to QuickOne (`brand.ts` and the visible strings)
 - [ ] Service tabs (Food, Grocery, Pharmacy, Home services) with catalogs and a call button per service
 - [ ] Coded items in each catalog (click & order) with the pack's labels
 
-### User Story 28.4 (Person B)
+### User Story 33.4 (Person B)
 **As a responder, I want to see which cover a call used, so that I read the transcript's codes correctly.**
 - [ ] `cover` incident field + Firestore rules (Person B deploys the rules)
 - [ ] Transcript chips use the incident's cover phrases; "Cover" badge on the incident and the queue row
 - [ ] Credibility prompt and "delivery chat" wording made service-neutral
 
-### User Story 28.5
+### User Story 33.5
 **As the team, we want proof that every cover works before the finale, so that the proven demo is never put at risk.**
-- [ ] Eval: 6 new cover scenarios + the food scenarios against a same-day baseline on `main`
+- [x] Eval: 6 cover scenarios (`cover-*`) and the `--quickone` flag (any scenario with the web's per-cover prompt + set_service)
+- [ ] Eval run: the food scenarios plain vs `--quickone` (same day), plus the 6 cover scenarios
 - [ ] 8 real spoken calls on the staging preview (every cover, neutral entry, a mid-call switch, open mode)
 - [ ] Go/no-go on 28 Nov
 - [ ] Native follow-ups logged: Settings presets → covers, `set_service` handler, native catalogs

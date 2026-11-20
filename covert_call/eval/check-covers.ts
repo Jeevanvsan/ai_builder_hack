@@ -1,4 +1,4 @@
-// Offline checks for the QuickOne cover packs (backlog Epic 28). No network, no keys, no Firebase:
+// Offline checks for the QuickOne cover packs (backlog Epic 33). No network, no keys, no Firebase:
 //
 //   cd covert_call/eval && node --no-warnings check-covers.ts [--snapshots <dir>] [--out <dir>]
 //
@@ -17,10 +17,10 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { COVERS, COVER_IDS, coverPhrases, type CoverPack, type FollowUps } from '../shared/covers/index.ts'
-import { isCallerMoving } from '../shared/incidents/knownFacts.ts'
+import { COVERS, COVER_IDS, coverPhrases, speechHints, type CoverPack, type FollowUps } from '../shared/covers/index.ts'
+import { isCallerMoving, knownFactsNote } from '../shared/incidents/knownFacts.ts'
 import { PERSONA_SYSTEM_INSTRUCTION, SILENT_OBSERVER_INSTRUCTION, buildCoverSheet, buildPersonaInstruction } from '../web/src/lib/gemini/persona.ts'
-import { LIVE_CALL_TOOLS } from '../web/src/lib/gemini/tools.ts'
+import { LIVE_CALL_TOOLS, liveCallTools } from '../web/src/lib/gemini/tools.ts'
 
 const arg = (name: string) => {
   const i = process.argv.indexOf(name)
@@ -117,7 +117,20 @@ for (const id of COVER_IDS) {
   const clashes = COVER_IDS.filter((o) => o !== id).flatMap((o) => spoken(COVERS[o]).filter((s) => p.keywords.test(s.text)).map((s) => `${o} ${s.what} "${s.text}"`))
   check(!clashes.length, clashes.length ? `keywords match another service's words: ${clashes.join('; ')}` : "switch keywords match no other service's words")
   check(p.vocabulary.length <= MAX_ANSWER_WORDS, `${p.vocabulary.length} answer words (max ${MAX_ANSWER_WORDS} for speech-to-text hints)`)
+  // The session's whole hint list (the neutral line starts on "other" and adds the service words). Over 75 entries
+  // the call would not connect; liveSession.ts cuts at 75 as a safety net, which would drop place names.
+  const hints = speechHints(p, 'QuickOne', id === 'other').length
+  check(hints <= 75, `${hints} speech-to-text hints in the session (limit 75)`)
   check(p.close.includes('{desk}'), 'closing line names the desk')
+
+  // The call's tools for this cover: set_service added last, no food examples left in another service's tools.
+  const decls = liveCallTools(p, true)[0].functionDeclarations ?? []
+  check(liveCallTools(p, true).length === 1 && decls.length === 13 && decls.at(-1)?.name === 'set_service', 'one tool list: the 12 call tools plus set_service')
+  if (id !== 'food') {
+    const toolText = JSON.stringify(decls)
+    check(!toolText.includes("order's on its way"), 'no food goodbye ("your order\'s on its way") in the tools')
+    if (p.address !== 'delivery address') check(!toolText.includes('delivery address') && toolText.includes(`their ${p.address}`), `confirm_address asks for "their ${p.address}"`)
+  }
 
   // Rendered prompts and sheet.
   const app = 'QuickOne'
@@ -141,6 +154,12 @@ for (const id of COVER_IDS) {
     writeFileSync(join(out, `sheet-${id}.txt`), sheet)
   }
 }
+
+console.log('\nShared pieces native and the eval import')
+check(liveCallTools(COVERS.food) === LIVE_CALL_TOOLS, 'liveCallTools(food) without switching is LIVE_CALL_TOOLS itself')
+const sample = { location: {}, extractedFieldsLive: { dangerIndicators: [], peopleCount: null, urgency: null }, sceneObservations: [] } as unknown as Parameters<typeof knownFactsNote>[0]
+check(knownFactsNote(sample).includes('the delivery address (house name or number, area, town)'), 'knownFactsNote keeps "delivery address" by default')
+check(knownFactsNote(sample, COVERS.home.address).includes('the address for the visit (house name'), "knownFactsNote uses the cover's address word when given")
 
 const any = buildPersonaInstruction({ pack: COVERS.other, appName: 'QuickOne', entry: 'any' })
 console.log('\nNeutral "Call QuickOne" entry')

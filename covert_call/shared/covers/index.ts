@@ -1,4 +1,4 @@
-// QuickOne cover packs (backlog Epic 28): one meaning set, one vocabulary per service. See ./types.ts.
+// QuickOne cover packs (backlog Epic 33): one meaning set, one vocabulary per service. See ./types.ts.
 
 import { OTHER_CODES, SELF_CODES, type CodeScope } from '../codes.ts'
 import { FOOD } from './food.ts'
@@ -30,6 +30,27 @@ export function coverCodeList(pack: CoverPack, scope: CodeScope): string {
 // Every situation phrase of a pack with its code id: transcript chips on the dashboard, speech-to-text hints.
 export function coverPhrases(pack: CoverPack): { id: CodeId; phrase: string }[] {
   return ALL_IN_ORDER.map((c) => ({ id: c.id as CodeId, phrase: pack.codes[c.id as CodeId].phrase }))
+}
+
+// Place names the call's speech-to-text kept mishearing ("Vazhicherry" → "Veterinary"); the same for every cover.
+const PLACE_HINTS = [
+  'Alappuzha', 'Alleppey', 'Vazhicherry', 'Muhamma', 'Mullakkal', 'Kalavoor', 'Cherthala', 'Kochi', 'Ernakulam',
+  'Kottayam', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Bengaluru', 'HSR Layout', 'Koramangala',
+  'petrol pump', 'junction', 'police station',
+]
+
+// The Live session's customVocabulary for a cover: the app name, Mia, "talk", the covert word, every code phrase and
+// the answers to the follow-ups (so a whispered "cola" isn't heard as "Kola"), the place names, and on the neutral
+// "Call QuickOne" line the service words a caller names first. The Live API takes at most 75 entries; check-covers.ts
+// keeps every cover under that. The food cover with "QuickBite" gives exactly the list used before cover packs.
+export function speechHints(pack: CoverPack, appName: string, neutral = false): string[] {
+  return [
+    appName, 'Mia', 'talk', pack.covertWord,
+    ...coverPhrases(pack).map((c) => c.phrase),
+    ...pack.vocabulary.filter((v) => v !== pack.covertWord),
+    ...(neutral ? ['food', 'groceries', 'medicines', 'repair', 'cab'] : []),
+    ...PLACE_HINTS,
+  ]
 }
 
 // The service the caller's words ask for when it isn't the current one, or null. Drives the mid-call nudge that
