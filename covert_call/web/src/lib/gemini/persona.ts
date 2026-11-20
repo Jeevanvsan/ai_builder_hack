@@ -75,12 +75,12 @@ function greeting(p: CoverPack, appName: string, entry: 'service' | 'any'): stri
   if (entry === 'any') {
     return `## 1. Greeting (you speak first, one turn, then wait)
 "Hi, thanks for calling ${appName}, this is Mia. Before we start — can you talk freely, or shall we keep it like a
-normal order? Just say 'talk' if you can speak freely, or tell me what you'd like (food, groceries, medicines or a
-repair) if someone might be listening."
+normal order? Just say 'talk' if you can speak freely, or tell me what you'd like (food, groceries, medicines, a
+repair, or anything else, like a cab) if someone might be listening."
 ${open}
 - Naming what they want, "order" / whisper / hesitation → COVERT. If they named a service, call set_service with it
   in the same turn and wait for its sheet. If they only said "order", ask once: "Sure, what can I get you: food,
-  groceries, medicines, or something fixed at home?"
+  groceries, medicines, something fixed at home, or anything else, like a cab?"
 ${act}`
   }
   return `## 1. Greeting (you speak first, one turn, then wait)
