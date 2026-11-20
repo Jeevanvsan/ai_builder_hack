@@ -59,13 +59,16 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
   const pos = livePosition(incident.location)
   if (route) evidence.nearby = { kind: 'nearby', label: 'Route to safety', values: [], tone: 'live' }
 
-  // Responder picks a station: route from the caller's latest position; the caller's app follows it live.
+  // Responder picks a station: route from the caller's latest position; the caller's app follows it live. Planned
+  // the same way as the caller's current route (on foot, two-wheeler or car); the caller's app re-plans from their
+  // own speed after that.
   const routeTo = async (s: NearbyService) => {
     const t = pos
     if (!t) return
-    const r = await bestSafeRoute({ lat: t.lat, lng: t.lng }, s.kind, 'Responder chose this station', 'responder', s)
+    const r = await bestSafeRoute({ lat: t.lat, lng: t.lng }, s.kind, 'Responder chose this station', 'responder', s, route?.travelMode ?? 'DRIVE')
     if (r) await setSafeRoute(db, incident.id, r)
   }
+  const modeWord = route?.travelMode === 'WALK' ? ' on foot' : route?.travelMode === 'TWO_WHEELER' ? ' by two-wheeler' : route?.travelMode === 'DRIVE' ? ' by car' : ''
   const tiles = ORDER.map((k) => evidence[k]).filter((e): e is Evidence => Boolean(e))
   const suggested = suggestedServiceKind(incident.extractedFieldsLive.dangerIndicators)
 
@@ -93,7 +96,7 @@ export default function CaseBoard({ incident, live, now, timer }: { incident: In
           {prog.arrived ? (
             <div className="route-eta"><strong>Arrived</strong> · {route.requestedBy === 'responder' ? 'set by dispatcher' : 'chosen by AI'}</div>
           ) : (
-            <div className="route-eta"><strong>{Math.max(1, Math.round(prog.remainingS / 60))} min</strong> · {km} to go · {route.requestedBy === 'responder' ? 'set by dispatcher' : 'chosen by AI'}</div>
+            <div className="route-eta"><strong>{Math.max(1, Math.round(prog.remainingS / 60))} min</strong>{modeWord} · {km} to go · {route.requestedBy === 'responder' ? 'set by dispatcher' : 'chosen by AI'}</div>
           )}
           {step && !prog.arrived && <div className="route-next"><span className="route-next-label">Next</span><DecodeText text={step.instruction} /></div>}
         </div>

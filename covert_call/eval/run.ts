@@ -23,6 +23,7 @@ import {
   recordVoiceStress, reportSceneObservation, startIncident, updateLiveFields,
 } from '../shared/incidents/client.ts'
 import { affirmed } from '../shared/incidents/severity.ts'
+import { setGoogleMaps } from '../shared/google/maps.ts'
 import { knownFactsNote } from '../shared/incidents/knownFacts.ts'
 import type { Incident } from '../shared/incidents/types.ts'
 import { PERSONA_SYSTEM_INSTRUCTION, SILENT_OBSERVER_INSTRUCTION } from '../web/src/lib/gemini/persona.ts'
@@ -79,6 +80,14 @@ if (RESOLVE) {
 } else if (RECORD && !process.argv.includes('--keep-open')) {
   console.log('No RESPONDER_EMAIL/RESPONDER_PASSWORD in eval/.env.local: test incidents stay open in the queue.')
 }
+
+// ---- Google Maps web services (Places, Routes), as the caller app uses them: the web app's key, sent with a
+// localhost Referer so its website restriction accepts it. Put that key in eval's own local env file too: Node keeps
+// the first value it reads, even an empty one. Without a key (or GOOGLE_MAPS=off, for an A/B against the free
+// services) addresses, landmarks, stations and routes use OpenStreetMap, as before.
+const mapsKey = process.env.GOOGLE_MAPS === 'off' ? '' : (process.env.VITE_GOOGLE_MAPS_API_KEY ?? '')
+setGoogleMaps({ key: mapsKey, headers: { Referer: 'http://localhost/' } })
+console.log(mapsKey ? 'Maps: Google (Places, Routes).' : 'Maps: OpenStreetMap (no Google Maps key).')
 
 // ---- Fake GPS: one owner at a time (gps scenarios run alone, before the parallel batch)
 type Fix = { lat: number; lng: number }

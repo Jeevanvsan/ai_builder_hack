@@ -775,6 +775,41 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 @keyframes live-pulse { from { transform: scale(0.5); opacity: 0.9; } to { transform: scale(1.4); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .live-pulse { animation: none; } }
 .board-map .leaflet-control-attribution { font-size: 10px; background: rgba(255, 255, 255, 0.7); }
+/* Google map markers (GoogleIncidentMap.tsx): HTML twins of the OSM map's circle markers and tooltips. */
+.gm-marker { position: relative; display: grid; place-items: center; }
+.gm-marker > * { grid-area: 1 / 1; }
+.gm-dot { display: block; border-radius: 50%; box-sizing: border-box; box-shadow: 0 1px 3px rgba(20, 30, 50, 0.35); }
+.gm-halo { width: 52px; height: 52px; border-radius: 50%; background: rgba(201, 42, 42, 0.18); }
+.gm-pulse { width: 48px; height: 48px; border-radius: 50%; background: rgba(11, 87, 208, 0.2); animation: live-pulse 1.6s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .gm-pulse { animation: none; } }
+.gm-label {
+  position: absolute; white-space: nowrap; padding: 2px 7px; border-radius: 4px; pointer-events: none;
+  background: #fff; color: #1f2933; font-size: 12px; font-weight: 700; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.gm-label-top { bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); }
+.gm-label-right { left: calc(100% + 6px); top: 50%; transform: translateY(-50%); }
+.gm-turn .gm-label { color: #1a73e8; }
+/* Map / Satellite / 3D switch (Google only), beside the zoom buttons at the bottom left. */
+.map-frame { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.board-map .map-frame { height: 100%; }
+.map-views {
+  position: absolute; left: 4rem; bottom: 1.25rem; z-index: 5; display: inline-flex; overflow: hidden;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 1px 4px rgba(20, 30, 50, 0.3);
+}
+.map-views button { border: 0; background: transparent; padding: 0.32rem 0.8rem; font: inherit; font-size: 0.78rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.map-views button.active { background: var(--accent); color: #fff; }
+.map-views-note {
+  position: absolute; left: 4rem; bottom: 3.5rem; z-index: 5; max-width: 22rem; margin: 0; padding: 0.25rem 0.6rem;
+  border-radius: 6px; font-size: 0.72rem; color: var(--text); background: rgba(255, 255, 255, 0.92);
+}
+/* Street view tab (StreetViewPanel.tsx). */
+.street-view { position: relative; }
+.street-view-pano { height: 340px; border-radius: 8px; overflow: hidden; background: #eef2f7; }
+.street-view-msg {
+  position: absolute; inset: 0; display: grid; place-items: center; height: 340px; margin: 0; padding: 1rem;
+  border-radius: 8px; text-align: center; font-size: 0.85rem; color: var(--muted); background: #eef2f7;
+}
+.street-view-meta { margin: 0.5rem 0 0; font-size: 0.78rem; color: var(--muted); }
 /* Softens the map towards the edges so tiles read clearly, while the area around the hub stays sharp. */
 .board-veil {
   position: absolute;

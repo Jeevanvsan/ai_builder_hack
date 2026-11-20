@@ -5,6 +5,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, query, setDoc, updateDoc,
 import { INCIDENTS } from '../../../shared/incidents/client.ts'
 import { incidentDoc } from './incidentsStore'
 import type { Incident } from '../../../shared/incidents/types.ts'
+import { latestFix } from '../../../shared/incidents/position.ts'
 import { db } from './firebase'
 
 // Epic 31: the verification agent. After a call ends, Gemini weighs whether it may be a false or prank call and
@@ -62,14 +63,19 @@ function evidence(i: Incident, h: CallerHistory | null): string {
   const f = i.extractedFieldsLive
   const rough = i.location.rough
   const conf = i.location.confirmed
-  const gap = rough && conf?.lat != null && conf.lng != null ? km(rough, { lat: conf.lat, lng: conf.lng }) : null
+  // The stated address against where the phone last measured itself to be (a precise GPS fix from the live trail or
+  // the start), else the start fix; gps_source tells the model which, so an IP fix tens of km off isn't read as a lie.
+  const fix = latestFix(i.location)
+  const phone = fix ?? rough
+  const gap = phone && conf?.lat != null && conf.lng != null ? km(phone, { lat: conf.lat, lng: conf.lng }) : null
+  const gpsSource = fix ? `gps${fix.accuracyM != null ? ` (±${fix.accuracyM} m)` : ''}` : rough?.source ?? 'unknown'
   const minutes = i.sessionEndedAt ? (Date.parse(i.sessionEndedAt) - Date.parse(i.sessionStartedAt)) / 60000 : null
   const lines = (i.transcriptLines ?? []).slice(-20).map((l) => `${l.speaker}: ${l.text}`).join('\n')
   return [
     `channel=${i.channel}${i.incidentType === 'sos' ? ' (silent SOS)' : ''}; call_minutes=${minutes?.toFixed(1) ?? 'unknown'}`,
     `danger_tags=${f.dangerIndicators.join(' | ') || 'none'}; urgency=${f.urgency ?? 'none'}; people=${f.peopleCount ?? 'unknown'}`,
     `voice_stress_trend=${(i.voiceStressTrend ?? []).map((v) => v.score).join(',') || 'none'}`,
-    `stated_address=${conf?.address ?? 'none'}; gps_source=${rough?.source ?? "unknown"}; distance_gps_to_stated_address_km=${gap?.toFixed(1) ?? 'unknown'}`,
+    `stated_address=${conf?.address ?? 'none'}; gps_source=${gpsSource}; distance_gps_to_stated_address_km=${gap?.toFixed(1) ?? 'unknown'}`,
     `camera_and_sound=${(i.sceneObservations ?? []).map((o) => `${o.source}:${o.detail}`).join(' | ') || 'none'}`,
     `coercion_signals=${(i.coercionSignals ?? []).map((c) => c.detail || c.kind).join(' | ') || 'none'}`,
     `motion=${(i.motionEvents ?? []).map((m) => m.kind).join(',') || 'none'}`,

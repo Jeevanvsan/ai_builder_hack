@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Incident } from '../../../../shared/incidents/types'
 import BulletinCard from '../BulletinCard'
@@ -9,12 +9,17 @@ import MessageCaller from '../MessageCaller'
 import NoteForm from '../NoteForm'
 import ReplayScrubber from '../ReplayScrubber'
 import { channelLabel } from '../../lib/format'
+import { livePosition, precisionLabel } from '../../lib/livePosition'
+import { googleMapsKey } from '../../lib/googleMaps'
+
+// Loaded only when the Street view tab is opened (and only exists with a Google Maps key).
+const StreetViewPanel = lazy(() => import('./StreetViewPanel'))
 import Conversation from './Conversation'
 import DecodeText from './DecodeText'
 import SceneSketch from './SceneSketch'
 import CallerCheck from './CallerCheck'
 
-type Tab = 'conversation' | 'scene' | 'message' | 'case'
+type Tab = 'conversation' | 'scene' | 'street' | 'message' | 'case'
 const SUMMARY_WAIT_MS = 90_000
 
 // Right-hand panel: the live conversation while the call runs, the case file once it ends. It follows the call
@@ -49,6 +54,11 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
         <button type="button" role="tab" aria-selected={tab === 'scene'} className={tab === 'scene' ? 'active' : ''} onClick={() => pick('scene')}>
           Scene
         </button>
+        {googleMapsKey && (
+          <button type="button" role="tab" aria-selected={tab === 'street'} className={tab === 'street' ? 'active' : ''} onClick={() => pick('street')}>
+            Street view
+          </button>
+        )}
         {canMessage && (
           <button type="button" role="tab" aria-selected={tab === 'message'} className={tab === 'message' ? 'active' : ''} onClick={() => pick('message')}>
             Message caller
@@ -62,6 +72,10 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
       <div className="panel-body">
         {tab === 'scene' ? (
           <SceneSketch incident={incident} />
+        ) : tab === 'street' ? (
+          <Suspense fallback={<p className="muted">Loading Street View…</p>}>
+            <StreetViewPanel incident={incident} />
+          </Suspense>
         ) : tab === 'message' ? (
           <MessageCaller incidentId={incident.id} live={live} />
         ) : tab === 'conversation' ? (
@@ -209,13 +223,19 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
 function FactSheet({ incident: i }: { incident: Incident }) {
   const f = i.extractedFieldsLive
   const r = i.safeRoute
+  const here = livePosition(i.location)
+  const precision = precisionLabel(here)
   const rows: [string, string][] = [
     ['Urgency', f.urgency ?? 'not stated'],
     ['People', f.peopleCount != null ? String(f.peopleCount) : 'not stated'],
     ['Danger', f.dangerIndicators.length ? f.dangerIndicators.join('; ') : 'none reported'],
-    ['Location', i.location.confirmed?.address ?? (i.location.rough ? `approx. ${i.location.rough.lat.toFixed(4)}, ${i.location.rough.lng.toFixed(4)}` : 'unknown')],
+    ['Location', i.location.confirmed?.address ?? (here ? `approx. ${here.lat.toFixed(4)}, ${here.lng.toFixed(4)}${precision ? ` (${precision})` : ''}` : 'unknown')],
   ]
-  if (i.location.track?.length) rows.push(['Movement', `${i.location.track.length} live GPS points`])
+  const track = i.location.track ?? []
+  if (track.length) {
+    const named = track.filter((p) => p.source === 'landmark').length
+    rows.push(['Movement', `${track.length - named} live GPS points${named ? `, ${named} from places the caller named` : ''}`])
+  }
   if (r) rows.push(['Heading to', `${r.destination.name} (${r.destination.kind}), ${(r.distanceM / 1000).toFixed(1)} km, step ${r.stepIndex + 1} of ${r.steps.length}`])
   if (i.voiceStressScore != null) rows.push(['Voice stress', String(i.voiceStressScore)])
   if (i.callerEstimate) {

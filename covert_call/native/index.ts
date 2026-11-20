@@ -2,7 +2,8 @@ import { registerRootComponent } from 'expo'
 import App from './App'
 import { installGeolocation } from './src/lib/platform/geolocation'
 import { configureTurn } from '../shared/video/signaling'
-import { TURN } from './src/lib/config'
+import { setGoogleMaps } from '../shared/google/maps'
+import { GOOGLE_MAPS, TURN } from './src/lib/config'
 
 // react-native-webrtc's globals must be registered before any peer connection (Epic 9/11 native path). Its native
 // module isn't present in Expo Go, so guard the call: this lets the app boot from an Expo Go QR for testing the
@@ -23,5 +24,8 @@ installGeolocation()
 // credential in it would be scraped and the quota drained. With none set the app stays on STUN, and the live
 // feed only reaches a dashboard that can contact the phone directly (see shared/video/signaling.ts).
 configureTurn(TURN)
+
+// Google Places and Routes for addresses, landmarks, stations and routes; OpenStreetMap without a key.
+setGoogleMaps(GOOGLE_MAPS)
 
 registerRootComponent(App)

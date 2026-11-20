@@ -7,6 +7,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../../App'
 import { db } from '../lib/firebase'
 import { startIncident, endIncident, setCameraMode } from '../../../shared/incidents/client'
+import { startLocationTrail, type LocationTrail } from '../../../shared/incidents/trail'
 import { startVideoPublisher } from '../../../shared/video/publisher'
 import { startSilentObserver, type SilentObserverHandle } from '../lib/gemini/silentSession'
 import { runPostSessionPasses, uploadCallAudio } from '../lib/gemini/postSession'
@@ -43,6 +44,7 @@ export function SosScreen() {
 
   const incidentIdRef = useRef<string | null>(null)
   const observerRef = useRef<SilentObserverHandle | null>(null)
+  const trailRef = useRef<LocationTrail | null>(null)
   const previousBrightnessRef = useRef<number | null>(null)
   // Every camera the phone will give us, each published as its own feed so a responder can switch between them.
   const streamsRef = useRef<RtcStream[]>([])
@@ -70,6 +72,8 @@ export function SosScreen() {
         severity: 'high',
       })
       incidentIdRef.current = id
+      // Follow the caller for the whole SOS (a hostage may be moved), not just the one reading taken at the start.
+      if (!endingRef.current) trailRef.current = startLocationTrail(db, id)
 
       // Drop the backlight to its minimum so the screen reads as "off" in a dark room, not merely black. The
       // previous value is restored on exit. Best-effort: a refused permission just leaves it as it was.
@@ -125,6 +129,7 @@ export function SosScreen() {
     endingRef.current = true
 
     const id = incidentIdRef.current
+    trailRef.current?.stop()
     const transcript = observerRef.current?.getTranscript() ?? ''
     const recording = await withTimeout(observerRef.current?.end() ?? Promise.resolve(null), null)
     cameraWatcherRef.current?.stop()
@@ -158,6 +163,7 @@ export function SosScreen() {
 
   useEffect(() => () => {
     if (tapTimerRef.current) clearTimeout(tapTimerRef.current)
+    trailRef.current?.stop()
   }, [])
 
   // The whole overlay listens — not just a corner — so the gesture works wherever on the dead-looking screen
