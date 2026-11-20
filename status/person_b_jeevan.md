@@ -997,3 +997,22 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
 - **Checked:** web build + lint, landing build (it imports the menu), cover checks. Clicked through the production build headless at phone size: all four tabs, an item added, cart and checkout for a home-services booking, a reload keeping the tab. No console errors. No order was placed and no call made. Not deployed.
 - **Note for Jeevan:** the landing manual's screenshot check (`landing/scripts/capture-manual-shots.mjs:561`) expects "QuickBite Order Desk" and fails on this branch; that's part of the post-go landing update. The step-1 request for the `cover` incident field still stands; it's the next step.
 - **Native parity:** native has its own menu and screens, so nothing changed there. Follow-ups if native adopts QuickOne: service tabs, the three catalogs, the top-bar call button.
+
+### 2026-11-20 ~19:15 IST: QuickOne step 4, the `cover` field, the dashboard, and staging previews (same branch, done from Ameen's side)
+- **Data model:** incidents get an optional `cover` (`'food' | 'grocery' | 'pharmacy' | 'home' | 'other'`) in `shared/incidents/types.ts`, plus `setCover()` in `client.ts`. The web call sets it at the start and on every service switch, a coded order sets it at checkout, and the eval does the same. All writes are best-effort. Missing means food (older incidents, native).
+- **Firestore rules, DEPLOYED (production-wide), at Ameen's request:** `cover` added to the `hasOnly` list with an `in [...]` check, and not locked in `validChange`. Compiled and released from `covert_call/dashboard` with `firebase deploy --only firestore:rules`. The file deployed is main's rules plus that one line.
+- **Dashboard (your area):**
+  - The conversation view highlights the incident's own code words (`Conversation.tsx` gets `cover` from `SidePanel`).
+  - It now takes the earliest match first, which fixes the old bug where the first option in Mia's "A, B or C?" question got no meaning.
+  - It matches whole words only.
+  - A badge ("Pharmacy", "Grocery", "Home services", "Other services") sits next to the SOS badge on the queue row and the incident header (`coverLabel()` in `lib/format.ts`). Food shows no badge.
+  - The credibility prompt and the "delivery chat" line no longer assume a food app.
+- **Previews (expire 2026-12-20), production untouched:**
+  - Web: https://quickbite-5cde0-staging--quickone-2wh4xec6.web.app (a preview channel on the staging site; the staging site itself still serves QuickBite, checked).
+  - Dashboard: https://quickbite-5cde0-dashboard--quickone-wwq8nfom.web.app (sign in as usual).
+- **Calls on the web preview won't connect yet:** staging builds read only `VITE_GEMINI_LIVE_API_KEY_FREE`, and the bundle built on this machine contains no Gemini key (as the 16 Oct note said). Fix: add that free-tier key to `covert_call/web/.env.local`, rebuild with `--mode staging`, and redeploy to the same channel (`firebase hosting:channel:deploy quickone --config firebase.staging.json --expires 30d`). If the Gemini keys have HTTP-referrer restrictions, also allow the preview domain.
+- **Checked:** web and dashboard build + lint, native `tsc`, strict eval `tsc`, cover checks; the transcript matcher was tested against every cover's phrases.
+- **Notes for Jeevan:**
+  - **Your rules were deployed from this branch.** The file is main's rules plus the `cover` line. If anything was live that isn't on main, it was replaced, so please check once in the console's rules history.
+  - Incidents made from the preview land in the normal live queue (same Firestore), with a cover badge on non-food calls. The production dashboard ignores the field.
+  - Please review the dashboard changes above; they're in your area.

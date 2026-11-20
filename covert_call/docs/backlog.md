@@ -800,14 +800,15 @@ fields except where noted.*
 
 ### User Story 33.4 (Person B)
 **As a responder, I want to see which cover a call used, so that I read the transcript's codes correctly.**
-- [ ] `cover` incident field + Firestore rules (Person B deploys the rules)
-- [ ] Transcript chips use the incident's cover phrases; "Cover" badge on the incident and the queue row
-- [ ] Credibility prompt and "delivery chat" wording made service-neutral
+- [x] `cover` incident field + Firestore rules (rules deployed 2026-11-20 from Ameen's side)
+- [x] Transcript chips use the incident's cover phrases (earliest match first, whole words); "Cover" badge on the incident and the queue row
+- [x] Credibility prompt and "delivery chat" wording made service-neutral
 
 ### User Story 33.5
 **As the team, we want proof that every cover works before the finale, so that the proven demo is never put at risk.**
 - [x] Eval: 6 cover scenarios (`cover-*`) and the `--quickone` flag (any scenario with the web's per-cover prompt + set_service)
 - [ ] Eval run: the food scenarios plain vs `--quickone` (same day), plus the 6 cover scenarios
-- [ ] 8 real spoken calls on the staging preview (every cover, neutral entry, a mid-call switch, open mode)
+- [x] Staging previews deployed (web + dashboard, expire 2026-12-20)
+- [ ] 8 real spoken calls on the staging preview (every cover, neutral entry, a mid-call switch, open mode): needs the free Gemini key in the staging build
 - [ ] Go/no-go on 28 Nov
 - [ ] Native follow-ups logged: Settings presets → covers, `set_service` handler, native catalogs
