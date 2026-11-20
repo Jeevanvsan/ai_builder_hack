@@ -1010,9 +1010,26 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
 - **Previews (expire 2026-12-20), production untouched:**
   - Web: https://quickbite-5cde0-staging--quickone-2wh4xec6.web.app (a preview channel on the staging site; the staging site itself still serves QuickBite, checked).
   - Dashboard: https://quickbite-5cde0-dashboard--quickone-wwq8nfom.web.app (sign in as usual).
-- **Calls on the web preview won't connect yet:** staging builds read only `VITE_GEMINI_LIVE_API_KEY_FREE`, and the bundle built on this machine contains no Gemini key (as the 16 Oct note said). Fix: add that free-tier key to `covert_call/web/.env.local`, rebuild with `--mode staging`, and redeploy to the same channel (`firebase hosting:channel:deploy quickone --config firebase.staging.json --expires 30d`). If the Gemini keys have HTTP-referrer restrictions, also allow the preview domain.
+- **Gemini key:** the web preview is built with the free-tier key (`VITE_GEMINI_LIVE_API_KEY_FREE`, the only key staging builds use), so calls can connect. If the Gemini keys have HTTP-referrer restrictions, the preview domain must be allowed. To redeploy the same link: build with `--mode staging`, then `firebase hosting:channel:deploy quickone --config firebase.staging.json --expires 30d`. (Corrected ~19:40 IST: an earlier version of this note said the key was missing. That check only looked for old-format `AIza…` keys; this machine's Gemini keys use the newer `AQ.` format.)
 - **Checked:** web and dashboard build + lint, native `tsc`, strict eval `tsc`, cover checks; the transcript matcher was tested against every cover's phrases.
 - **Notes for Jeevan:**
   - **Your rules were deployed from this branch.** The file is main's rules plus the `cover` line. If anything was live that isn't on main, it was replaced, so please check once in the console's rules history.
   - Incidents made from the preview land in the normal live queue (same Firestore), with a cover badge on non-food calls. The production dashboard ignores the field.
   - Please review the dashboard changes above; they're in your area.
+
+### 2026-11-21 ~00:30 IST: QuickOne eval results and the cab fix (same branch, done from Ameen's side)
+- **Eval, 2026-11-20** (free key, one run per scenario):
+  - Food scenarios: the frozen prompt scored 65/81 strict (67 judged); QuickOne's per-cover prompt (`--quickone`) scored 69/81 (71 judged). Nothing suggests QuickOne broke the food flow.
+  - QuickOne calls used about 8% more tokens, and the median reply went from 956 to 1,257 ms. That phase also had Firestore timeouts, so worth a re-check.
+  - The 6 cover scenarios: 33/42. Grocery while being followed scored 8/8, and the switch from food to pharmacy 6/6.
+- **Found and fixed:** the neutral entry's greeting offered only food, groceries, medicines or a repair, so a caller who wanted a cab picked "something fixed at home". The greeting and Mia's follow-up question now add "or anything else, like a cab". Only the neutral entry changed in `persona.ts`; the food prompt is unchanged and `check-covers` passes.
+- **Re-run after the fix:**
+  - Cab: 4/6. It now switches to the cab cover at 21 s; before, it switched to home repair at 117 s.
+  - Locked in: 6/7. Before it was 4/7 and ran out of time.
+  - Medicines: 6/7. It now switches at once; before, only after the app's nudge.
+- **Still weak, not QuickOne-specific:**
+  - "Domestic" is rarely tagged; it fails in most domestic scenarios, food ones included.
+  - One cab run tagged the wrong code. The "other services" cover uses tier words ("premium" means a weapon).
+- **Watch in real calls:** in covert mode Mia sometimes names the destination plainly ("the Central Police Station"), without the persona's "the rider's meeting point" framing. The rule is the same in the old prompt.
+- Ameen has no time for the 8 planned real calls; at least one is planned during a finale rehearsal.
+- Includes last night's two-line Gemini key correction (status and backlog), restored from the stash.

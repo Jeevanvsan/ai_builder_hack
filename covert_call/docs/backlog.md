@@ -807,8 +807,9 @@ fields except where noted.*
 ### User Story 33.5
 **As the team, we want proof that every cover works before the finale, so that the proven demo is never put at risk.**
 - [x] Eval: 6 cover scenarios (`cover-*`) and the `--quickone` flag (any scenario with the web's per-cover prompt + set_service)
-- [ ] Eval run: the food scenarios plain vs `--quickone` (same day), plus the 6 cover scenarios
+- [x] Eval run 2026-11-20: the food scenarios 65/81 strict plain, 69/81 with `--quickone` (about 8% more tokens, median reply 956 → 1,257 ms); the 6 cover scenarios 33/42
+- [x] Fix from the run: the neutral greeting offers "or anything else, like a cab" (a cab caller had picked home repair); re-run: the cab switches at 21 s, locked-in 6/7, medicines switches at once
 - [x] Staging previews deployed (web + dashboard, expire 2026-12-20)
-- [ ] 8 real spoken calls on the staging preview (every cover, neutral entry, a mid-call switch, open mode): needs the free Gemini key in the staging build
+- [ ] Real spoken calls on the staging preview (8 planned: every cover, neutral entry, a mid-call switch, open mode; Ameen has no time, so at least one during a finale rehearsal)
 - [ ] Go/no-go on 28 Nov
 - [ ] Native follow-ups logged: Settings presets → covers, `set_service` handler, native catalogs
