@@ -94,8 +94,11 @@ type Fix = { lat: number; lng: number }
 let gpsFix: Fix | null = null
 const watchers = new Map<number, (p: GeolocationPosition) => void>()
 let watchSeq = 0
+// Walking pace by default; EVAL_GPS_SPEED (metres per second) makes the same scripted track a vehicle (12 is a car
+// in town), which should give a car route instead of a walking one.
+const GPS_SPEED = Number(process.env.EVAL_GPS_SPEED ?? 1.6)
 const position = (f: Fix) => ({
-  coords: { latitude: f.lat, longitude: f.lng, accuracy: 8, speed: 1.6, altitude: null, altitudeAccuracy: null, heading: null },
+  coords: { latitude: f.lat, longitude: f.lng, accuracy: 8, speed: GPS_SPEED, altitude: null, altitudeAccuracy: null, heading: null },
   timestamp: Date.now(),
 }) as unknown as GeolocationPosition
 Object.defineProperty(globalThis.navigator, 'geolocation', {
