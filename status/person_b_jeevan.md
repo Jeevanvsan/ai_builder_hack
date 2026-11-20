@@ -957,3 +957,53 @@ The form's "Brief Description of Your Solution (please include how you are lever
 - Fix in `covert_call/docs/setup/trusted-alert-Code.gs`: Yopmail addresses get the email without the PDF, which holds everything the PDF does. Other addresses still get the PDF. Checked with a dry run on this incident's data (stubbed services, nothing sent).
 - ~12:58 IST: the new version was deployed to the existing deployment (same URL) and the `INC-MUZNKM7N` report was resent; the script returned `sent`. If the temporary `Test` file is still in the Apps Script project, delete it. Not committed.
 - **Note for Jeevan:** the manual still says "The PDF case report goes to the shared inbox qbtour@yopmail.com" (`covert_call/landing/src/components/ManualGuides.tsx:205`). Judges using that inbox now get the email without the PDF.
+
+### 2026-11-20 ~21:50 IST: Google Maps, exact location, Street View and 3D, code ready (Epic 34, done from Ameen's side)
+- New branch `feature/google-maps` from `main`, separate from QuickOne. Plan: everything lands before the 30 Nov freeze; go/no-go on 28 Nov together with QuickOne. Setup guide: `covert_call/docs/setup/google-maps.md`. Backlog: Epic 34.
+- **No Google Maps key exists yet**, so nothing Google has run for real. With no key, every part falls back to today's OpenStreetMap path. Checks so far: type-checks (dashboard, web, native, strict eval), lint, a dashboard build, and 28 scratch checks with stubbed responses (location logic, request and response parsing, the key never logged). Not committed, not deployed.
+- **Dashboard (your area, please review):**
+  - `GoogleIncidentMap.tsx` was rewritten to match the OSM map. Before, setting a key would have hidden the route and trail.
+  - New: a Map / Satellite / 3D switch at the board's bottom left (`IncidentMap.tsx`, `GoogleIncident3D.tsx`) and a "Street view" tab in the side panel (`board/StreetViewPanel.tsx`), both only with a key.
+  - New: an accuracy ring on the map, "GPS ±40 m" or "IP estimate" on the Location tile, and hollow trail points for places the caller named.
+  - The queue card, fact sheet and credibility check now read the latest position.
+- **Location capture (shared, so native gets it too):**
+  - GPS accuracy and a source are stored.
+  - `location.rough` is no longer overwritten by every trail point, so it stays the start fix.
+  - The silent SOS, silent tap and order-placed screens now keep sending the position (`shared/incidents/trail.ts`), on web and native.
+  - Address search no longer uses an IP fix as a hint.
+  - Fixed: a station you pick with "Route here" was swapped back to the nearest one on the next periodic re-route.
+- **Google lookups (`shared/google/maps.ts`):**
+  - Addresses go to Places, then OSM. (Geocoding was dropped the same night: Google refuses it for website-restricted keys.)
+  - Landmarks are found by best name match.
+  - Stations come with phone numbers, so the route tile's "Call" link finally has numbers.
+  - Routes are on foot, two-wheeler or car, chosen from GPS speed, the running signal or Mia's words; a car route when unknown, as before. Mia's notes add "on foot" only on walking routes.
+  - Each app sets its key once at startup (`setGoogleMaps`) instead of passing it at every call site.
+- **Notes for Ameen:**
+  - Add the new variable names to the example env templates (not edited, because of the env-file hook):
+    - web: `VITE_GOOGLE_MAPS_API_KEY`;
+    - dashboard: `VITE_GOOGLE_MAP_ID`;
+    - native: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` and `EXPO_PUBLIC_ANDROID_CERT_SHA1`.
+  - The landing page's "Leaflet / OSM" chip and deck slides 8, 9 and 12 are left until after the go, so they don't claim Google Maps before it ships.
+- **Note for Jeevan:**
+  - Ameen is doing the Google Cloud setup himself, and the 29 Nov production deploy, since you're busy with another project. If you can, a 10-minute look at the dashboard changes (your area) before 28 Nov would help.
+  - Nearby stations with phone numbers use the Places "Enterprise" SKU (1,000 free a month), so the budget alert matters.
+
+### 2026-11-20 ~23:45 IST: Google Maps keys set up and tested (Epic 34, done from Ameen's side)
+- **Google Cloud (Ameen):**
+  - Project "Quick Bite" (`gen-lang-client-0441842014`, the paid Gemini key's project), not the Firebase project. Billing was already attached.
+  - Budget alert: ₹1,000 a month, whole billing account, emails at 50/90/100%.
+  - APIs enabled: Maps JavaScript, Places (New), Routes. Geocoding was enabled too but isn't used.
+  - Map ID "QuickBite board" with a light style: place icons off except hospital, police, fire and landmarks; pharmacies off.
+  - Two website-restricted keys: dashboard, and caller web. The caller key is also in `eval`'s local env file.
+- **Tested with the real keys (not committed, not deployed):**
+  - Both builds contain a Maps key and use the Map ID.
+  - Dashboard on localhost, headless, on demo incident INC-MWP7R826: the Google map shows the route, next turn, trail and live caller; Satellite and 3D work; the Street view tab shows a panorama 30 m from the caller (MG Road, Dec 2025 imagery). The new map style removes the clutter.
+  - Eval with Google: chase 6/6 (walking route to Kadavanthra Police Station, 1.3 km, Google turn-by-turn with landmarks, the station's phone number stored); covert address 6/7 (same as before; the miss is "domestic" not tagged).
+  - Google against OSM: about 200 ms against 2–4 s per address. They agree on Convent Square, St George Auditorium and Singapore.
+- **Fixed from the tests:**
+  - Nearby stations now take the best-known places of each kind (not the plain nearest, which gave a traffic police cabin, a visa medical agency and a mis-tagged shop), drop closed places, then sort by distance.
+  - An address is exact only when the area the caller named appears in Google's address. "Asha Nivas, Vazhicherry" had matched an "Asha Nivas" in Pazhaveedu, 2 km away.
+  - The Geocoding step is removed: Google refuses it for website-restricted keys.
+- **Notes for Ameen:**
+  - When the `maps` preview channels are deployed, add their two URLs to the keys' website lists, the caller key and the dashboard key.
+  - Untick Geocoding on the caller key if you like; it isn't used.

@@ -769,3 +769,42 @@ fields except where noted.*
 
 - [ ] Move all Gemini calls off public `VITE_GEMINI_*` keys onto Firebase AI Logic, with App Check enforced
 - [ ] Stopgap until then: restrict each key to the Generative Language API + the app's HTTP referrers in Google Cloud Console
+
+---
+
+# PHASE 5 (planned 2026-11-20)
+
+## EPIC 34 — Google Maps, exact caller location, Street View and 3D 🔴 (before the 30 Nov freeze)
+
+Branch `feature/google-maps`. Setup: [`setup/google-maps.md`](setup/google-maps.md). Every part falls back to the free
+OpenStreetMap services when there is no key. Epic 33 is QuickOne (branch `feature/quickone-dynamic-cover`).
+
+### User Story 34.1
+**As a responder, I want the Google map to show everything the OSM map does, so that switching maps never hides the route.**
+- [x] `GoogleIncidentMap.tsx` at parity: route with casing, next turn, destination by kind, trail with fading points, live caller with pulse, pin rules, follow, fit-to-route, centre-only zoom on the board
+- [ ] Check against the OSM map on a route incident (INC-MUZKKVL1) once the dashboard key exists
+- [ ] Cloud-styled Map ID for the muted board look (`VITE_GOOGLE_MAP_ID`)
+- [ ] Analytics map on Google (second on the cut list)
+
+### User Story 34.2
+**As a responder, I want to see the caller's surroundings, so that I can recognise the place before I arrive.**
+- [x] Map / Satellite / 3D switch on the board map (3D is photorealistic where Google has buildings, such as Singapore, and satellite over terrain elsewhere)
+- [x] Street view tab: a free imagery check within 100 m, then a panorama from the nearest road facing the caller, with the imagery date or a "no imagery" message; re-checked after a 75 m move
+- [ ] Check in Singapore (the demo address) and in Kerala with the key
+
+### User Story 34.3
+**As a responder, I want to know how precise the caller's position is and to follow them on every channel, so that I send help to the right spot.**
+- [x] GPS accuracy stored on the start fix and on every trail point; trail points tagged `gps`, `landmark` or `sim`
+- [x] `location.rough` stays the start fix, so the timeline, case sketch, analytics map and repeat-location linking get the real start
+- [x] Accuracy ring on the map; "GPS ±40 m", "IP estimate" or "a landmark the caller named" on the Location tile; landmark points drawn hollow
+- [x] Silent SOS, silent tap and the order-placed screen keep sending the position, on web and native (closes 22.4's open sub-task)
+- [x] Address search is biased only by a precise phone fix, never an IP guess; the GPS fallback pin needs 100 m accuracy or better
+- [x] A station the dispatcher picked survives the periodic re-route
+
+### User Story 34.4
+**As a caller, I want Mia to find the place I name and route me the way I'm travelling, so that her directions work on foot.**
+- [x] `shared/google/maps.ts`: Places Text and Nearby Search and Routes, set once per app with `setGoogleMaps` (the Geocoding API refuses website-restricted keys, so it is not used)
+- [x] Addresses: Places, then OSM; exact only when the area the caller named is in Google's address. Landmarks: best name match in the 3 km box. Stations: the best-known of each kind, nearest first, with phone numbers. A recognisable place at each turn
+- [x] Travel mode from GPS speed, the running motion signal and Mia's own words (on foot, two-wheeler or car); a car route when unknown, as before
+- [ ] Eval: chase, address and cover scenarios with and without the key (`GOOGLE_MAPS=off`)
+- [ ] Voice calls on the maps preview: on foot, by car, at home, an SOS, a coded order
