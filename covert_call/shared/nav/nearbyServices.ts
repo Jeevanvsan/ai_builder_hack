@@ -342,7 +342,11 @@ export type LandmarkHit = { lat: number; lng: number; name: string; confidence: 
 // could just as easily be a same-named place further out that got missed), or the weaker Nominatim fallback path
 // rather than an exact OSM name match.
 export async function locateLandmark(text: string, near: { lat: number; lng: number }): Promise<LandmarkHit | null> {
-  const words = text
+  // "MG Road, Kochi": the last part is the town, not the landmark. Searching for "kochi" alone (MG and Road are too
+  // short or too generic) matched a business named after the city, 3 km away across the water (INC-MWPCLSVB).
+  const parts = text.split(',').map((s) => s.trim()).filter(Boolean)
+  const phrase = parts.length > 1 ? parts.slice(0, -1).join(' ') : text
+  const words = phrase
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)

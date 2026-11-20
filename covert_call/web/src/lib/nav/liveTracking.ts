@@ -246,8 +246,12 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       if (landmark && anchor) {
         // Capped: a slow lookup (Photon took 7 s once) made the whole answer miss its 6 s budget.
         const hit = await Promise.race([locateLandmark(landmark, anchor).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2_500))])
-        // The simulated GPS (demo recording) is exact: a landmark the caller names never moves it.
-        if (hit && !gpsSimEnabled && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
+        // The simulated GPS (demo recording) is exact: a landmark the caller names never moves it. Nor does a loose
+        // match (one word, or far out in the search box) move a precise GPS fix: "MG Road, Kochi" matched a business
+        // named after the city 3 km away, and the route was planned from there (INC-MWPCLSVB, INC-MWP4OUPB).
+        // Without GPS a loose match still moves the caller, and Mia reads it back to confirm (uncertainMatch).
+        const overridesGps = !gpsFix || !pos || (hit?.confidence === 'high' && distanceM(pos, hit) > GPS_OVERRIDE_M)
+        if (hit && !gpsSimEnabled && overridesGps && distanceM(anchor, hit) > 30) {
           // The dashboard follows a trail of 2+ points, so the first reported landmark also records where they
           // started — from the anchor (what the caller confirmed), not a possibly-wrong GPS/rough fix.
           if (!latestIncident?.location.track?.length) void appendTrackPoint(db, incidentId, { ...anchor, speed: null, source: anchorSource })
