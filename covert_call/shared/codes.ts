@@ -1,7 +1,9 @@
 // Single source of truth for QuickBite's coded meanings (backlog Epic 8, Story 8.1).
 //
 // The same table drives three things so they can never drift apart:
-//   1. the live-call persona's coded menu choices (persona.ts builds its Step 4 lists from here),
+//   1. the live-call persona's coded choices ("## 3. What is happening" lists; the food phrases here are the food
+//      cover pack's phrases, see shared/covers/food.ts; other services reuse these ids and meanings with their own
+//      words, shared/covers/),
 //   2. the "click & order" path — menu items reference a code id and the cart is decoded at checkout,
 //   3. the long-press "real meaning" hint shown on a coded menu item.
 //
@@ -61,7 +63,8 @@ export function personaCodeList(scope: CodeScope): string {
 
 // Decodes a placed "click & order" cart into incident fields (Story 8.2). `lines` pairs a code id with the
 // quantity ordered of that coded item. Quantity of a coded item stands in for headcount (the call's "how many
-// pizzas" drill-down). `deliveryUrgency` comes from the checkout delivery-speed choice.
+// pizzas" drill-down). `deliveryUrgency` comes from the checkout delivery-speed choice. `label` is the item's name
+// in its own catalog (a pharmacy coded item); without it the notes use the food menu label.
 export interface DecodedOrder {
   dangerIndicators: string[]
   peopleCount: number | null
@@ -69,8 +72,8 @@ export interface DecodedOrder {
   notes: string | null
 }
 
-export function decodeOrder(lines: { codeId: string; qty: number }[], deliveryUrgency: Severity): DecodedOrder {
-  const codes = lines.map((l) => ({ code: CODE_BY_ID[l.codeId], qty: l.qty })).filter((x) => x.code)
+export function decodeOrder(lines: { codeId: string; qty: number; label?: string }[], deliveryUrgency: Severity): DecodedOrder {
+  const codes = lines.map((l) => ({ code: CODE_BY_ID[l.codeId], qty: l.qty, label: l.label })).filter((x) => x.code)
 
   const dangerIndicators = [...new Set(codes.map((x) => x.code.indicator))]
   // Highest quantity among the coded items approximates how many people are involved.
@@ -81,7 +84,7 @@ export function decodeOrder(lines: { codeId: string; qty: number }[], deliveryUr
     .reduce((a, b) => (rank[a] >= rank[b] ? a : b), deliveryUrgency)
   const scopes = new Set(codes.map((x) => x.code.scope))
   const notes = codes.length
-    ? `Coded order: ${codes.map((x) => `${x.code.menuLabel} (${x.code.meaning})`).join('; ')}.` +
+    ? `Coded order: ${codes.map((x) => `${x.label ?? x.code.menuLabel} (${x.code.meaning})`).join('; ')}.` +
       (scopes.has('other') ? ' Reporting about someone else / the surroundings.' : '')
     : null
 

@@ -769,3 +769,43 @@ fields except where noted.*
 
 - [ ] Move all Gemini calls off public `VITE_GEMINI_*` keys onto Firebase AI Logic, with App Check enforced
 - [ ] Stopgap until then: restrict each key to the Generative Language API + the app's HTTP referrers in Google Cloud Console
+
+---
+
+# PHASE 5 (planned 2026-11-20)
+
+*One meaning set, one vocabulary per service. Branch `feature/quickone-dynamic-cover`. Tested on a staging preview channel; production stays QuickBite until the 28 Nov go/no-go (freeze 30 Nov). Agree the `cover` incident field (`shared/incidents/types.ts`, `dashboard/firestore.rules`) with Person B before writing it. Native imports the persona and tools from web: `PERSONA_SYSTEM_INSTRUCTION` and `LIVE_CALL_TOOLS` stay byte-identical, so native is unchanged until it adopts covers.*
+
+## EPIC 28 — QuickOne: dynamic cover 🔴
+
+### User Story 28.1
+**As a caller, I want to call about whatever fits my situation right now (food, groceries, medicines, a repair, a cab), so that the call sounds normal to whoever is listening.**
+- [x] Cover packs in `shared/covers/` (food = today's wording; grocery, pharmacy, home services, any other service) over the unchanged meanings in `shared/codes.ts`
+- [x] `buildPersonaInstruction()` in `persona.ts`; `PERSONA_SYSTEM_INSTRUCTION` stays the byte-identical food prompt
+- [x] `eval/check-covers.ts`: same-breath meanings, no giveaway words, movement tags, keyword clashes, byte-identical snapshot
+- [ ] Ameen reviews the new packs' wording
+
+### User Story 28.2
+**As a caller, I want Mia to follow me if I ask for a different service mid-call, so that I am never stuck with a cover that doesn't fit.**
+- [ ] `SET_SERVICE_TOOL` (separate from `LIVE_CALL_TOOLS`); the new service's sheet comes back in the tool reply; SERVICE line in the known-facts note
+- [ ] Code-side nudge when the caller's words ask for another service
+- [ ] Neutral "Call QuickOne" entry: the caller names the service in their first answer
+
+### User Story 28.3
+**As a caller, I want the app to look like an ordinary multi-service app, so that having it on my phone proves nothing.**
+- [ ] Rename to QuickOne (`brand.ts` and the visible strings)
+- [ ] Service tabs (Food, Grocery, Pharmacy, Home services) with catalogs and a call button per service
+- [ ] Coded items in each catalog (click & order) with the pack's labels
+
+### User Story 28.4 (Person B)
+**As a responder, I want to see which cover a call used, so that I read the transcript's codes correctly.**
+- [ ] `cover` incident field + Firestore rules (Person B deploys the rules)
+- [ ] Transcript chips use the incident's cover phrases; "Cover" badge on the incident and the queue row
+- [ ] Credibility prompt and "delivery chat" wording made service-neutral
+
+### User Story 28.5
+**As the team, we want proof that every cover works before the finale, so that the proven demo is never put at risk.**
+- [ ] Eval: 6 new cover scenarios + the food scenarios against a same-day baseline on `main`
+- [ ] 8 real spoken calls on the staging preview (every cover, neutral entry, a mid-call switch, open mode)
+- [ ] Go/no-go on 28 Nov
+- [ ] Native follow-ups logged: Settings presets → covers, `set_service` handler, native catalogs
