@@ -22,7 +22,7 @@ import { apiKey, db as webDb, setDemo } from './firebaseNode.ts'
 import { runPostCall, type PostCallMetrics } from './postcall.ts'
 import {
   appendTranscriptLine, confirmAddress, endIncident, recordAiUsage, INCIDENTS, recordCoercionSignal, recordAdvice, recordVehicleNumber,
-  recordVoiceStress, reportSceneObservation, startIncident, updateLiveFields,
+  recordVoiceStress, reportSceneObservation, setCover, startIncident, updateLiveFields,
 } from '../shared/incidents/client.ts'
 import { affirmed } from '../shared/incidents/severity.ts'
 import { knownFactsNote } from '../shared/incidents/knownFacts.ts'
@@ -302,6 +302,8 @@ async function runCall(s: Scenario): Promise<Result> {
       : { channel: 'live-call' })
     incidentId = started.id
     incidentCreateMs = Date.now() - c0
+    // As the app does: the dashboard reads this service's code words (QuickOne, Epic 33).
+    if (quickOne && !s.silent) enqueueWrite((d, id) => setCover(d, id, startCover.id))
   }
 
   let miaBuf = ''
@@ -378,6 +380,8 @@ async function runCall(s: Scenario): Promise<Result> {
           serviceName = nextName
           switched ||= entry === 'any' || args.service !== startCover.id
           if (lastData) pendingFacts = factsFor(lastData)
+          const next = args.service
+          enqueueWrite((d, id) => setCover(d, id, next))
         }
         return buildCoverSheet(cover, APP_NAME, serviceName)
       }

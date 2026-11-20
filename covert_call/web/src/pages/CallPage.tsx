@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, recordMotionEvent, setDemoMode, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, recordMotionEvent, setCover, setDemoMode, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
 import { coverPack, isCoverId, type CoverId } from '../../../shared/covers/index.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
@@ -127,6 +127,9 @@ export function CallPage() {
       setMicIssue(null)
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
+      // QuickOne (Epic 33): which service's code words this call uses, for the dashboard. Best-effort: a rejected
+      // write (rules not yet allowing the field) never affects the call.
+      void setCover(db, id, startCover).catch(() => {})
       setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
       watchDemoControl(db, id) // demo recording only (?demoInject=1); no-op otherwise
       // Epic 32: email trusted contacts once if this call turns high severity.
@@ -144,7 +147,10 @@ export function CallPage() {
             onStatusChange: setStatus,
             onCallEnd: () => finishCallRef.current(),
             onCallDropped: () => finishCallRef.current({ dropped: true }),
-            onCover: (coverId) => setCallCover({ id: coverId, chosen: true }),
+            onCover: (coverId) => {
+              setCallCover({ id: coverId, chosen: true })
+              void setCover(db, id, coverId).catch(() => {})
+            },
           },
           {
             micStream: media ? new MediaStream(media.stream.getAudioTracks()) : undefined,

@@ -8,7 +8,7 @@ import DecodeText from '../../components/board/DecodeText'
 import SidePanel from '../../components/board/SidePanel'
 import TimelineRail from '../../components/board/TimelineRail'
 import { playEscalationCue } from '../../lib/alertOutputs'
-import { channelLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
+import { channelLabel, coverLabel, formatElapsed, formatTime, statusLabel } from '../../lib/format'
 import { useIncident } from '../../lib/incidentsStore'
 import { useAuth } from '../../lib/authContext'
 import { responderLabel } from '../../lib/auth'
@@ -72,6 +72,7 @@ export default function IncidentDetailPage() {
             {incident.isDemo && <span className="demo-badge" title="Demo / test call (demoIncidents), not a real incident">DEMO</span>}
             <Chip tone={incident.response.status === 'new' ? 'new' : 'neutral'}>{statusLabel(incident.response.status)}</Chip>
             {incident.incidentType === 'sos' && <span className="sos-badge">SOS{incident.scenario ? ` · ${incident.scenario}` : ''}</span>}
+            {coverLabel(incident.cover) && <span className="cover-badge">{coverLabel(incident.cover)}</span>}
           </div>
           <span className="sub">
             {channelLabel(incident.channel)} · started {formatTime(incident.sessionStartedAt)}

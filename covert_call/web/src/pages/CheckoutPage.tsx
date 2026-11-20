@@ -9,7 +9,7 @@ import { ClockIcon, HomeIcon, WalletIcon } from '../components/disguise/icons'
 import { computeBill, formatRupees, useCart } from '../state/cart'
 import { db } from '../lib/firebase'
 import { decodeOrder } from '../../../shared/codes'
-import { startIncident, updateLiveFields } from '../../../shared/incidents/client.ts'
+import { setCover, startIncident, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Severity } from '../../../shared/incidents/types.ts'
 
 type Payment = 'cod' | 'upi'
@@ -53,6 +53,8 @@ export function CheckoutPage() {
         const decoded = decodeOrder(codedLines, deliveryUrgency)
         const { id } = await startIncident(db, { channel: 'click-order' })
         incidentId = id
+        // Which service's catalog the coded items came from, for the dashboard (best-effort).
+        void setCover(db, id, service.id).catch(() => {})
         await updateLiveFields(db, id, {
           dangerIndicators: decoded.dangerIndicators,
           peopleCount: decoded.peopleCount,

@@ -38,7 +38,7 @@ export default function MessageCaller({ incidentId, live }: { incidentId: string
 
   return (
     <div className="message-caller">
-      <p className="message-head muted">Mia passes it on as delivery chat, so the disguise holds.</p>
+      <p className="message-head muted">Mia passes it on as ordinary order chat, so the disguise holds.</p>
       {live && (
         <>
           <div className="message-quick">

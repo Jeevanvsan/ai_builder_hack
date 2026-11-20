@@ -682,6 +682,21 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
   background: #b3261e;
 }
 
+/* QuickOne (Epic 33): the service a call or coded order used, when it isn't food. */
+.cover-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #7a3b12;
+  background: #fdeee3;
+  border: 1px solid #f2c9a8;
+}
+
 /* Back/Front camera toggle on the live video (Epic 11 / 14.2). */
 .video-cam-toggle { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 2; display: flex; gap: 0.4rem; }
 .video-cam-toggle .btn { background: rgba(17, 20, 24, 0.75); color: #fff; border: 1px solid rgba(255,255,255,0.25); }

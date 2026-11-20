@@ -292,6 +292,12 @@ export function setCameraMode(db: Firestore, id: string, mode: 'dual' | 'alterna
   return updateDoc(ref(db, id), { cameraMode: mode })
 }
 
+// QuickOne (Epic 33): the service a call or coded order is on, so the dashboard reads its code words. Set at the
+// start and again on a mid-call switch. Best-effort for callers: it never blocks or breaks the call.
+export function setCover(db: Firestore, id: string, cover: NonNullable<Incident['cover']>): Promise<void> {
+  return updateDoc(ref(db, id), { cover })
+}
+
 // A scene observation whose wording signals immediate danger is also promoted to a danger indicator so it lifts
 // severity through the normal path — a gunshot the AI hears must escalate the incident, not just get logged.
 const DANGEROUS_OBSERVATION = /weapon|gun|firearm|knife|gunshot|shot|scream|explosion|blast|fire|smoke|stab|blood|fight|attack|assault|chok|strangl/i

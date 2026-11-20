@@ -1,27 +1,42 @@
-import { useEffect, useRef, useState } from 'react'
-import { ALL_CODES } from '../../../../shared/codes'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { CODE_BY_ID } from '../../../../shared/codes'
+import { coverPack, coverPhrases } from '../../../../shared/covers/index.ts'
 import type { Incident } from '../../../../shared/incidents/types'
 
 type Line = NonNullable<Incident['transcriptLines']>[number]
-type Code = (typeof ALL_CODES)[number]
+type Code = (typeof CODE_BY_ID)[string]
 type Segment = { plain: string; code?: Code }
+type Phrase = { re: RegExp; code: Code }
 
-// Coded phrases (shared/codes.ts — the same table the persona and the coded menu use) are shown with their real
-// meaning inline, so the disguise decodes itself on screen as the caller speaks.
-function annotate(text: string): Segment[] {
-  const lower = text.toLowerCase()
-  const hit = ALL_CODES.find((c) => lower.includes(c.food))
-  if (!hit) return text ? [{ plain: text }] : []
-  const idx = lower.indexOf(hit.food)
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// The call's own code phrases (QuickOne, Epic 33: the food, grocery, pharmacy, home or "other" words, picked by
+// incident.cover; food when missing), each mapped to its real meaning. Whole words only, so a short phrase
+// ("basic") never matches inside another word ("basically").
+function phrasesFor(cover: Incident['cover']): Phrase[] {
+  return coverPhrases(coverPack(cover)).map((p) => ({ re: new RegExp(`\\b${escape(p.phrase)}\\b`, 'i'), code: CODE_BY_ID[p.id] }))
+}
+
+// Coded phrases are shown with their real meaning inline, so the disguise decodes itself on screen as the caller
+// speaks. The earliest match is taken first, so every option in Mia's "A, B or C?" question gets its meaning.
+function annotate(text: string, phrases: Phrase[]): Segment[] {
+  let best: { index: number; length: number; code: Code } | null = null
+  for (const p of phrases) {
+    const m = p.re.exec(text)
+    if (m && (!best || m.index < best.index || (m.index === best.index && m[0].length > best.length))) {
+      best = { index: m.index, length: m[0].length, code: p.code }
+    }
+  }
+  if (!best) return text ? [{ plain: text }] : []
   const parts: Segment[] = []
-  if (idx > 0) parts.push({ plain: text.slice(0, idx) })
-  parts.push({ plain: text.slice(idx, idx + hit.food.length), code: hit })
-  const after = text.slice(idx + hit.food.length)
-  if (after) parts.push(...annotate(after))
+  if (best.index > 0) parts.push({ plain: text.slice(0, best.index) })
+  parts.push({ plain: text.slice(best.index, best.index + best.length), code: best.code })
+  const after = text.slice(best.index + best.length)
+  if (after) parts.push(...annotate(after, phrases))
   return parts
 }
 
-function Bubble({ line, isNew }: { line: Line; isNew: boolean }) {
+function Bubble({ line, isNew, phrases }: { line: Line; isNew: boolean; phrases: Phrase[] }) {
   const [shown, setShown] = useState(isNew ? 0 : line.text.length)
 
   useEffect(() => {
@@ -38,7 +53,7 @@ function Bubble({ line, isNew }: { line: Line; isNew: boolean }) {
     <li className={`bubble ${mia ? 'bubble-mia' : 'bubble-caller'}`}>
       <span className="bubble-who">{mia ? 'Mia (AI)' : 'Caller'}</span>
       <span className="bubble-text">
-        {annotate(line.text.slice(0, visible)).map((p, i) =>
+        {annotate(line.text.slice(0, visible), phrases).map((p, i) =>
           p.code ? (
             <span key={i} className="bubble-coded" title={`Really means: ${p.code.meaning}`}>
               <s>{p.plain}</s>
@@ -53,9 +68,10 @@ function Bubble({ line, isNew }: { line: Line; isNew: boolean }) {
   )
 }
 
-export default function Conversation({ lines, emptyText }: { lines: Line[]; emptyText: string }) {
+export default function Conversation({ lines, emptyText, cover }: { lines: Line[]; emptyText: string; cover?: Incident['cover'] }) {
   const listRef = useRef<HTMLUListElement>(null)
   const newestAt = lines.at(-1)?.at
+  const phrases = useMemo(() => phrasesFor(cover), [cover])
 
   // The panel body is the scroller; keep the newest message in view as the call goes on.
   useEffect(() => {
@@ -74,7 +90,7 @@ export default function Conversation({ lines, emptyText }: { lines: Line[]; empt
   }, [])
   return (
     <ul className="bubbles" ref={listRef}>
-      {merged.map((line, i) => <Bubble key={`${i}`} line={line} isNew={line.at === newestAt} />)}
+      {merged.map((line, i) => <Bubble key={`${i}`} line={line} isNew={line.at === newestAt} phrases={phrases} />)}
     </ul>
   )
 }

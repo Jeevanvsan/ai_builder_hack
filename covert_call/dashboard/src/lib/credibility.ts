@@ -79,9 +79,10 @@ function evidence(i: Incident, h: CallerHistory | null): string {
   ].join('\n')
 }
 
-const PROMPT = `You review emergency calls for a responder team. The caller app is disguised as a food-delivery app:
-in a covert call the caller orders food and coded food words mean danger, so short answers, food talk, whispering
-and a quiet or abrupt end are NORMAL and must not count against the call. A forced "cancel" or a second voice
+const PROMPT = `You review emergency calls for a responder team. The caller app is disguised as an everyday ordering
+app (food, groceries, medicines, home repairs or other bookings): in a covert call the caller places an ordinary
+order and its coded words mean danger, so short answers, order talk, whispering and a quiet or abrupt end are
+NORMAL and must not count against the call. A forced "cancel" or a second voice
 taking over is a sign of coercion, which means MORE danger, never a prank.
 Estimate how likely this call is GENUINE (0 = almost certainly false or a prank, 100 = clearly genuine), from:
 story consistency, the stated address vs GPS (a big gap can also just mean the caller is moving or reporting for

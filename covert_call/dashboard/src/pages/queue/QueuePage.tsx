@@ -9,7 +9,7 @@ import { SORTS, sortIncidents } from '../../lib/sortIncidents'
 import { useIncidents } from '../../lib/incidentsStore'
 import { isUnviewed, rankOpenIncidents } from '../../lib/ranking'
 import { usePagination } from '../../lib/usePagination'
-import { channelLabel, formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
+import { channelLabel, coverLabel, formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
 import { useNow } from '../../lib/useNow'
 
 // Epic: live queue as a card feed, not a table — severity/live/new state read visually (color, size, position)
@@ -104,6 +104,7 @@ export default function QueuePage() {
                       {channelLabel(i.channel)}
                       {i.isDemo && <span className="demo-badge">DEMO</span>}
                       {i.incidentType === 'sos' && <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>}
+                      {coverLabel(i.cover) && <span className="cover-badge">{coverLabel(i.cover)}</span>}
                     </span>
                     {search.reasons.get(i.id) && <span className="search-reason">AI: {search.reasons.get(i.id)}</span>}
                   </div>

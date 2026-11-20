@@ -88,7 +88,7 @@ service cloud.firestore {
     function validIncident(d) {
       return d.keys().hasAll(['sessionStartedAt', 'channel', 'callState', 'location', 'extractedFieldsLive', 'severity', 'response'])
         && d.keys().hasOnly([
-          'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cameraMode', 'callState',
+          'sessionStartedAt', 'sessionEndedAt', 'channel', 'incidentType', 'scenario', 'cover', 'cameraMode', 'callState',
           'location', 'extractedFieldsLive', 'consolidatedSummary', 'fieldConfidence', 'fieldConfidenceLive',
           'transcriptSummary', 'transcriptLines', 'fieldHistory', 'reasoningTrace', 'recommendation', 'bulletin', 'groundedContext',
           'correlatedIncidentIds', 'safeRoute', 'consolidationFailed', 'recordingFailed',
@@ -100,6 +100,9 @@ service cloud.firestore {
         && d.channel in ['live-call', 'silent-tap', 'click-order', 'silent-sos']
         && (!('incidentType' in d) || d.incidentType in ['report', 'sos'])
         && (!('scenario' in d) || (d.scenario is string && d.scenario.size() <= 40))
+        // QuickOne (Epic 33): the service whose code words the call used. Not locked in validChange: it follows a
+        // mid-call switch.
+        && (!('cover' in d) || d.cover in ['food', 'grocery', 'pharmacy', 'home', 'other'])
         && (!('cameraMode' in d) || d.cameraMode in ['dual', 'alternating', 'back-only'])
         && d.callState in ['active', 'ended']
         && d.severity in ['low', 'medium', 'high']

@@ -24,6 +24,9 @@ export interface Incident {
   incidentType?: 'report' | 'sos'
   // Free-form scenario tag for an SOS, e.g. 'hostage' (Epic 11).
   scenario?: string
+  // QuickOne (Epic 33): the service whose words a call or coded order used (shared/covers/). It follows a mid-call
+  // switch. Missing means food: incidents from before QuickOne, and the native app, which is food only.
+  cover?: 'food' | 'grocery' | 'pharmacy' | 'home' | 'other'
   // Which cameras the SOS captured: both at once, alternating, or back only (Epic 11.2).
   cameraMode?: 'dual' | 'alternating' | 'back-only'
   callState: CallState

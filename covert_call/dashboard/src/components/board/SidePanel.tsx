@@ -67,6 +67,7 @@ export default function SidePanel({ incident, live, now }: { incident: Incident;
         ) : tab === 'conversation' ? (
           <Conversation
             lines={incident.transcriptLines ?? []}
+            cover={incident.cover}
             emptyText={incident.channel === 'live-call'
               ? (live ? 'Waiting for the caller to speak…' : 'No transcript was captured for this call.')
               : incident.channel === 'silent-sos'
