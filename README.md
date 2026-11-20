@@ -5,15 +5,15 @@
 QuickBite helps people who are in danger but can't be seen asking for help: someone being watched, followed, threatened or held. It looks and works like an ordinary food-delivery app, but every way of ordering is a hidden way to reach a response team. Anyone glancing at the screen, or listening nearby, sees and hears someone ordering dinner.
 
 - **Try QuickBite (web app, nothing to install):** https://quickbite-5cde0.web.app
-- **Responder dashboard:** https://quickbite-5cde0-dashboard.web.app (judge login: `judge@quickbite.com` / `judge@Quickbite123`)
+- **Responder dashboard:** https://quickbite-5cde0-dashboard.web.app
 - **Website and demo videos:** https://quickbite-5cde0-landing.web.app/#demo
 - **User manual:** https://quickbite-5cde0-landing.web.app/manual
-- **Guided tour for judges (what to say to Mia, where to look on the dashboard, screenshots):** https://quickbite-5cde0-landing.web.app/manual/tour
+- **Guided tour (what to say to Mia, where to look on the dashboard, screenshots):** https://quickbite-5cde0-landing.web.app/manual/tour
 - **Privacy Policy:** https://quickbite-5cde0-landing.web.app/privacy
 
 ### Try it in two minutes
 
-1. Open the responder dashboard on a laptop and sign in with the judge login above.
+1. Open the responder dashboard on a laptop and sign in with the responder credential.
 2. Open the web app on a phone or in another tab. **Allow the microphone** (both the browser's prompt and the browser's mic permission in your phone settings); without it the call can't start.
 3. Tap **Call to order**. Mia asks if you can talk: say "order" (someone is listening) or "talk".
 4. Answer her food questions. Each code's meaning is spoken with it, e.g. "garlic bread" means someone is following you.

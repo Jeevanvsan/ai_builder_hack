@@ -874,3 +874,86 @@ The public repo goes to judges, so every tracked doc, deck and spreadsheet file 
 
 ### 2026-10-17 ~12:35 IST: README cost per call now $0.20
 The deck was corrected to $0.20 per call, the 59-call average from the cost sheet; Ameen confirmed that's the right figure. The root `README.md` "Tested on real calls" section now says "Across 59 real calls, AI cost averaged about $0.20 per call" instead of $0.35. The 8-call test results in the same sentence are unchanged.
+
+### 2026-10-17 ~14:00 IST: submission form "Brief Description" text (done from Ameen's side)
+The form's "Brief Description of Your Solution (please include how you are leveraging Google services)" field allows 1024 characters. This text is 1018 characters, ASCII only, in one paragraph. Revised at Ameen's request: the language list was removed, and the Google services now follow a "BUILT ON GOOGLE:" label, each in [brackets] so a reader spots them. Each way in is followed by its situation in brackets, framed by how much the caller can talk or use the screen: (speak openly or discreetly), (can use the screen), (brief screen time), (held hostage). Paste it as it is, because a single-line field drops line breaks:
+
+> QuickBite looks like a food-delivery app but is a covert two-way emergency line for people who are watched, threatened or held and can't safely call for help. Each way to order reaches responders: a voice call (speak openly or discreetly), a coded cart (can use the screen), silent delivery instructions (brief screen time) or a heart double-tap SOS (held hostage) that fakes a switched-off phone. BUILT ON GOOGLE: [Gemini Live API] runs Mia, a restaurant persona who hears the caller, sees the camera and says each food code's meaning in the same breath ("garlic bread means you're followed"), turning answers into danger, location and stress data via 12 function-calling tools and guiding chased callers to the nearest police station. [Gemini Flash-Lite] writes the case summary and dispatch bulletin, reads photos and links cases. [Cloud Firestore] streams every fact to responders in seconds. [Firebase Hosting + Auth] serve and secure the apps. [Google Apps Script + Drive] store evidence and email case reports.
+
+- Every claim was checked against the deployed system: root `README.md`, `covert_call/docs/architecture/`, `shared/aiModels.ts`, `web/src/lib/gemini/tools.ts` (12 tools), `shared/codes.ts` and deck slides 1–8.
+- Left out on purpose because none of them are live: Cloud Run / ADK (roadmap), Google Maps, Firebase AI Logic + App Check (behind `VITE_USE_AI_LOGIC`), and Gemma (eval judge only).
+- **Note for Jeevan:** deck slide 8 lists "Maps JS" under Google services, but the live console draws its maps with Leaflet + OpenStreetMap because no Maps key is set. Worth fixing before judges compare the deck with the app. The deck wasn't touched.
+- Not committed.
+
+### 2026-11-12 ~18:00 IST: finale presentation notes (done from Ameen's side)
+- Shortlisted for the Grand Finale (Singapore, 4 Dec 2026). Wrote a set of local presentation and rehearsal notes in `finale_prep/` (storyline and scripts, system walkthrough, Gemini notes, question bank, facts sheet, demo runbook, pre-finale to-do list). The folder is in `.gitignore`, so it is not in the repo.
+- No code, deck or deployed site was changed.
+- **Note for Jeevan:** Ameen will send you the folder directly. Please start with `00_README.md`; it lists three items that need your decision this week (they are on your side: project settings, the deck and the production deploy).
+
+### 2026-11-17 ~19:25 IST (revised ~20:12): mentor session prep (done from Ameen's side)
+- The mentor session with a Google expert is on **Wed 18 Nov, 3:00 pm IST**, on Google Meet, for 10 to 15 minutes, about the prototype only. Wrote `finale_prep/08_mentor_session.md` (gitignored, shared directly). At Ameen's request it is a walkthrough, not a list of technical questions:
+  - the pitch, which now names the four ways to reach responders;
+  - the user manual: the four ways in, the guided tour, the code table;
+  - a finished case on the console (`INC-MUZNKM7N`), with 20 seconds of its call recording so the mentor hears Mia teach the code;
+  - the rest of the console: live queue, Ask AI, case history, analytics, responder performance. In a 15-minute slot, also the recorded chase;
+  - then open feedback: does the idea hold up, and what would the mentor improve.
+
+  A live call happens only if the mentor asks for one. The file also covers the audio setup for joining from two places, fallbacks, short answers to likely questions, a notes table and a debrief list. `finale_prep/00_README.md` now points to it.
+- Pitch wording changed at Ameen's request: "But you can order dinner." now reads "The only thing you can do is call for help covertly, without alerting anyone." `01` Script 1 still has the old version.
+- Fixed a typo in `.gitignore`: it ignored `final_prep.zip`, so `finale_prep.zip`, the shared copy of the prep notes including the gaps list, was not ignored and could have been committed to the public repo.
+- No code, deck, rules or deployed site were changed. Keys, rules and deploys stay untouched until after the session on purpose, so nothing breaks the demo. The key fix (`07`, item 1) starts right after.
+- **Note for Jeevan:**
+  - You lead the session as team lead: the opening, the pitch, the finished case, the console tour, the feedback questions, the clock and the close. You present throughout, with tab audio on so the recording reaches the mentor.
+  - Tonight, please:
+    - forward the Meet invite to Ameen (the email only went to you);
+    - open the two finished cases, check they load in full, and note where Mia offers the codes in the recording;
+    - check the Gemini usage page for spend we don't recognise.
+  - Dry run on a private Meet tomorrow at 1:30 pm.
+- Not committed.
+
+### 2026-11-17 ~21:40 IST: answer on hallucination for the mentor session (done from Ameen's side)
+- Added "If they ask about hallucination" to `finale_prep/08_mentor_session.md`. It has a 25-second answer (Ameen), one example (the police station Mia invented when no route existed, now blocked in code) and five follow-ups with owners:
+  - the summary and bulletin;
+  - the "AI recommends" label;
+  - the camera seeing things;
+  - Ask AI;
+  - "how often".
+
+  Also a stage note on the finished case and three "Don't say" rows.
+- Checked against the code first. Two claims in the prep pack were wrong, now corrected in `04` Q18 and `03` §12:
+  - Camera sightings show on the console as "Seen" with **no** confidence number.
+  - A dangerous sighting **does** add a danger tag and can raise severity (`reportSceneObservation()` in `shared/incidents/client.ts`).
+- New `07` item 3b. The console labels the rules' recommendation **"AI recommends"** (`IncidentDetailPage.tsx`, `CriticalAlerts.tsx`). That contradicts "AI proposes, code decides", and the live bundle shows the same label. Also on the case page:
+  - The bulletin's ACTION line is written by Gemini (`consolidate.ts`).
+  - The confirmed/inferred/uncertain rating the summary step writes (`fieldConfidence`) is never shown.
+
+  The fix is a label rename, about five minutes, after the session.
+- No code, deck, rules or deployed site were changed. Not committed.
+- **Note for Jeevan:** the "AI recommends" label is on the finished case you present tomorrow. Keep saying the recommended action comes from rules in our code. If the mentor points at the label, say it's wrong and we'll rename it. Don't fix it before the session.
+
+### 2026-11-17 ~22:50 IST: word-for-word mentor session script (done from Ameen's side)
+- New `finale_prep/09_mentor_script.md`. It holds only the script, in the order Ameen set, with each line and where to click or point:
+  1. Jeevan: the landing page, and the pitch on "Four ways in".
+  2. Ameen: the user manual, "Free to talk" to "Heart double-tap SOS". You click.
+  3. Jeevan: the console, Case history, then case `INC-MUZNKM7N` card by card.
+  4. Analytics.
+  5. Responder management and performance.
+  6. The close, with two feedback questions.
+- It reads in 10 to 11 minutes with clicks. The steps marked ✂ come out if the mentor says we only have 10 minutes. Every on-screen label in it was checked against the code.
+- `08` now points to `09`. It has a new run sheet and owner table, and updated tonight items, pre-flight and fallbacks. The pre-flight now says to present a window with two tabs, the landing page at 100% zoom.
+- The Q&A, the hallucination answers and the "Don't say" table are unchanged. `00_README.md` lists `09`.
+- No code, deck, rules or deploys were changed. Not committed.
+- **Note for Jeevan:** you present your browser window the whole time, and you click during Ameen's part.
+  - In Case history, type `MUZNKM7N` and don't press Enter; Enter starts an AI search.
+  - Don't click "Route here" on the case. It saves a new route into the record.
+  - Refresh AI Insights tonight, not during the session. Don't say it refreshes daily: the panel claims it, but that's switched off.
+  - On Responder performance, Responder A, B and C are the seeded sample data. Your 190-case bubble covers the "Speed vs. volume" chart; the script explains it.
+  - Tonight's list in `08` has the rest.
+
+### 2026-11-18 ~12:55 IST: case report emails never reached Yopmail; fixed and deployed (done from Ameen's side)
+- Resent the case report for `INC-MUZNKM7N` to `priy1661@yopmail.com`. report.quickbite@gmail.com sent it (it's in Sent), but it never reached the Yopmail inbox.
+- Ran a 4-email test from the Apps Script, same account and code. "hi", the report as plain text, and the report HTML with images all arrived. The same HTML email with the PDF attached didn't. Yopmail silently drops an email with the PDF attached.
+- So the case reports sent to Yopmail addresses so far (11 since Oct 8) most likely never arrived, including any sent to the manual's shared inbox `qbtour@yopmail.com`. The only confirmed arrival is a Gmail address (Oct 6).
+- Fix in `covert_call/docs/setup/trusted-alert-Code.gs`: Yopmail addresses get the email without the PDF, which holds everything the PDF does. Other addresses still get the PDF. Checked with a dry run on this incident's data (stubbed services, nothing sent).
+- ~12:58 IST: the new version was deployed to the existing deployment (same URL) and the `INC-MUZNKM7N` report was resent; the script returned `sent`. If the temporary `Test` file is still in the Apps Script project, delete it. Not committed.
+- **Note for Jeevan:** the manual still says "The PDF case report goes to the shared inbox qbtour@yopmail.com" (`covert_call/landing/src/components/ManualGuides.tsx:205`). Judges using that inbox now get the email without the PDF.

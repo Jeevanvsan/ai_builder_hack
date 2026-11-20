@@ -2,6 +2,7 @@
 // 1. Trusted-contact alert: emails the caller's trusted contacts when their call turns high severity.
 // 2. Case report: when a danger call ends, emails the caller the full case report (HTML + PDF attachment, with the
 //    scene sketch and camera snaps) at the address saved on the incident, and records sent/failed on the incident.
+//    Yopmail addresses get the email without the PDF: Yopmail silently drops emails with one attached.
 const PROJECT = 'quickbite-5cde0'
 const DOCS = 'https://firestore.googleapis.com/v1/projects/' + PROJECT + '/databases/(default)/documents/'
 const MAX_RECIPIENTS = 3
@@ -99,17 +100,20 @@ function caseReport(id) {
       f = readIncident(id) || f
     }
     const snaps = readSnaps(id)
-    const r = buildReport(id, f, snaps)
-    const pdf = Utilities.newBlob(r.pdfHtml, 'text/html', 'case.html').getAs('application/pdf').setName('QuickBite-case-report-' + id + '.pdf')
-    MailApp.sendEmail({
+    // Yopmail (the judges' shared inbox) silently drops an email that has a PDF attached; the same email without it
+    // arrives (tested 2026-11-18). Everything in the PDF is also in the email itself.
+    const withPdf = !/@yopmail\./i.test(to)
+    const r = buildReport(id, f, snaps, withPdf)
+    const mail = {
       to: to,
       subject: 'Your QuickBite case report: ' + id,
       body: r.text,
       htmlBody: r.html,
       inlineImages: r.images,
-      attachments: [pdf],
       name: 'QuickBite Safety',
-    })
+    }
+    if (withPdf) mail.attachments = [Utilities.newBlob(r.pdfHtml, 'text/html', 'case.html').getAs('application/pdf').setName('QuickBite-case-report-' + id + '.pdf')]
+    MailApp.sendEmail(mail)
     props.setProperty('report:' + id, new Date().toISOString())
     setStatus(id, 'sent', to)
     return out({ ok: true, sent: 1 })
@@ -122,7 +126,7 @@ function caseReport(id) {
 
 // Everything recorded on the incident: HTML for the email (images inline by cid), HTML for the PDF (images as
 // data URIs) and a plain-text copy.
-function buildReport(id, f, snaps) {
+function buildReport(id, f, snaps, withPdf) {
   const IST = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : '')
   const time = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) : '')
   const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -249,7 +253,8 @@ function buildReport(id, f, snaps) {
   const html = page(picHtml(true))
   const pdfHtml = '<html><body>' + page(picHtml(false)) + '</body></html>'
   const text = ['QuickBite Safety: case report', ''].concat(sections.map(([t, ls]) => t.toUpperCase() + '\n' + ls.map((l) => (typeof l === 'string' ? l : l.text)).join('\n')))
-    .concat(convo.length ? ['FULL CONVERSATION\n' + convo.map((l) => l.text).join('\n')] : []).concat(['', footer, '', 'The full report with the scene sketch and camera snaps is attached as a PDF.']).join('\n\n')
+    .concat(convo.length ? ['FULL CONVERSATION\n' + convo.map((l) => l.text).join('\n')] : []).concat(['', footer])
+    .concat(withPdf ? ['', 'The full report with the scene sketch and camera snaps is attached as a PDF.'] : []).join('\n\n')
   return { text: text, html: html, pdfHtml: pdfHtml, images: images }
 }
 

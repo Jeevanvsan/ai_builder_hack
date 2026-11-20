@@ -38,6 +38,9 @@ skills-lock.json
 
 # Landing demo videos are large; they are deployed from local disk, not stored in git
 covert_call/landing/public/videos/*.mp4
+
+# Local presentation notes, shared between team members directly
+finale_prep/
 *.tsbuildinfo
 
 # Remotion pitch video: keep source, ignore rendered output (large MP4s)
@@ -48,3 +51,5 @@ covert_call/dashboard/exports/
 
 # Android build: large binary, deployed to the landing site from local disk, not stored in git
 covert_call/landing/public/download/*.apk
+
+finale_prep.zip
