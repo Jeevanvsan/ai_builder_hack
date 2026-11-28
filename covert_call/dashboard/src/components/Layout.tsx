@@ -24,8 +24,7 @@ export default function Layout() {
       <div className="header-group">
         <header className="topbar">
           <div className="brand">
-            <span className="brand-mark">QB</span>
-            <span className="brand-name">QuickBite</span>
+            <img className="brand-logo" src="/brand/quickone-logo.svg" alt="QuickOne" />
             <span className="brand-sub">Monitoring Dashboard</span>
           </div>
           <div className="topbar-right">

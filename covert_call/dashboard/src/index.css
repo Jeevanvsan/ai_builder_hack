@@ -88,6 +88,7 @@ h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color
 }
 .brand-name { font-weight: 700; font-size: 1.1rem; letter-spacing: 0.01em; }
 .brand-sub { color: var(--muted); }
+.brand-logo { height: 30px; width: auto; display: block; }
 
 .hotkey-hint { font-size: 0.8rem; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 0.3rem; }
 .hotkey-hint kbd {
