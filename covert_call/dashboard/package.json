@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "deploy": "npm run build && npx firebase-tools deploy --only hosting:dashboard",
+    "deploy:staging": "tsc -b && vite build --mode staging && npx firebase-tools deploy --only hosting --config firebase.staging.json",
     "seed": "node --no-warnings scripts/seed.ts",
     "simulate-call": "node --no-warnings scripts/simulate-call.ts",
     "resolve-all": "node --no-warnings scripts/resolve-all.ts",

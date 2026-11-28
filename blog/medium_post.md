@@ -76,7 +76,7 @@ Disguise isn't new. In 2020, a Polish teenager's fake cosmetics shop, [Rumianki 
 - **Gemini 3.5 Flash-Lite:** one structured request after each call for the summary, the dispatch bulletin, field confidence and redactions.
 - **Gemini 3.1 Flash-Lite:** case linking, reading photos, a backup check on camera frames, and the console's "Ask AI" search.
 - **Cloud Firestore and security rules:** the database and the real-time channel, one document per incident. The rules validate every write.
-- **Firebase Authentication and Hosting:** responder sign-in and roles, and four hosted sites.
+- **Firebase Authentication and Hosting:** responder sign-in and roles, and five hosted sites.
 - **Google Maps Platform:** Places for addresses, landmarks and the nearest police, hospital and fire stations; Routes for walking, two-wheeler or car routes; the Maps JavaScript API with a custom Map ID, satellite, 3D and Street View.
 - **Apps Script, Drive, Gmail and Google's STUN servers:** recordings, emailed case reports and peer-to-peer live video.
 - **Gemma:** the judge in our offline test harness.
@@ -241,7 +241,7 @@ The theme asked for AI that strengthens resilience and community support. For us
 
 Team NexMind is one of the 50 teams shortlisted for the AI Builder Cup 2026 Grand Finale, and we'll demo QuickOne live in Singapore on 4 December. Thank you to Google Cloud and Hack2skill for the challenge, to Experion Technologies, and to our Google mentor for the feedback that sharpened it.
 
-- The app: [quickbite-5cde0.web.app](https://quickbite-5cde0.web.app)
+- The app: [quickbite-5cde0-staging.web.app](https://quickbite-5cde0-staging.web.app)
 - The demo videos: [quickbite-5cde0-landing.web.app](https://quickbite-5cde0-landing.web.app/#demo)
 
 ## Meet Team NexMind
