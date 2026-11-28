@@ -1185,3 +1185,25 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
   - You're the requested reviewer; the dashboard changes are in your area.
   - After merging, production is deployed from `main` (planned 29 Nov), with the Maps build variables listed in the PR.
   - The landing page, its manual and the deck still say QuickBite.
+
+### 2026-11-28 ~14:32 IST: four sites, two main and two staging; staging now has all the updates (done from Ameen's side)
+- **Ameen's decision:**
+  - The main caller app and main dashboard stay on their current builds, as the fallback. **Main is not updated on 29 Nov.**
+  - The staging caller app and the staging dashboard carry all the latest updates: QuickOne and Google Maps, the code in PR #25.
+- **Checked before deploying:**
+  - The staging caller site's live channel was still the 9 Oct build.
+  - There was no staging dashboard site, only the `maps` preview channel, which expires 21 Dec.
+  - Both `maps` previews matched PR #25's code exactly.
+- **Deployed** from `integration/quickone-maps` (397f210; no app code has changed since c5fb079):
+  - **Staging caller**, https://quickbite-5cde0-staging.web.app, with `npm run deploy:staging`, released 14:29 IST. Checked: title "QuickOne", the four service tabs, no console errors.
+  - **Staging dashboard** on a new Hosting site, `quickbite-5cde0-dashboard-staging`: https://quickbite-5cde0-dashboard-staging.web.app, released 14:30 IST. Checked: the same bundle as the verified preview; sign-in works; the live queue shows the shared incidents.
+  - New `covert_call/dashboard/firebase.staging.json`. It is hosting only, with no `firestore` section, so a staging deploy can't touch the rules. Deploy with `npm run deploy:staging` from `covert_call/dashboard`.
+- **Main untouched:** the main caller is still the 16 Oct build, and the main dashboard the 7 Oct build.
+- **Shared Firestore:** calls made on staging show up on both dashboards. Main shows them without cover badges or the Google map.
+- **Open, for Ameen:** add `https://quickbite-5cde0-dashboard-staging.web.app/*` to the website restrictions of the dashboard Maps key (project `quick-bite-510804`).
+  - That key still returns 403 from the new domain, so until then the staging dashboard's Google map shows Google's error box. Everything else works.
+  - The caller Maps key already accepts the staging caller domain.
+- **Blog:** "The app" now links the staging caller site, and `blog/README.md` no longer says to wait for 29 Nov.
+- **Note for Jeevan:**
+  - The staging dashboard is a new site in your area. Deploy it only with `npm run deploy:staging`; `npm run deploy` updates main.
+  - Main stays as the fallback through the finale.

@@ -13,9 +13,9 @@ Everything the AI Builder Cup "Top 50 stories" email asks for: the Medium post, 
 
 ## Before publishing
 
-1. **Wait for the 29 Nov production deploy.** The post links the live app, which should show "QuickOne" by then, not "QuickBite". Open https://quickbite-5cde0.web.app and check the name.
+1. **The post links the staging app**, https://quickbite-5cde0-staging.web.app, which runs QuickOne with Google Maps. Don't switch it to the main site (https://quickbite-5cde0.web.app): main deliberately stays on the older QuickBite build as the fallback.
 2. **Check the team line at the end of the post.** It says who built what; correct it if needed.
-3. **Optional:** the post links the live app without inviting anyone to call. Every call still rings the live console and spends Gemini quota. If that's a worry before the 4 Dec finale, link only the landing page.
+3. **Optional:** the post links the staging app without inviting anyone to call. Every call still rings both dashboards (main and staging share one database) and spends Gemini quota. If that's a worry before the 4 Dec finale, link only the landing page.
 
 ## Publish on Medium
 
