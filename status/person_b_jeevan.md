@@ -1214,5 +1214,5 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
 - The "Open the web app" links now go to the staging QuickOne app (`quickbite-5cde0-staging.web.app`), the same app the blog links.
 - Home copy refreshed from `blog/medium_post.md`: multi-service (food, groceries, medicines, home services), a "one meaning, many covers" strip, Google Maps routing, a Top 50 / Singapore badge. The marquee now lists Google Maps Platform, Flash-Lite and Gemma; Leaflet/OSM and Cloud Run are removed.
 - Placeholder brand art is in `public/brand/quickone-icon.svg` and `quickone-logo.svg`, used by the favicon, header, footer and mini phone screens. To use the final logo, replace the files and keep the names.
-- The manual's step-by-step scripts still use the food cover, which is valid for QuickOne. Not deployed yet.
+- The manual's step-by-step scripts still use the food cover, which is valid for QuickOne. Deployed to quickbite-5cde0-landing.web.app on 2026-11-28 (IST).
 - **Note for Ameen:** if staging is promoted to production, change `LINKS.web` in `landing/src/components/ui.tsx` back.
