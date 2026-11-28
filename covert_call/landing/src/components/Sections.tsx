@@ -545,7 +545,7 @@ export function Recognition() {
                 <a className="award-open" href={open.preview.site + open.preview.pages[page].path} target="_blank" rel="noreferrer">Open site ↗</a>
               </div>
               <Browser url={(open.preview.site + open.preview.pages[page].path).replace('https://', '')}>
-                <iframe className="award-frame" title={`${open.title}: ${open.preview.pages[page].label}`} src={open.preview.site + open.preview.pages[page].path} loading="lazy" />
+                <ScaledFrame title={`${open.title}: ${open.preview.pages[page].label}`} src={open.preview.site + open.preview.pages[page].path} />
               </Browser>
             </div>
           )}
@@ -558,5 +558,24 @@ export function Recognition() {
         )}
       </div>
     </section>
+  )
+}
+
+// Shows a site at desktop width, shrunk to fit its box, so a phone sees the whole page small instead of a
+// sideways-scrolling slice.
+function ScaledFrame({ src, title, width = 1280 }: { src: string; title: string; width?: number }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setScale(Math.min(1, el.clientWidth / width)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [width])
+  return (
+    <div className="award-frame" ref={box}>
+      <iframe title={title} src={src} loading="lazy" style={{ width, height: `${100 / scale}%`, transform: `scale(${scale})` }} />
+    </div>
   )
 }

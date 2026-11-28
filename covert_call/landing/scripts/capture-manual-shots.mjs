@@ -17,7 +17,8 @@ import { ALL_CODES } from '../../shared/codes.ts'
 
 // QB_WEB_URL points the phone steps at another build (e.g. a local preview of a fix that isn't deployed yet).
 const WEB = process.env.QB_WEB_URL || 'https://quickbite-5cde0.web.app'
-const DASH = 'https://quickbite-5cde0-dashboard.web.app'
+// QB_DASH_URL points the dashboard steps at another site (e.g. the staging dashboard).
+const DASH = process.env.QB_DASH_URL || 'https://quickbite-5cde0-dashboard.web.app'
 const OUT = fileURLToPath(new URL('../public/shots/manual/', import.meta.url))
 const SCRATCH = join(tmpdir(), 'quickbite-manual-shots')
 const RUN_FILE = join(SCRATCH, 'incidents.json')

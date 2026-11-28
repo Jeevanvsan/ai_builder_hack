@@ -859,3 +859,6 @@ button.award { font: inherit; cursor: pointer; }
   .award-open { flex: none; margin-left: 4px; }
   .award-frame { height: 65vh; }
 }
+
+.award-frame { position: relative; overflow: hidden; }
+.award-frame iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: #fff; }
