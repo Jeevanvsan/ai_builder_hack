@@ -1207,3 +1207,4 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
 - **Note for Jeevan:**
   - The staging dashboard is a new site in your area. Deploy it only with `npm run deploy:staging`; `npm run deploy` updates main.
   - Main stays as the fallback through the finale.
+- **PR:** you merged #25 (13:58 IST) before these two commits were pushed, so they're in **#26**: https://github.com/Jeevanvsan/ai_builder_hack/pull/26 (the staging dashboard config, the blog's staging link and this entry). You're the requested reviewer.
