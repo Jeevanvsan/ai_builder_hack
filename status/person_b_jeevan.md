@@ -1125,3 +1125,50 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
 - **Go/no-go on 28 Nov:** if both features go, merge this branch into `main`; if only one goes, merge that feature's own branch.
 - **Note for Ameen:** make the one rehearsal call on the combined preview above.
 
+### 2026-11-25 ~14:35 IST (revised ~15:00): intro video scripts for the Singapore finalists (done from Ameen's side)
+- **Revised:** each person's section is now a script to read straight down. There are three separate versions (Manglish, Malayalam script, English), one breath per line, with a "( pause )" cue. All three versions now use short sentences and simple, everyday words (for example "help team" for responders, and "Gemini AI takes the call"). The brief, the no-go lines and the shooting notes moved to the bottom.
+- The organisers asked each finalist team for a 20 to 30 second vertical video: "Hi, we are Team NexMind, and we are from India. We are coming to Singapore!", then "We're builders, and we're building…". They want it in our native language and unedited.
+- We're recording separately, so there are two scripts, one each. They're in `finale_prep/10_intro_video_script.md` (gitignored, shared directly), and `00_README.md` lists it.
+  - Every line is in Malayalam, with a romanised version and an English version.
+  - Both close in English on QuickOne's line: "It looks like an ordinary order. It's a call for help."
+  - **Ameen:** the caller's side. QuickOne looks like an app for ordering food, medicine or a taxi, but nothing is really ordered. It's a secret way to call for help, answered by Gemini AI.
+  - **Jeevan:** the responder's side. A secret help app that looks like a delivery app; Gemini AI tells the help team what is happening, and Google Maps shows the way to the nearest police station.
+- The scripts use QuickOne and Google Maps, which are still waiting on the 28 Nov go/no-go. The file has the replacement lines if either one doesn't ship.
+- No code, deck, rules or deployed site were changed. Not committed.
+- **Note for Jeevan:**
+  - Your script is the "Jeevan's video" section.
+  - Record on your own: phone upright at eye level, head and shoulders, plain background, the same framing as Ameen.
+  - Keep it between 20 and 30 seconds, and send your own Drive link through the form.
+
+### 2026-11-28 ~12:25 IST: Top 50 Medium blog and LinkedIn posts drafted (done from Ameen's side)
+- Hack2skill asked every Top 50 team for a technical blog on Medium, a LinkedIn share (tag Google Cloud and Hack2skill; #Top50Stories #Hack2skill #AIBuilderCup #GoogleCloud), and the URL plus a team photo through their Google Form.
+- **Written as QuickOne with Google Maps Platform live**, per Ameen's go decision on both today. Production still showed QuickBite at the time of writing, so the blog goes out after the 29 Nov deploy.
+- **New folder `blog/` (untracked, not committed):**
+  - `medium_post.md`: the post, about 3,100 words. It covers the problem, the solution, the stack and Google tools, the approach, the challenges, testing and impact. Every number comes from `finale_prep/05` and `03`, the 20–21 Nov entries here, or git. It follows the "don't claim" list.
+  - `medium_post.html`: the same post, for copying into Medium. `build_html.py` rebuilds it.
+  - `images/`: 7 images, each checked for personal data:
+    - 5 designed figures: the cover, four ways in, one meaning/many covers, the architecture, one answer end to end.
+    - 2 crops of the console, with the header removed and the test address blurred.
+    - Sources and `render.mjs` are in `images/src/`.
+  - `linkedin_post.md`: one post each (Ameen: the caller's side; Jeevan: the responder's side).
+  - `README.md`: the paste steps, the image captions and alt text, the Medium tags, and the submission checklist.
+- **Screenshots** were taken from the `maps` preview channels:
+  - The caller app was not used to call, SOS or order.
+  - Delivery instructions was captured with Firestore blocked.
+  - The dashboard: only the resolved demo cases `INC-MWP7R826` and `INC-MUZNKM7N` were opened. Map views and tabs were switched; nothing was clicked that writes.
+  - The live queue had 10 incidents before and after, so nothing was written.
+- Docs only. Nothing to port to native.
+- **Note for Jeevan:**
+  - Please check your role line at the end of the post, and your LinkedIn version in `blog/linkedin_post.md`.
+  - The form needs a clear group photo with both of us in it.
+  - The preview dashboard still labels the rules-based recommendation "AI recommends". The blog crops that header out and says the recommended action comes from rules.
+- **~13:49 IST, review edits to the blog (at Ameen's request):**
+  - **Removed:** the GitHub link, the "text harness doesn't catch voice failures" challenge (the challenges are now 1–4), and the Geocoding sentence.
+  - **Rewritten:** the Kaloor address check, the post-call paragraph, and the inference numbers. That passage now explains how 22 became 5–6: one reply-starting tool response per batch, notes riding on tool results, and the batching rule in the prompt.
+  - **Added:**
+    - the theme name;
+    - a "Meet Team NexMind" section with a slot for the team photo and "Personal guidance: Venkitesh R Mallan and Jiji O R";
+    - Experion Technologies named in the thank-you line;
+    - thanks and tags for Experion and both guides in the two LinkedIn posts;
+    - a ready "If someone asks" answer in `blog/README.md`.
+  - **Note for Jeevan:** your LinkedIn version now tags Experion Technologies, Venkitesh R Mallan and Jiji O R. Pick each from the @ dropdown.
