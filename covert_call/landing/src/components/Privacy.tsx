@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { LINKS } from './ui'
 
 const UPDATED = '29 September 2026'
 
