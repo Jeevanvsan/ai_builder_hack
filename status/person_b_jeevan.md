@@ -1172,3 +1172,16 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
     - thanks and tags for Experion and both guides in the two LinkedIn posts;
     - a ready "If someone asks" answer in `blog/README.md`.
   - **Note for Jeevan:** your LinkedIn version now tags Experion Technologies, Venkitesh R Mallan and Jiji O R. Pick each from the @ dropdown.
+
+### 2026-11-28 ~13:56 IST: PR #25 opened, QuickOne + Google Maps + the blog into main (done from Ameen's side)
+- https://github.com/Jeevanvsan/ai_builder_hack/pull/25: `integration/quickone-maps` into `main`, following the go/no-go plan.
+  - 18 commits: QuickOne (Epic 33), Google Maps Platform (Epic 34), `blog/` and the status entries.
+  - Mergeable with no conflicts: `main` hadn't moved since the branch was cut.
+- **Re-checked today:**
+  - web and dashboard build plus lint, native `tsc --noEmit`, and `eval/check-covers.ts`: all pass;
+  - the gitleaks scans on the PR: pass.
+- The landmark fix that also sits on `feature/google-maps` (256ade0) is identical in content to the one on this branch, so nothing is left behind on either feature branch.
+- **Note for Jeevan:**
+  - You're the requested reviewer; the dashboard changes are in your area.
+  - After merging, production is deployed from `main` (planned 29 Nov), with the Maps build variables listed in the PR.
+  - The landing page, its manual and the deck still say QuickBite.
