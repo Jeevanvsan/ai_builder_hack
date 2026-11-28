@@ -47,7 +47,7 @@ const MOCKS: Record<string, ReactNode> = {
       {['Report sent', 'Backed out'].map((t) => (
         <div key={t} style={{ textAlign: 'center' }}>
           <div style={{ transform: 'scale(.7)', transformOrigin: 'top center', height: 400 }}>
-            <Phone><div className="qb"><div className="qb-top"><span className="qb-brand"><img className="qb-brand-mark" src="/brand/quickone-icon.svg" alt="" />QuickOne</span><span>🛒</span></div><div className="qb-search">🔍 Search food, groceries, medicines…</div><div className="qb-banner"><b>50% OFF</b>on your first order</div></div></Phone>
+            <Phone><div className="qb"><div className="qb-top"><img className="qb-logo" src="/brand/quickone-logo.svg" alt="QuickOne" /><span>🛒</span></div><div className="qb-search">🔍 Search food, groceries, medicines…</div><div className="qb-banner"><b>50% OFF</b>on your first order</div></div></Phone>
           </div>
           <b>{t}</b>
         </div>

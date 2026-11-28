@@ -113,7 +113,7 @@ export function QuickOneScreen({ variant = 'home' }: { variant?: 'home' | 'item'
   }
   return (
     <div className="qb">
-      <div className="qb-top"><span className="qb-brand"><img className="qb-brand-mark" src="/brand/quickone-icon.svg" alt="" />QuickOne</span><span>🛒</span></div>
+      <div className="qb-top"><img className="qb-logo" src="/brand/quickone-logo.svg" alt="QuickOne" /><span>🛒</span></div>
       <div className="qb-search">🔍 Search food, groceries, medicines…</div>
       <div className="qb-banner"><b>50% OFF</b>on your first order</div>
       <div className="qb-cats">{['🍕', '🍔', '🍜', '🍰'].map((c) => <div key={c} className="qb-cat">{c}</div>)}</div>
