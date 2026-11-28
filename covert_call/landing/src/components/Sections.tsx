@@ -454,31 +454,49 @@ export function Footer() {
   )
 }
 
-// Recognition: a logo row. One entry per award, article or mention (newest first).
-// `logo` is an image in public/brand/recognition/ (monochrome works best); without it the name shows as a wordmark.
-type Recognition = { name: string; caption: string; logo?: string; href?: string }
-const RECOGNITION: Recognition[] = [
-  { name: 'AI Builder Cup 2026', caption: 'Top 50 shortlisted' },
+// Awards: one tile per award, article or mention (newest first). `badge` is an image in public/brand/recognition/
+// (shown in greyscale); `href` is optional. The arrows appear only when the tiles overflow the row.
+type Award = { year: string; badge: string; title: string; href?: string }
+const AWARDS: Award[] = [
+  { year: '2026', badge: '/brand/recognition/top50-cup.svg', title: 'AI Builder Cup 2026 · Top 50 shortlisted' },
 ]
 
 export function Recognition() {
+  const row = useRef<HTMLDivElement>(null)
+  const [overflow, setOverflow] = useState(false)
+  useEffect(() => {
+    const el = row.current
+    if (!el) return
+    const check = () => setOverflow(el.scrollWidth > el.clientWidth + 4)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  const scroll = (dir: number) => row.current?.scrollBy({ left: dir * 260, behavior: 'smooth' })
   return (
-    <section id="recognition" className="recog">
+    <section id="recognition" className="awards">
       <div className="container">
-        <p className="recog-head">Recognised by</p>
-        <div className="recog-row">
-          {RECOGNITION.map((r) => {
+        <h2 className="awards-head">Awards</h2>
+        <div className="awards-row" ref={row} style={{ justifyContent: overflow ? 'flex-start' : 'center' }}>
+          {AWARDS.map((a) => {
             const inner = (
               <>
-                {r.logo ? <img src={r.logo} alt={r.name} className="recog-logo" /> : <span className="recog-word">{r.name}</span>}
-                <span className="recog-cap">{r.caption}</span>
+                <span className="award-year">{a.year}</span>
+                <img src={a.badge} alt="" className="award-badge" />
+                <span className="award-title">{a.title}</span>
               </>
             )
-            return r.href
-              ? <a key={r.name} className="recog-item" href={r.href} target="_blank" rel="noreferrer">{inner}</a>
-              : <div key={r.name} className="recog-item">{inner}</div>
+            return a.href
+              ? <a key={a.title} className="award" href={a.href} target="_blank" rel="noreferrer">{inner}</a>
+              : <div key={a.title} className="award">{inner}</div>
           })}
         </div>
+        {overflow && (
+          <div className="awards-nav">
+            <button type="button" aria-label="Previous awards" onClick={() => scroll(-1)}>‹</button>
+            <button type="button" aria-label="Next awards" onClick={() => scroll(1)}>›</button>
+          </div>
+        )}
       </div>
     </section>
   )
