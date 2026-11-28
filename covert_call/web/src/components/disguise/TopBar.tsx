@@ -54,8 +54,7 @@ export function TopBar() {
           onPointerCancel={cancelPress}
           onContextMenu={(e) => e.preventDefault()}
         >
-          <span className="brand-dot" />
-          {APP_NAME}
+          <img className="brand-logo" src="/brand/quickone-logo.svg" alt={APP_NAME} draggable={false} />
         </div>
         <div className="topbar-actions">
           <button type="button" className="icon-btn" aria-label={`Call ${APP_NAME}`} onClick={callAnyService}>

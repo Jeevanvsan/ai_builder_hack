@@ -120,6 +120,13 @@ img {
   -webkit-touch-callout: none;
 }
 
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
+  pointer-events: none;
+}
+
 .brand-dot {
   width: 11px;
   height: 11px;
