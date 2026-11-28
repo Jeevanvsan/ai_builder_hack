@@ -807,7 +807,7 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
   background: #fff; border: 1px solid #e3e7ee; color: var(--text); transition: transform .25s; }
 .award:hover { transform: translateY(-4px); }
 .award-year { font-size: 12px; font-weight: 700; color: #4b5260; }
-.award-badge { width: 76px; height: 76px; object-fit: contain; filter: grayscale(1) contrast(1.1); opacity: .9; }
+.award-badge { width: 120px; height: 84px; object-fit: contain; filter: grayscale(1) contrast(1.1); opacity: .9; }
 .award-title { font-size: 12px; line-height: 1.4; color: #5b6472; }
 .awards-nav { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
 .awards-nav button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--ink-border); background: rgba(255,255,255,.04); color: #e8ecf4; font-size: 18px; line-height: 1; cursor: pointer; }
