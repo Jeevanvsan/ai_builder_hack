@@ -426,7 +426,7 @@ export function DashboardGuide({ link }: { link: LinkProps }) {
 
       <Section id="channels" title="What each way in shows">
         <div className="manual-table-wrap">
-          <table className="manual-table">
+          <table className="manual-table manual-wide">
             <thead><tr><th /><th>Call to order</th><th>Click &amp; order</th><th>Delivery instructions</th><th>Heart SOS</th></tr></thead>
             <tbody>{CHANNELS.map(([k, ...v]) => <tr key={k}><th>{k}</th>{v.map((x, i) => <td key={i}>{x}</td>)}</tr>)}</tbody>
           </table>
