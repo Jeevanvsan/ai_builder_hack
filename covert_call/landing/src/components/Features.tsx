@@ -9,7 +9,7 @@ function MockCall() {
   return (
     <div className="call" style={{ paddingTop: 70 }}>
       <div className="call-avatar">M</div>
-      <h4>Mia · QuickBite Support</h4>
+      <h4>Mia · QuickOne Support</h4>
       <small>Confirming your order</small>
       <div className="bubble mia">Would you like the family combo tonight?</div>
       <div className="bubble me">Yes, for two please.</div>
@@ -129,6 +129,14 @@ const CODE_TABLE = [
   ['Sealed To-Go Box', 'Being taken'],
 ]
 
+const COVERS = [
+  ['🍕 Food', 'Garlic bread'],
+  ['🛒 Grocery', 'A loaf of bread'],
+  ['💊 Pharmacy', 'Vitamin C'],
+  ['🔧 Home repair', 'The water heater'],
+  ['🚕 Ride', 'Basic'],
+]
+
 const CALL_LINES = [
   { who: 'mia', text: '"Garlic bread, a family combo or a kids\' meal? Garlic bread means someone is following you, family combo means you saw a crime, kids\' meal means a child is in danger."' },
   { who: 'me', text: '"Garlic bread, please."' },
@@ -153,7 +161,14 @@ function CodedTranscript() {
           <motion.div key={l.text} className={`bubble ${l.who}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ maxWidth: '92%' }}>{l.text}</motion.div>
         ))}
       </div>
-      <small className="muted" style={{ fontWeight: 700, letterSpacing: '.06em' }}>ONE CODE TABLE, SHARED BY THE CALL AND THE CART</small>
+      <small className="muted" style={{ fontWeight: 700, letterSpacing: '.06em' }}>ONE MEANING, MANY COVERS</small>
+      <div className="code-grid">
+        {COVERS.map(([svc, word]) => (
+          <div key={svc} className="code-pill"><span>{svc}</span><span>{word}</span></div>
+        ))}
+      </div>
+      <small className="muted" style={{ display: 'block', margin: '10px 0 0' }}>“Someone is following you” in five services. Callers can switch service mid-call; responders always see the same meaning.</small>
+      <small className="muted" style={{ fontWeight: 700, letterSpacing: '.06em', display: 'block', marginTop: 14 }}>THE FOOD COVER, SHARED BY THE CALL AND THE CART</small>
       <div className="code-grid">
         {CODE_TABLE.map(([food, meaning]) => (
           <div key={food} className="code-pill"><span>{food}</span><span>{meaning}</span></div>
@@ -193,14 +208,14 @@ const DIVES: Dive[] = [
   {
     tag: 'Call to order · Gemini Live', usp: true,
     title: <>To anyone listening, it's <span className="grad">just an order call.</span></>,
-    body: "Mia is a real-time Gemini Live voice agent who stays in character as QuickBite's order desk. She works like an investigator in disguise: she asks who the order is for, offers food choices for the situation, then drills down with follow-ups on headcount, weapons, injuries, clothing, vehicle, movement and address.",
-    ticks: ['Open mode: if the caller can talk freely, Mia drops the food cover and speaks like a dispatcher', 'Low-latency native audio, with auto-reconnect if the connection drops', 'Speaks the caller\'s language (e.g. Malayalam) with the same codes', 'Gives brief safety advice in character, logged for responders'],
+    body: "Mia is a real-time Gemini Live voice agent who stays in character as QuickOne's order desk, for food, groceries, medicines or a repair. She works like an investigator in disguise: she asks who the order is for, offers choices for the situation in that service's words, then drills down with follow-ups on headcount, weapons, injuries, clothing, vehicle, movement and address.",
+    ticks: ['Open mode: if the caller can talk freely, Mia drops the order cover and speaks like a dispatcher', 'Low-latency native audio, with auto-reconnect if the connection drops', 'Speaks the caller\'s language (e.g. Malayalam) with the same codes', 'Gives brief safety advice in character, logged for responders', 'Guides a chased caller turn by turn to the nearest police, hospital or fire station on Google Maps'],
     visual: <div style={{ display: 'grid', placeItems: 'center' }}><Phone><Shot name="call" alt="Call to order screen" fallback={<MockCall />} /></Phone></div>,
   },
   {
     tag: 'Same-breath coding', usp: true,
     title: <>The caller never has to <span className="grad">remember a code.</span></>,
-    body: "Every option Mia offers comes with its real meaning in the same sentence. The caller just repeats a food word and a number, which sounds like an ordinary order to anyone nearby. The same code table drives the coded menu, so the call and the cart can never disagree.",
+    body: "Every option Mia offers comes with its real meaning in the same sentence. The caller just repeats an everyday word and a number, which sounds like an ordinary order to anyone nearby. The same code table drives the coded menu, so the call and the cart can never disagree.",
     ticks: ['11 scenario codes plus drill-down follow-ups', 'Quantity = how many people', 'If the caller goes quiet, Mia gently repeats the options'],
     visual: <CodedTranscript />,
   },
@@ -229,8 +244,13 @@ const DIVES: Dive[] = [
     tag: 'Live structured extraction',
     title: <>A conversation in, <span className="grad">an incident report out</span>, as it happens.</>,
     body: "Gemini function calling turns each answer into typed incident fields as soon as it's spoken, and live sync pushes them to the dashboard in under a second. Severity is recalculated live and never drops mid-call. When the call ends, a consolidation pass writes the full case record.",
-    ticks: ['Danger tags, people count, injuries, weapons, address', 'Camera frames (~1 fps) and background sounds logged as "Seen & heard"', 'Voice-stress score and trend feed into severity'],
-    visual: <Browser url="dashboard · incident"><Shot name="extraction" alt="Live extracted fields" fallback={<MockExtraction />} /></Browser>,
+    ticks: ['Danger tags, people count, injuries, weapons, address', 'Camera frames (~1 fps) and background sounds logged as "Seen & heard"', 'Voice-stress score and trend feed into severity', 'Live route and Street View on Google Maps as the caller moves'],
+    visual: (
+      <div style={{ display: 'grid', gap: 18 }}>
+        <Browser url="dashboard · incident"><Shot name="extraction" alt="Live extracted fields" fallback={<MockExtraction />} /></Browser>
+        <div className="shot-full"><Browser url="dashboard · live route"><Shot name="google-maps" alt="Live route to the nearest police post on Google Maps, beside Street View near the caller" fallback={<MockExtraction />} /></Browser></div>
+      </div>
+    ),
   },
 ]
 
@@ -272,10 +292,10 @@ export function DeepDives() {
 
 /* ---------- bento grid with lightbox ---------- */
 
-type Card = { ico: string; title: string; body: string; shot: string; cls?: string }
+type Card = { ico: string; title: string; body: string; shot: string; extra?: string; cls?: string }
 const CARDS: Card[] = [
   { ico: '📝', title: 'Delivery instructions', body: 'A silent, tap-only path styled as rider instructions: chips, a note for the rider and a photo that Gemini vision reads. There is no call button on it.', shot: 'silent', cls: 'span-2' },
-  { ico: '📍', title: 'Smart location', body: 'GPS, then IP fallback, then an address confirmed through a normal "delivery address" question.', shot: 'map', cls: 'row-2' },
+  { ico: '📍', title: 'Smart location', body: 'GPS, then IP fallback, then an address confirmed through a normal "delivery address" question. Addresses and nearby police, hospitals and fire stations come from Google Maps.', shot: 'map', extra: 'google-maps', cls: 'row-2' },
   { ico: '🧭', title: 'Movement-aware routing', body: 'Navigation is relayed only when the caller is followed or on the move, never otherwise.', shot: 'route' },
   { ico: '🎥', title: 'Live video + Drive', body: 'Peer-to-peer WebRTC to the dashboard, with a copy saved to the team Drive during the call.', shot: 'video' },
   { ico: '👂', title: 'Seen & heard', body: 'Gunshots, screams, other voices, and what the camera shows, logged separately from what the caller says.', shot: 'seen' },
@@ -329,9 +349,16 @@ export function Bento() {
       <Modal open={!!open} onClose={() => setOpen(null)} wide>
         {open && (
           <div>
-            <Browser url={`covert call · ${open.title.toLowerCase()}`}>
+            <Browser url={`quickone · ${open.title.toLowerCase()}`}>
               <Shot name={open.shot} alt={open.title} fallback={mockFor(open.shot) ?? <MockGeneric title={open.title} lines={[open.body]} />} />
             </Browser>
+            {open.extra && (
+              <div style={{ marginTop: 18 }}>
+                <Browser url={`quickone · ${open.title.toLowerCase()} · google maps`}>
+                  <Shot name={open.extra} alt={`${open.title} on Google Maps`} fallback={<MockGeneric title={open.title} lines={[open.body]} />} />
+                </Browser>
+              </div>
+            )}
             <h3 style={{ marginTop: 18 }}>{open.ico} {open.title}</h3>
             <p style={{ marginBottom: 0 }}>{open.body}</p>
           </div>

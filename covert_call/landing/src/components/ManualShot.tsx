@@ -12,7 +12,7 @@ const PANEL = { w: 480, h: 903 }
 const SHOTS = {
   'qb-home': {
     ...PHONE,
-    alt: 'QuickBite home screen with the hidden controls numbered',
+    alt: 'QuickOne home screen with the hidden controls numbered',
     legend: [
       'Heart: double-tap for the silent SOS',
       'Account (mobile number, trusted contacts)',
@@ -21,7 +21,7 @@ const SHOTS = {
       'Call to order: the call with Mia',
     ],
   },
-  'qb-addons': { ...PHONE, alt: 'The Add-ons list in QuickBite, with Extra Pepperoni among ordinary add-ons' },
+  'qb-addons': { ...PHONE, alt: 'The Add-ons list in QuickOne, with Extra Pepperoni among ordinary add-ons' },
   'qb-item-meaning': {
     ...PHONE,
     alt: 'Cheesy Garlic Bread item sheet with its hidden meaning shown under the picture',
@@ -30,7 +30,7 @@ const SHOTS = {
   'qb-checkout': { ...PHONE, alt: 'Checkout with the Delivery time card set to As soon as possible' },
   'qb-order-placed': { ...PHONE, alt: 'Order placed screen with the order status steps' },
   'qb-order-on-the-way': { ...PHONE, alt: 'Order placed screen showing On the way after a responder started the response' },
-  'qb-call': { ...PHONE, alt: 'The QuickBite Order Desk call screen during a call' },
+  'qb-call': { ...PHONE, alt: 'The QuickOne Order Desk call screen during a call' },
   'qb-mic-help': { ...PHONE, alt: 'The Allow the microphone help screen with steps for Android' },
   'qb-instructions-hold': { ...PHONE, alt: 'Delivery instructions screen with an option held to show its meaning' },
   'dash-queue': {
@@ -77,7 +77,7 @@ export function ManualShot({ name, caption }: { name: ShotName; caption?: ReactN
   return (
     <figure className={`manual-shot ${s.phone ? 'is-phone' : 'is-desk'}`}>
       <button type="button" className="manual-shot-zoom" onClick={() => setOpen(true)} aria-label={`Enlarge: ${s.alt}`}>
-        {s.phone ? img : <Browser url="quickbite-5cde0-dashboard.web.app">{img}</Browser>}
+        {s.phone ? img : <Browser url="quickbite-5cde0-dashboard-staging.web.app">{img}</Browser>}
       </button>
       {(caption || s.legend) && (
         <figcaption>

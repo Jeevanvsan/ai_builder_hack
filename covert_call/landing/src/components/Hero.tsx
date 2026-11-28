@@ -1,9 +1,9 @@
 import { AnimatePresence, motion, useScroll, useTransform } from 'motion/react'
 import { useEffect, useState } from 'react'
-import { LINKS, Phone, QuickBiteScreen } from './ui'
+import { LINKS, Phone, QuickOneScreen } from './ui'
 
 const SCRIPT = [
-  { who: 'mia', text: 'Hi, QuickBite order desk! Is this order for yourself?' },
+  { who: 'mia', text: 'Hi, QuickOne order desk! Is this order for yourself?' },
   { who: 'me', text: 'Yes, for me.' },
   { who: 'mia', text: "Garlic bread, family combo or kids' meal? Garlic bread means someone is following you…" },
   { who: 'me', text: 'Garlic bread, please.' },
@@ -27,7 +27,7 @@ export default function Hero() {
     return () => clearTimeout(t)
   }, [step])
 
-  const words = 'It looks like a food order.'.split(' ')
+  const words = 'It looks like an ordinary order.'.split(' ')
 
   return (
     <section className="hero" id="top">
@@ -35,7 +35,7 @@ export default function Hero() {
       <div className="blob" style={{ width: 380, height: 380, background: 'var(--high-glow)', bottom: -120, left: -140, opacity: 0.25 }} />
       <div className="container hero-grid">
         <div>
-          <motion.span className="eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Safety, disguised as dinner</motion.span>
+          <motion.span className="eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Safety, disguised as an order</motion.span>
           <h1>
             {words.map((w, i) => (
               <motion.span key={i} style={{ display: 'inline-block', marginRight: '0.25em' }} initial={{ opacity: 0, y: 40, rotate: 4 }} animate={{ opacity: 1, y: 0, rotate: 0 }} transition={{ delay: 0.1 + i * 0.08, type: 'spring', stiffness: 200, damping: 20 }}>{w}</motion.span>
@@ -46,18 +46,17 @@ export default function Hero() {
             </motion.span>
           </h1>
           <motion.p className="lead" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }}>
-            Covert Call hides four ways to ask for help inside an ordinary food-delivery app: a Gemini Live order call, a coded cart, silent delivery instructions and a hidden SOS. Whatever the person picks, responders see a structured, live incident.
+            QuickOne looks like an everyday app for ordering food, groceries, medicines or a home repair. Hidden inside are four ways to ask for help: a Gemini Live order call, a coded cart, silent delivery instructions and a hidden SOS. Whatever the person picks, responders see a structured, live incident.
           </motion.p>
           <motion.div className="hero-ctas" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.15 }}>
             <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Try the web app →</a>
           </motion.div>
-          <motion.p className="web-note" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }}>
-            ★ Recommended: use the web app. It's the quickest way in, nothing to install, and has every feature.
-          </motion.p>
           <motion.div className="hero-badges" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }}>
             <span><i className="pulse" /> Live web app</span>
             <span>✦ Gemini Live</span>
             <span>⚡ Real-time dashboard</span>
+            <span>🗺️ Google Maps</span>
+            <a href="/#recognition">🏆 Top 50 · AI Builder Cup 2026</a>
           </motion.div>
         </div>
 
@@ -67,13 +66,13 @@ export default function Hero() {
               <AnimatePresence mode="wait">
                 {step === -1 ? (
                   <motion.div key="menu" style={{ height: '100%' }} exit={{ opacity: 0, scale: 1.08, filter: 'blur(6px)' }} transition={{ duration: 0.45 }}>
-                    <QuickBiteScreen />
+                    <QuickOneScreen />
                   </motion.div>
                 ) : (
                   <motion.div key="call" style={{ height: '100%' }} initial={{ clipPath: 'circle(0% at 50% 85%)' }} animate={{ clipPath: 'circle(150% at 50% 85%)' }} transition={{ duration: 0.7, ease: 'easeInOut' }}>
                     <div className="call">
                       <div className="call-avatar">M</div>
-                      <h4>QuickBite Order Desk</h4>
+                      <h4>QuickOne Order Desk</h4>
                       <small>Order #QB-2041 · 00:{String(12 + Math.max(step, 0) * 4).padStart(2, '0')}</small>
                       {SCRIPT.slice(0, Math.min(step + 1, SCRIPT.length)).slice(-4).map((l) => (
                         <motion.div key={l.text} layout className={`bubble ${l.who}`} initial={{ opacity: 0, y: 12, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }}>{l.text}</motion.div>

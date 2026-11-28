@@ -35,8 +35,7 @@ export default function SignInPage() {
     <div className="signin-shell">
       <form className="signin-card" onSubmit={submit}>
         <div className="brand">
-          <span className="brand-mark">QB</span>
-          <span className="brand-name">QuickBite</span>
+          <img className="brand-logo" src="/brand/quickone-logo.svg" alt="QuickOne" />
         </div>
         <h1 className="signin-title">Monitoring Dashboard</h1>
         <p className="signin-sub">Sign in with your responder account.</p>

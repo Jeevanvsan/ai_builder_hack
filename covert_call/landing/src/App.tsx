@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react'
 import { Bento, DeepDives } from './components/Features'
 import { Gallery } from './components/Gallery'
 import Hero from './components/Hero'
+import Blog from './components/Blog'
 import Manual from './components/Manual'
 import Privacy from './components/Privacy'
-import { Compare, DemoSlider, Disguise, Download, Footer, HowItWorks, Marquee, Nav, Problem, SplitView } from './components/Sections'
+import { Compare, DemoSlider, Disguise, Download, Footer, HowItWorks, Marquee, Nav, Problem, Recognition, SplitView } from './components/Sections'
 import { APK_URL, LINKS, Modal } from './components/ui'
 
 export default function App() {
@@ -34,7 +35,7 @@ export default function App() {
     setApkOpen(true)
   }
   if (path.startsWith('/manual')) {
-    document.title = 'User manual · Covert Call'
+    document.title = 'User manual · QuickOne'
     return (
       <MotionConfig reducedMotion="user">
         <Nav />
@@ -44,8 +45,17 @@ export default function App() {
       </MotionConfig>
     )
   }
+  if (window.location.pathname.replace(/\/$/, '') === '/blog') {
+    document.title = 'Blog & news · QuickOne'
+    return (
+      <>
+        <Blog />
+        <Footer />
+      </>
+    )
+  }
   if (window.location.pathname.replace(/\/$/, '') === '/privacy') {
-    document.title = 'Privacy Policy · Covert Call'
+    document.title = 'Privacy Policy · QuickOne'
     return (
       <>
         <Privacy />
@@ -58,6 +68,7 @@ export default function App() {
       <Nav />
       <main>
         <Hero />
+        <Recognition />
         <Problem />
         <Disguise />
         <HowItWorks />

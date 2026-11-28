@@ -1208,3 +1208,13 @@ Ameen's idea: the cover shouldn't be food only. A caller should be able to call 
   - The staging dashboard is a new site in your area. Deploy it only with `npm run deploy:staging`; `npm run deploy` updates main.
   - Main stays as the fallback through the finale.
 - **PR:** you merged #25 (13:58 IST) before these two commits were pushed, so they're in **#26**: https://github.com/Jeevanvsan/ai_builder_hack/pull/26 (the staging dashboard config, the blog's staging link and this entry). You're the requested reviewer.
+
+## 2026-11-28 (IST, 16:16) — Landing page rebranded to QuickOne (branch `landing-update-quickone`)
+- `covert_call/landing`: product name "Covert Call" and app name "QuickBite" are now "QuickOne" everywhere (home, manual, privacy, titles). URLs, the `QuickBite.apk` file name and the judge login are unchanged.
+- The "Open the web app" links now go to the staging QuickOne app (`quickbite-5cde0-staging.web.app`), the same app the blog links.
+- Home copy refreshed from `blog/medium_post.md`: multi-service (food, groceries, medicines, home services), a "one meaning, many covers" strip, Google Maps routing, a Top 50 / Singapore badge. The marquee now lists Google Maps Platform, Flash-Lite and Gemma; Leaflet/OSM and Cloud Run are removed.
+- Placeholder brand art is in `public/brand/quickone-icon.svg` and `quickone-logo.svg`, used by the favicon, header, footer and mini phone screens. To use the final logo, replace the files and keep the names.
+- The manual's step-by-step scripts still use the food cover, which is valid for QuickOne. Deployed to quickbite-5cde0-landing.web.app on 2026-11-28 (IST).
+- **Note for Ameen:** if staging is promoted to production, change `LINKS.web` in `landing/src/components/ui.tsx` back.
+- 2026-11-28 (IST, evening): new QuickOne logo (the bag with a "1", traced from the Nano Banana art) is on the landing page, and on the **web app** as the favicon and the top-bar logo (`web/public/brand/`, `TopBar.tsx` `.brand-logo`). Long-press on the logo still starts the demo call. Deployed to **staging only**, production is unchanged. **Note for Ameen:** the call-screen avatar still shows "QO" initials, and native still uses the old icon.
+- 2026-11-28 (IST, evening): dashboard now shows the QuickOne logo (header, sign-in page and favicon; the tab title reads 'QuickOne Monitoring Dashboard'). Deployed to **staging only**.

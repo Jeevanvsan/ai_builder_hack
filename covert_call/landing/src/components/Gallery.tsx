@@ -2,11 +2,11 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
 import { Modal, Reveal } from './ui'
 
-// Real screenshots of the QuickBite app and the responder dashboard (public/shots), grouped by area. Tap one to
+// Real screenshots of the QuickOne app and the responder dashboard (public/shots), grouped by area. Tap one to
 // see it full size.
 type Area = 'app' | 'dashboard' | 'analytics'
 const SHOTS: { name: string; area: Area; title: string; caption: string; phone?: boolean }[] = [
-  { name: 'qb-home', area: 'app', phone: true, title: 'The disguise', caption: 'An ordinary food-delivery menu. "Call to order" starts the covert call.' },
+  { name: 'qb-home', area: 'app', phone: true, title: 'The disguise', caption: 'An ordinary ordering app. "Call to order" starts the covert call.' },
   { name: 'qb-item', area: 'app', phone: true, title: 'A coded menu item', caption: 'Long-press reveals the real meaning: Extra Pepperoni = someone near you has a weapon.' },
   { name: 'queue', area: 'dashboard', title: 'Live queue', caption: 'Every incident ranked by severity, with danger tags, voice stress and location.' },
   { name: 'search', area: 'dashboard', title: 'Ask AI search', caption: 'Describe a situation in plain words; AI finds the matching open incidents.' },
@@ -19,7 +19,7 @@ const SHOTS: { name: string; area: Area; title: string; caption: string; phone?:
 
 const TABS: { id: 'all' | Area; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'app', label: 'QuickBite app' },
+  { id: 'app', label: 'QuickOne app' },
   { id: 'dashboard', label: 'Responder dashboard' },
   { id: 'analytics', label: 'Analytics' },
 ]

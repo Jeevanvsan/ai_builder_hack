@@ -21,7 +21,7 @@ import { watchFlaggedDevices } from './credibility'
 
 export type AlertPermission = 'granted' | 'denied' | 'default' | 'unsupported'
 
-const BASE_TITLE = 'QuickBite Monitoring Dashboard'
+const BASE_TITLE = 'QuickOne Monitoring Dashboard'
 
 function currentPermission(): AlertPermission {
   return notificationsSupported() ? Notification.permission : 'unsupported'
