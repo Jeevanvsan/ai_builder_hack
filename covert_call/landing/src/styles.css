@@ -811,3 +811,19 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
 .award-title { font-size: 12px; line-height: 1.4; color: #5b6472; }
 .awards-nav { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
 .awards-nav button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--ink-border); background: rgba(255,255,255,.04); color: #e8ecf4; font-size: 18px; line-height: 1; cursor: pointer; }
+
+/* Award details modal */
+button.award { font: inherit; cursor: pointer; }
+.award-more { font-size: 11px; font-weight: 700; color: var(--accent); }
+.award-modal-head { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; padding-right: 44px; }
+.award-modal-head img { width: 84px; height: 60px; object-fit: contain; flex: none; }
+.award-modal-head h3 { margin: 4px 0 0; }
+.award-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 0 0 18px; }
+.award-facts div { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.award-facts dt { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tone); }
+.award-facts dd { margin: 4px 0 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.award-tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.award-tabs button { border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.award-tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.award-open { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--accent); text-decoration: none; }
+.award-frame { display: block; width: 100%; height: min(60vh, 560px); border: 0; background: #fff; }

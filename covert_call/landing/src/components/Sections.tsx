@@ -1,6 +1,6 @@
 import { animate, motion, useInView, useMotionValueEvent, useScroll } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
-import { LINKS, Phone, QuickOneScreen, Reveal, Shot, SwipeDots } from './ui'
+import { Browser, LINKS, Modal, Phone, QuickOneScreen, Reveal, Shot, SwipeDots } from './ui'
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false)
@@ -456,9 +456,29 @@ export function Footer() {
 
 // Awards: one tile per award, article or mention (newest first). `badge` is an image in public/brand/recognition/;
 // `href` is optional. The arrows appear only when the tiles overflow the row.
-type Award = { year: string; badge: string; title: string; href?: string }
+type AwardPreview = { site: string; pages: { label: string; path: string }[]; about: string; facts: [string, string][] }
+type Award = { year: string; badge: string; title: string; href?: string; preview?: AwardPreview }
 const AWARDS: Award[] = [
-  { year: '2026', badge: '/brand/recognition/ai-builder-cup-logo.png', title: 'AI Builder Cup 2026 · Top 50 shortlisted' },
+  {
+    year: '2026', badge: '/brand/recognition/ai-builder-cup-logo.png', title: 'AI Builder Cup 2026 · Top 50 shortlisted',
+    preview: {
+      site: 'https://aibuildercup.com/',
+      pages: [
+        { label: 'Overview', path: 'index.html' },
+        { label: 'Challenges & Requirements', path: 'themes.html' },
+        { label: 'Rewards & Prizes', path: 'rewards.html' },
+        { label: 'FAQs', path: 'Faqs.html' },
+      ],
+      about: 'The Google Cloud AI Builder Cup, powered by Hack2skill, invites builders across Japan and Asia-Pacific (JAPAC) to take a real-world problem, build an AI solution on Google Cloud, and show that something built for a local need can scale globally. The strongest teams demo live in front of Google Cloud and industry experts.',
+      facts: [
+        ['Our result', 'Top 50 shortlisted, picked from about 17,000 entries'],
+        ['Theme', 'Sustainability & Social Impact'],
+        ['Grand Finale', 'Demo Day in Singapore, 4 December 2026'],
+        ['Region', 'Japan and Asia-Pacific (JAPAC)'],
+        ['Prize pool', 'USD 30,000'],
+      ],
+    },
+  },
 ]
 
 export function Recognition() {
@@ -473,6 +493,8 @@ export function Recognition() {
     return () => window.removeEventListener('resize', check)
   }, [])
   const scroll = (dir: number) => row.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
+  const [open, setOpen] = useState<Award | null>(null)
+  const [page, setPage] = useState(0)
   return (
     <section id="recognition" className="dark">
       <div className="container">
@@ -493,13 +515,41 @@ export function Recognition() {
             )
             return (
               <Reveal key={a.title} delay={i * 0.08}>
-                {a.href
-                  ? <a className="award" href={a.href} target="_blank" rel="noreferrer">{inner}</a>
-                  : <div className="award">{inner}</div>}
+                {a.preview
+                  ? <button type="button" className="award" onClick={() => { setPage(0); setOpen(a) }}>{inner}<span className="award-more">View details</span></button>
+                  : a.href
+                    ? <a className="award" href={a.href} target="_blank" rel="noreferrer">{inner}</a>
+                    : <div className="award">{inner}</div>}
               </Reveal>
             )
           })}
         </div>
+        <Modal open={!!open} onClose={() => setOpen(null)} wide>
+          {open?.preview && (
+            <div className="award-modal">
+              <div className="award-modal-head">
+                <img src={open.badge} alt="" />
+                <div>
+                  <span className="eyebrow">Recognition · {open.year}</span>
+                  <h3>{open.title}</h3>
+                </div>
+              </div>
+              <p>{open.preview.about}</p>
+              <dl className="award-facts">
+                {open.preview.facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+              </dl>
+              <div className="award-tabs" role="tablist">
+                {open.preview.pages.map((pg, i) => (
+                  <button key={pg.path} type="button" role="tab" aria-selected={page === i} className={page === i ? 'on' : ''} onClick={() => setPage(i)}>{pg.label}</button>
+                ))}
+                <a className="award-open" href={open.preview.site + open.preview.pages[page].path} target="_blank" rel="noreferrer">Open site ↗</a>
+              </div>
+              <Browser url={(open.preview.site + open.preview.pages[page].path).replace('https://', '')}>
+                <iframe className="award-frame" title={`${open.title}: ${open.preview.pages[page].label}`} src={open.preview.site + open.preview.pages[page].path} loading="lazy" />
+              </Browser>
+            </div>
+          )}
+        </Modal>
         {overflow && (
           <div className="awards-nav">
             <button type="button" aria-label="Previous awards" onClick={() => scroll(-1)}>‹</button>
