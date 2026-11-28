@@ -6,7 +6,7 @@ const UPDATED = '29 September 2026'
 const SECTIONS: { h: string; body: ReactNode }[] = [
   {
     h: 'Who we are',
-    body: <p>Covert Call is a safety service that hides a way to ask for help inside QuickBite, an ordinary-looking food-delivery app. This policy explains what the QuickBite app (web and Android) and the responder dashboard collect, why, and who can see it. This landing page itself sets no cookies and runs no analytics or ads.</p>,
+    body: <p>QuickOne is a safety service hidden inside an ordinary-looking multi-service ordering app (food, groceries, medicines and home services). This policy explains what the QuickOne app (web and Android) and the responder dashboard collect, why, and who can see it. This landing page itself sets no cookies and runs no analytics or ads.</p>,
   },
   {
     h: 'What we collect, and when',
@@ -73,11 +73,11 @@ const SECTIONS: { h: string; body: ReactNode }[] = [
   },
   {
     h: 'Children',
-    body: <p>Covert Call is intended for adults. Anyone in danger may use it to ask for help. We do not knowingly collect data from children outside an emergency.</p>,
+    body: <p>QuickOne is intended for adults. Anyone in danger may use it to ask for help. We do not knowingly collect data from children outside an emergency.</p>,
   },
   {
     h: 'Emergencies',
-    body: <p>Covert Call supports, and does not replace, emergency services. If it is safe to do so, call your local emergency number.</p>,
+    body: <p>QuickOne supports, and does not replace, emergency services. If it is safe to do so, call your local emergency number.</p>,
   },
   {
     h: 'Changes',
@@ -89,7 +89,7 @@ export default function Privacy() {
   return (
     <main className="pp">
       <div className="container pp-inner">
-        <a href="/" className="pp-back">← Back to Covert Call</a>
+        <a href="/" className="pp-back">← Back to QuickOne</a>
         <span className="eyebrow">Legal</span>
         <h1>Privacy Policy</h1>
         <p className="muted">Last updated {UPDATED}</p>

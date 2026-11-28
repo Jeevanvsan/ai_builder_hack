@@ -111,7 +111,7 @@ export function TourPage({ link }: { link: LinkProps }) {
             <a className="btn btn-primary" href={DASHBOARD_URL} target="_blank" rel="noreferrer">Open the dashboard →</a>
           </div>
           <div>
-            <h3>On the phone: QuickBite</h3>
+            <h3>On the phone: QuickOne</h3>
             <PhoneLink qrName="qr-quickbite" href={LINKS.web}>
               <p>Scan with the phone camera, or open the link in <b>Chrome</b> (Android) or <b>Safari</b> (iPhone).</p>
             </PhoneLink>
@@ -129,7 +129,7 @@ export function TourPage({ link }: { link: LinkProps }) {
       <Section id="five-minutes" title="Only 5 minutes?" >
         <ol>
           <li>Sign in to the dashboard on the laptop (above).</li>
-          <li>Open QuickBite on the phone and do <a {...link('/manual/tour#script-a')}>Script A</a>, the covert call.</li>
+          <li>Open QuickOne on the phone and do <a {...link('/manual/tour#script-a')}>Script A</a>, the covert call.</li>
           <li>Watch the call fill in live, then open its <b>Case file</b> tab for the AI case summary.</li>
         </ol>
         <p className="muted">
@@ -146,7 +146,7 @@ export function TourPage({ link }: { link: LinkProps }) {
           to sound like a food order. You can't leave. The address is a sample one, so you don't share your own.
         </p>
         <ol>
-          <li>On the phone, with an empty cart, tap <b>Call to order</b>. The screen shows <b>QuickBite Order Desk</b> and a timer.</li>
+          <li>On the phone, with an empty cart, tap <b>Call to order</b>. The screen shows <b>QuickOne Order Desk</b> and a timer.</li>
           <li>Answer Mia with the food words below. She won't ask every question; answer whichever she asks. If she offers
             different food, pick the one whose meaning fits the story. Use only food words: plain words make her switch to an
             open emergency call.</li>
@@ -205,7 +205,7 @@ export function TourPage({ link }: { link: LinkProps }) {
               dash: <><b>Case file → Case report email</b>. The PDF case report goes to the shared inbox <a href={INBOX_URL} target="_blank" rel="noreferrer">{INBOX}</a>.</>,
             },
             {
-              mia: <>Perfect, your order's on its way. Thanks for calling QuickBite, take care!</>,
+              mia: <>Perfect, your order's on its way. Thanks for calling QuickOne, take care!</>,
               say: <>Nothing: Mia ends the call. (To hang up yourself, use the red button.)</>,
               dash: <>The hub says <b>Case record</b>; within a minute or two the <b>Case file</b> shows the AI summary, the dispatch bulletin and the recordings.</>,
             },
@@ -259,7 +259,7 @@ export function TourPage({ link }: { link: LinkProps }) {
               dash: <><b>Case file → Case report email</b>.</>,
             },
             {
-              mia: <>Perfect, your order's on its way. Thanks for calling QuickBite, take care!</>,
+              mia: <>Perfect, your order's on its way. Thanks for calling QuickOne, take care!</>,
               say: <>Nothing: Mia ends the call.</>,
               dash: <>Case file: AI summary, bulletin and recordings.</>,
             },
@@ -385,7 +385,7 @@ export function DashboardGuide({ link }: { link: LinkProps }) {
         </div>
       </header>
       <p className="manual-lead">
-        Everything a caller does in QuickBite lands here as it happens: a new case the moment a call, order or report
+        Everything a caller does in QuickOne lands here as it happens: a new case the moment a call, order or report
         starts, then each fact as the AI understands it. Sign-in details are in the{' '}
         <a {...link('/manual/tour#setup')}>guided tour</a>.
       </p>

@@ -9,7 +9,7 @@ export const APK_URL_RELEASE = 'https://github.com/Jeevanvsan/ai_builder_hack/re
 export const APK_URL = 'https://drive.usercontent.google.com/download?id=1sSKiKmJgq_t9nvqdemRnfLvcxnjxQSqz&export=download&confirm=t'
 
 export const LINKS = {
-  web: 'https://quickbite-5cde0.web.app',
+  web: 'https://quickbite-5cde0-staging.web.app',
   github: 'https://github.com/Jeevanvsan/ai_builder_hack',
 }
 
@@ -84,7 +84,7 @@ export function Phone({ children, style }: { children: ReactNode; style?: CSSPro
   )
 }
 
-export function QuickBiteScreen({ variant = 'home' }: { variant?: 'home' | 'item' | 'checkout' }) {
+export function QuickOneScreen({ variant = 'home' }: { variant?: 'home' | 'item' | 'checkout' }) {
   if (variant === 'item') {
     return (
       <div className="qb">
@@ -114,8 +114,8 @@ export function QuickBiteScreen({ variant = 'home' }: { variant?: 'home' | 'item
   }
   return (
     <div className="qb">
-      <div className="qb-top"><span className="qb-brand">QuickBite</span><span>🛒</span></div>
-      <div className="qb-search">🔍 Search pizza, biryani…</div>
+      <div className="qb-top"><span className="qb-brand"><img className="qb-brand-mark" src="/brand/quickone-icon.svg" alt="" />QuickOne</span><span>🛒</span></div>
+      <div className="qb-search">🔍 Search food, groceries, medicines…</div>
       <div className="qb-banner"><b>50% OFF</b>on your first order</div>
       <div className="qb-cats">{['🍕', '🍔', '🍜', '🍰'].map((c) => <div key={c} className="qb-cat">{c}</div>)}</div>
       {[['🍕', 'Farmhouse Pizza', '₹349'], ['🍛', 'Chicken Biryani', '₹289'], ['🍔', 'Classic Burger', '₹199']].map(([e, n, p]) => (

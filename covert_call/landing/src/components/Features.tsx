@@ -9,7 +9,7 @@ function MockCall() {
   return (
     <div className="call" style={{ paddingTop: 70 }}>
       <div className="call-avatar">M</div>
-      <h4>Mia · QuickBite Support</h4>
+      <h4>Mia · QuickOne Support</h4>
       <small>Confirming your order</small>
       <div className="bubble mia">Would you like the family combo tonight?</div>
       <div className="bubble me">Yes, for two please.</div>
@@ -129,6 +129,14 @@ const CODE_TABLE = [
   ['Sealed To-Go Box', 'Being taken'],
 ]
 
+const COVERS = [
+  ['🍕 Food', 'Garlic bread'],
+  ['🛒 Grocery', 'A loaf of bread'],
+  ['💊 Pharmacy', 'Vitamin C'],
+  ['🔧 Home repair', 'The water heater'],
+  ['🚕 Ride', 'Basic'],
+]
+
 const CALL_LINES = [
   { who: 'mia', text: '"Garlic bread, a family combo or a kids\' meal? Garlic bread means someone is following you, family combo means you saw a crime, kids\' meal means a child is in danger."' },
   { who: 'me', text: '"Garlic bread, please."' },
@@ -153,7 +161,14 @@ function CodedTranscript() {
           <motion.div key={l.text} className={`bubble ${l.who}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ maxWidth: '92%' }}>{l.text}</motion.div>
         ))}
       </div>
-      <small className="muted" style={{ fontWeight: 700, letterSpacing: '.06em' }}>ONE CODE TABLE, SHARED BY THE CALL AND THE CART</small>
+      <small className="muted" style={{ fontWeight: 700, letterSpacing: '.06em' }}>ONE MEANING, MANY COVERS</small>
+      <div className="code-grid">
+        {COVERS.map(([svc, word]) => (
+          <div key={svc} className="code-pill"><span>{svc}</span><span>{word}</span></div>
+        ))}
+      </div>
+      <small className="muted" style={{ display: 'block', margin: '10px 0 0' }}>“Someone is following you” in five services. Callers can switch service mid-call; responders always see the same meaning.</small>
+      <small className="muted" style={{ fontWeight: 700, letterSpacing: '.06em', display: 'block', marginTop: 14 }}>THE FOOD COVER, SHARED BY THE CALL AND THE CART</small>
       <div className="code-grid">
         {CODE_TABLE.map(([food, meaning]) => (
           <div key={food} className="code-pill"><span>{food}</span><span>{meaning}</span></div>
@@ -193,14 +208,14 @@ const DIVES: Dive[] = [
   {
     tag: 'Call to order · Gemini Live', usp: true,
     title: <>To anyone listening, it's <span className="grad">just an order call.</span></>,
-    body: "Mia is a real-time Gemini Live voice agent who stays in character as QuickBite's order desk. She works like an investigator in disguise: she asks who the order is for, offers food choices for the situation, then drills down with follow-ups on headcount, weapons, injuries, clothing, vehicle, movement and address.",
-    ticks: ['Open mode: if the caller can talk freely, Mia drops the food cover and speaks like a dispatcher', 'Low-latency native audio, with auto-reconnect if the connection drops', 'Speaks the caller\'s language (e.g. Malayalam) with the same codes', 'Gives brief safety advice in character, logged for responders'],
+    body: "Mia is a real-time Gemini Live voice agent who stays in character as QuickOne's order desk, for food, groceries, medicines or a repair. She works like an investigator in disguise: she asks who the order is for, offers choices for the situation in that service's words, then drills down with follow-ups on headcount, weapons, injuries, clothing, vehicle, movement and address.",
+    ticks: ['Open mode: if the caller can talk freely, Mia drops the order cover and speaks like a dispatcher', 'Low-latency native audio, with auto-reconnect if the connection drops', 'Speaks the caller\'s language (e.g. Malayalam) with the same codes', 'Gives brief safety advice in character, logged for responders', 'Guides a chased caller turn by turn to the nearest police, hospital or fire station on Google Maps'],
     visual: <div style={{ display: 'grid', placeItems: 'center' }}><Phone><Shot name="call" alt="Call to order screen" fallback={<MockCall />} /></Phone></div>,
   },
   {
     tag: 'Same-breath coding', usp: true,
     title: <>The caller never has to <span className="grad">remember a code.</span></>,
-    body: "Every option Mia offers comes with its real meaning in the same sentence. The caller just repeats a food word and a number, which sounds like an ordinary order to anyone nearby. The same code table drives the coded menu, so the call and the cart can never disagree.",
+    body: "Every option Mia offers comes with its real meaning in the same sentence. The caller just repeats an everyday word and a number, which sounds like an ordinary order to anyone nearby. The same code table drives the coded menu, so the call and the cart can never disagree.",
     ticks: ['11 scenario codes plus drill-down follow-ups', 'Quantity = how many people', 'If the caller goes quiet, Mia gently repeats the options'],
     visual: <CodedTranscript />,
   },

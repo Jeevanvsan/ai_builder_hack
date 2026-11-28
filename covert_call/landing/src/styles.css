@@ -789,3 +789,8 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
   .manual-start { padding: 14px; }
 }
 .manual-card a.btn-primary { color: #fff; }
+
+/* QuickOne brand mark (placeholder art in public/brand/) */
+.logo-mark { width: 30px; height: 30px; border-radius: 8px; flex: none; box-shadow: 0 0 0 5px rgba(217, 72, 15, .14); }
+.qb-brand { display: inline-flex; align-items: center; gap: 5px; }
+.qb-brand-mark { width: 14px; height: 14px; border-radius: 4px; }

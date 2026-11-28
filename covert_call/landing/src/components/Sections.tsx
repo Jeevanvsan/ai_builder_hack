@@ -1,6 +1,6 @@
 import { animate, motion, useInView, useMotionValueEvent, useScroll } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
-import { LINKS, Phone, QuickBiteScreen, Reveal, Shot, SwipeDots } from './ui'
+import { LINKS, Phone, QuickOneScreen, Reveal, Shot, SwipeDots } from './ui'
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false)
@@ -10,7 +10,7 @@ export function Nav() {
     <nav className={`nav${scrolled ? ' scrolled' : ''}`}>
       <motion.div style={{ scaleX: scrollYProgress, transformOrigin: 'left', height: 3, background: 'linear-gradient(90deg,var(--accent),var(--accent-glow))', position: 'absolute', top: 0, left: 0, right: 0 }} />
       <div className="container nav-inner">
-        <a href="/#top" className="logo"><span className="logo-dot" />Covert Call</a>
+        <a href="/#top" className="logo"><img className="logo-mark" src="/brand/quickone-icon.svg" alt="" />QuickOne</a>
         <div className="nav-links">
           <a href="/#disguise">Disguise</a>
           <a href="/#how">How it works</a>
@@ -58,7 +58,7 @@ export function Problem() {
           {[
             { n: <CountUp to={1} suffix=" in 3" />, t: 'women worldwide experience physical or sexual violence in their lifetime.', c: 'WHO, 2021' },
             { n: <CountUp to={51100} />, t: 'women and girls were killed by an intimate partner or family member in 2023.', c: 'UNODC / UN Women, 2024' },
-            { n: <CountUp to={0} suffix=" sec" />, t: 'of suspicion. To anyone watching, a Covert Call is just someone ordering dinner.', c: 'By design' },
+            { n: <CountUp to={0} suffix=" sec" />, t: 'of suspicion. To anyone watching, a QuickOne call is just someone placing an order.', c: 'By design' },
           ].map((s, i) => (
             <Reveal key={i} delay={i * 0.12}>
               <div className="stat">{s.n}<p>{s.t}</p><cite>{s.c}</cite></div>
@@ -84,9 +84,9 @@ export function Disguise() {
       <div className="container">
         <Reveal>
           <div className="section-head" style={{ marginInline: 'auto', textAlign: 'center' }}>
-            <span className="eyebrow">The disguise · QuickBite</span>
-            <h2>Looks like dinner. <span className="grad">Works like a lifeline.</span></h2>
-            <p className="muted">QuickBite is a fully working food-delivery app with a menu, cart and checkout. There's no install footprint on the web and nothing on screen that says "safety". Every way to ask for help is an ordinary part of it: a call to order, the cart, delivery instructions and the heart icon.</p>
+            <span className="eyebrow">The disguise · QuickOne</span>
+            <h2>Looks like an order. <span className="grad">Works like a lifeline.</span></h2>
+            <p className="muted">QuickOne is a fully working multi-service app for food, groceries, medicines and home services, each with its own catalog, cart and checkout. There's no install footprint on the web and nothing on screen that says "safety". Every way to ask for help is an ordinary part of it: a call to order, the cart, delivery instructions and the heart icon.</p>
           </div>
         </Reveal>
         <div className="fan" ref={ref}>
@@ -96,7 +96,7 @@ export function Disguise() {
               animate={inView ? { opacity: 1, y: i === 1 ? 0 : 40, rotate: p.r, x: p.x } : {}}
               whileHover={{ y: -20, rotate: 0, scale: 1.04, zIndex: 5 }}
               transition={{ type: 'spring', stiffness: 90, damping: 16, delay: i * 0.12 }}>
-              <Phone><Shot name={p.shot} alt={`QuickBite ${p.label}`} fallback={<QuickBiteScreen variant={p.v} />} /></Phone>
+              <Phone><Shot name={p.shot} alt={`QuickOne ${p.label}`} fallback={<QuickOneScreen variant={p.v} />} /></Phone>
               <div className="fan-caption">{p.label}</div>
             </motion.div>
           ))}
@@ -109,7 +109,7 @@ export function Disguise() {
 const MODES = [
   {
     t: 'Call to order', when: 'Can talk', emoji: '📞', where: 'Home → "Call to order"',
-    d: "A Gemini Live order call with Mia. She offers food choices and says each one's real meaning in the same sentence, so the caller only has to pick a food word.",
+    d: "A Gemini Live order call with Mia. She offers choices in the words of whatever is being ordered and says each one's real meaning in the same sentence, so the caller only has to pick an everyday word.",
     flow: ['Mia asks: "talk" or "order"? "Talk" switches to open mode, with no codes', 'Picks a category: "garlic bread" = being followed', 'Follow-ups: how many, weapons, injuries, address', 'Camera frames and background sounds read by Gemini', 'Safety advice given in character'],
   },
   {
@@ -198,7 +198,7 @@ export function Compare() {
         <Reveal>
           <div className="compare-wrap">
             <table className="compare">
-              <thead><tr><th /><th className="us">Covert Call</th><th>Emergency call</th><th>SOS button</th><th>Safety apps</th></tr></thead>
+              <thead><tr><th /><th className="us">QuickOne</th><th>Emergency call</th><th>SOS button</th><th>Safety apps</th></tr></thead>
               <tbody>
                 {rows.map(([label, ...vals], r) => (
                   <tr key={label}>
@@ -222,8 +222,8 @@ export function Compare() {
 // Paste a Google Drive share link's file ID into `drive` (file shared as "Anyone with the link")
 // to stream that slide from Drive; otherwise /videos/<file>.mp4 is used.
 const VIDEOS: { file: string; drive?: string; title: string; d: string }[] = [
-  { file: 'call', drive: '1C_uAcb8oxiq72EqzidJGWY9G5PN_tAKt', title: 'Covert Call', d: 'The whole idea: a food-delivery app that hides a call for help.' },
-  { file: 'chased-call', drive: '1uBdzXwyzJghvpMSNXqDNOqFgilbk9s8X', title: 'Someone chasing, free to speak', d: 'Open mode: the caller says "talk", Mia drops the food cover and acts as a calm dispatcher, guiding them to safety while responders track them live.' },
+  { file: 'call', drive: '1C_uAcb8oxiq72EqzidJGWY9G5PN_tAKt', title: 'QuickOne', d: 'The whole idea: an everyday ordering app that hides a call for help.' },
+  { file: 'chased-call', drive: '1uBdzXwyzJghvpMSNXqDNOqFgilbk9s8X', title: 'Someone chasing, free to speak', d: 'Open mode: the caller says "talk", Mia drops the order cover and acts as a calm dispatcher, guiding them to safety while responders track them live.' },
   { file: 'sos', title: 'Heart double-tap SOS', d: 'The screen goes black, both cameras stream, and the AI observes silently.' },
   { file: 'click-order', title: 'Tap and order', d: 'A coded cart is placed and arrives as a decoded incident.' },
 ]
@@ -318,7 +318,7 @@ export function DemoSlider() {
 }
 
 const MOMENTS = [
-  { mia: 'QuickBite order desk! Is this order for yourself?', me: 'Yes, for me.', field: 'Caller', value: 'In trouble: self', tone: 'high' },
+  { mia: 'QuickOne order desk! Is this order for yourself?', me: 'Yes, for me.', field: 'Caller', value: 'In trouble: self', tone: 'high' },
   { mia: 'Garlic bread, family combo or kids\u2019 meal? Garlic bread means someone is following you\u2026', me: 'Garlic bread.', field: 'Situation', value: 'Being followed', tone: 'high' },
   { mia: 'How many garlic breads? One for each person following you.', me: 'Two.', field: 'People', value: '2 followers', tone: 'med' },
   { mia: 'Extra pepperoni? That means they have a weapon.', me: 'Yes, extra pepperoni.', field: 'Weapon', value: 'Reported', tone: 'high' },
@@ -353,7 +353,7 @@ export function SplitView() {
             <Phone style={{ transform: 'scale(.9)', transformOrigin: 'top center' }}>
               <div className="call" style={{ paddingTop: 56 }}>
                 <div className="call-avatar" style={{ width: 56, height: 56, fontSize: 22 }}>Q</div>
-                <h4>QuickBite Order Desk</h4>
+                <h4>QuickOne Order Desk</h4>
                 <small>Order call</small>
                 <motion.div key={'m' + n} className="bubble mia" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>{m.mia}</motion.div>
                 <motion.div key={'c' + n} className="bubble me" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>{m.me}</motion.div>
@@ -401,7 +401,7 @@ export function SplitView() {
 }
 
 export function Marquee() {
-  const items = ['✦ Gemini Live', '🧠 Gemini function calling', '🔥 Firebase Hosting', '⚡ Cloud Firestore', '🔐 Firebase Auth', '☁️ Cloud Run', '📡 WebRTC', '⚛️ React + Vite', '📱 React Native', '📈 Apache ECharts', '🗺️ Leaflet / OSM']
+  const items = ['✦ Gemini Live', '🧠 Gemini function calling', '🔥 Firebase Hosting', '⚡ Cloud Firestore', '🔐 Firebase Auth', '📡 WebRTC', '⚛️ React + Vite', '📱 React Native', '📈 Apache ECharts', '🗺️ Google Maps Platform', '✦ Gemini Flash-Lite', '🧪 Gemma']
   return (
     <section style={{ padding: '70px 0' }}>
       <div className="container" style={{ textAlign: 'center', marginBottom: 30 }}><span className="eyebrow">Built with</span></div>
@@ -420,12 +420,12 @@ export function Download({ onDownload }: { onDownload: () => void }) {
           <div className="download-card">
             <div className="blob" style={{ width: 400, height: 400, background: 'var(--accent)', right: -100, top: -150, opacity: 0.35 }} />
             <div style={{ position: 'relative' }}>
-              <span className="eyebrow">Get Covert Call</span>
+              <span className="eyebrow">Get QuickOne</span>
               <h2>Try it now, in your browser.</h2>
               <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app is the recommended way in: it runs live in any phone or laptop browser, with nothing to install and every feature.</p>
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
-              <a className="dl-opt dl-primary" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🍕</span><span><b>Open QuickBite web app <em className="rec-pill">Recommended</em></b><small>Quickest access, nothing to install · quickbite-5cde0.web.app</small></span><span className="go">↗</span></a>
+              <a className="dl-opt dl-primary" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🛍️</span><span><b>Open QuickOne web app <em className="rec-pill">Recommended</em></b><small>Quickest access, nothing to install · quickbite-5cde0-staging.web.app</small></span><span className="go">↗</span></a>
               <a className="dl-opt" href={LINKS.github} target="_blank" rel="noreferrer"><span className="ico">💻</span><span><b>Source on GitHub</b><small>Public repository</small></span><span className="go">↗</span></a>
               <button className="dl-sub" onClick={onDownload}>Prefer an Android app? <b>Download the APK</b> (about 150 MB)</button>
             </div>
@@ -442,9 +442,9 @@ export function Footer() {
       <div className="container">
         <div className="footer-grid">
           <div>
-            <div className="logo"><span className="logo-dot" />Covert Call</div>
-            <p style={{ lineHeight: 1.6, maxWidth: 340, margin: 0 }}>A call for help that looks like a food order. Powered by Gemini on Google Cloud.</p>
-            <div className="safety">In an emergency, call your local emergency number if it's safe to do so. Covert Call supports, and does not replace, emergency services.</div>
+            <div className="logo"><img className="logo-mark" src="/brand/quickone-icon.svg" alt="" />QuickOne</div>
+            <p style={{ lineHeight: 1.6, maxWidth: 340, margin: 0 }}>A call for help that looks like an ordinary order. Powered by Gemini on Google Cloud.</p>
+            <div className="safety">In an emergency, call your local emergency number if it's safe to do so. QuickOne supports, and does not replace, emergency services.</div>
           </div>
           <div><h4>Product</h4><ul><li><a href="/#disguise">Disguise</a></li><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/#demo">Demo</a></li></ul></div>
           <div><h4>Try it</h4><ul><li><a href={LINKS.web} target="_blank" rel="noreferrer">Web app</a></li><li><a href="/#download">Android APK</a></li></ul></div>

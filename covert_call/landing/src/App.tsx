@@ -34,7 +34,7 @@ export default function App() {
     setApkOpen(true)
   }
   if (path.startsWith('/manual')) {
-    document.title = 'User manual · Covert Call'
+    document.title = 'User manual · QuickOne'
     return (
       <MotionConfig reducedMotion="user">
         <Nav />
@@ -45,7 +45,7 @@ export default function App() {
     )
   }
   if (window.location.pathname.replace(/\/$/, '') === '/privacy') {
-    document.title = 'Privacy Policy · Covert Call'
+    document.title = 'Privacy Policy · QuickOne'
     return (
       <>
         <Privacy />

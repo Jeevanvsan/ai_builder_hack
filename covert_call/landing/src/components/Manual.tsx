@@ -34,7 +34,7 @@ const FEATURES: Feature[] = [
       'You are reporting an emergency you are watching, such as an accident, a fire or a fight.',
     ],
     how: [
-      <>Open QuickBite and, with an <b>empty cart</b>, tap <b>Call to order</b> at the bottom of the home screen.</>,
+      <>Open QuickOne and, with an <b>empty cart</b>, tap <b>Call to order</b> at the bottom of the home screen.</>,
       <>When Mia asks whether you can talk freely, say <b>&ldquo;talk&rdquo;</b>. You can also just start describing the emergency; she switches to open mode straight away.</>,
       <>Answer her direct questions: what is happening, is anyone hurt, are you safe right now and <b>exactly where you are</b>. She asks you to spell names letter by letter and reads them back.</>,
       <>Follow her steps. She gives practical first aid (bleeding, breathing, burns, choking) and safety advice while you wait.</>,
@@ -60,14 +60,14 @@ const FEATURES: Feature[] = [
     icon: '📞',
     title: 'Call to order (disguised)',
     tag: 'Can talk, but someone may be listening',
-    what: <>A phone call to the &ldquo;QuickBite Order Desk&rdquo; that sounds like an ordinary food order. Mia, an AI assistant, asks food questions that secretly mean something, and everything you answer goes straight to a response team as a live emergency report.</>,
+    what: <>A phone call to the &ldquo;QuickOne Order Desk&rdquo; that sounds like an ordinary food order. Mia, an AI assistant, asks food questions that secretly mean something, and everything you answer goes straight to a response team as a live emergency report.</>,
     when: [
       'You can speak, but someone nearby might hear you.',
       'You are being followed, threatened or watched, and the call must sound normal.',
       'You want to report something happening to someone else without anyone noticing.',
     ],
     how: [
-      <>With an <b>empty cart</b>, tap <b>Call to order</b> and allow the microphone. The screen shows <b>QuickBite Order Desk</b> and a timer.</>,
+      <>With an <b>empty cart</b>, tap <b>Call to order</b> and allow the microphone. The screen shows <b>QuickOne Order Desk</b> and a timer.</>,
       <>When Mia asks whether you can talk freely, say <b>&ldquo;order&rdquo;</b>.</>,
       <>Mia offers food choices and says what each one really means in the same sentence (e.g. &ldquo;garlic bread means someone is following or chasing you&rdquo;). Answer with just the food word. You never need to remember any codes.</>,
       <>Her follow-ups are coded too: how many pizzas = how many people, &ldquo;hand it to you&rdquo; = the person is still with you, and so on (<a href="/manual/codes#call-codes">all of them</a>).</>,
@@ -419,10 +419,11 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
           <>
             <header className="manual-hero">
               <span className="eyebrow">User manual</span>
-              <h1>How to use QuickBite</h1>
+              <h1>How to use QuickOne</h1>
               <p className="muted">
-                QuickBite looks like an ordinary food-delivery app. Behind it, an AI assistant called Mia turns a food
-                order into a live emergency report for a response team. Every way in has its own page: what it is, when to
+                QuickOne looks like an ordinary app for ordering food, groceries, medicines or home services. Behind it, an AI
+                assistant called Mia turns an order into a live emergency report for a response team. The walkthroughs below use the
+                food cover; every other service works the same way with its own everyday words. Every way in has its own page: what it is, when to
                 use it, exactly what to do, and what the responders see.
               </p>
             </header>
@@ -487,10 +488,10 @@ export default function Manual({ path, onNavigate }: { path: string; onNavigate:
         </div>
 
         <div className="manual-help">
-          <b>In an emergency, if it is safe to do so, call your local emergency number (112 in India).</b> QuickBite supports,
+          <b>In an emergency, if it is safe to do so, call your local emergency number (112 in India).</b> QuickOne supports,
           and does not replace, emergency services.
           <div className="manual-actions">
-            <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open QuickBite →</a>
+            <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open QuickOne →</a>
             <a className="btn btn-ghost" href="/privacy">Privacy Policy</a>
           </div>
         </div>
