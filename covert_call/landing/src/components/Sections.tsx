@@ -458,7 +458,7 @@ export function Footer() {
 // (shown in greyscale); `href` is optional. The arrows appear only when the tiles overflow the row.
 type Award = { year: string; badge: string; title: string; href?: string }
 const AWARDS: Award[] = [
-  { year: '2026', badge: '/brand/recognition/top50-cup.svg', title: 'AI Builder Cup 2026 · Top 50 shortlisted' },
+  { year: '2026', badge: '/brand/recognition/ai-builder-cup-trophy.png', title: 'AI Builder Cup 2026 · Top 50 shortlisted' },
 ]
 
 export function Recognition() {
