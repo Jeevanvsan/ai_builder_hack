@@ -4,6 +4,7 @@ import { Browser, LINKS, Modal, Phone, QuickOneScreen, Reveal, Shot, SwipeDots }
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const [menu, setMenu] = useState(false)
   const { scrollY, scrollYProgress } = useScroll()
   useMotionValueEvent(scrollY, 'change', (v) => setScrolled(v > 30))
   return (
@@ -11,7 +12,7 @@ export function Nav() {
       <motion.div style={{ scaleX: scrollYProgress, transformOrigin: 'left', height: 3, background: 'linear-gradient(90deg,var(--accent),var(--accent-glow))', position: 'absolute', top: 0, left: 0, right: 0 }} />
       <div className="container nav-inner">
         <a href="/#top" className="logo"><img className="logo-full" src="/brand/quickone-logo.svg" alt="QuickOne" /></a>
-        <div className="nav-links">
+        <div className={`nav-links${menu ? ' open' : ''}`} onClick={() => setMenu(false)}>
           <a href="/#disguise">Disguise</a>
           <a href="/#how">How it works</a>
           <a href="/#features">Features</a>
@@ -21,8 +22,10 @@ export function Nav() {
           <a href="/manual" className={location.pathname.startsWith('/manual') ? 'active' : ''}>User manual</a>
         </div>
         <div className="nav-cta">
-          <a className="nav-manual-mobile" href="/manual">Manual</a>
           <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open the web app</a>
+          <button type="button" className="nav-burger" aria-label={menu ? 'Close menu' : 'Open menu'} aria-expanded={menu} onClick={() => setMenu((v) => !v)}>
+            <span /><span /><span />
+          </button>
         </div>
       </div>
     </nav>
