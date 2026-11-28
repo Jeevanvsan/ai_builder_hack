@@ -51,9 +51,6 @@ export default function Hero() {
           <motion.div className="hero-ctas" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.15 }}>
             <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Try the web app →</a>
           </motion.div>
-          <motion.p className="web-note" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }}>
-            ★ Recommended: use the web app. It's the quickest way in, nothing to install, and has every feature.
-          </motion.p>
           <motion.div className="hero-badges" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }}>
             <span><i className="pulse" /> Live web app</span>
             <span>✦ Gemini Live</span>

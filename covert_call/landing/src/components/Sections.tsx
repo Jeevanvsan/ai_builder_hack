@@ -424,7 +424,7 @@ export function Download({ onDownload }: { onDownload: () => void }) {
               <p className="muted" style={{ fontSize: 17, lineHeight: 1.6 }}>The web app is the recommended way in: it runs live in any phone or laptop browser, with nothing to install and every feature.</p>
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
-              <a className="dl-opt dl-primary" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🛍️</span><span><b>Open QuickOne web app <em className="rec-pill">Recommended</em></b><small>Quickest access, nothing to install · quickbite-5cde0-staging.web.app</small></span><span className="go">↗</span></a>
+              <a className="dl-opt dl-primary" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🛍️</span><span><b>Open QuickOne web app</b><small>Quickest access, nothing to install · quickbite-5cde0-staging.web.app</small></span><span className="go">↗</span></a>
               <button className="dl-sub" onClick={onDownload}>Prefer an Android app? <b>Download the APK</b> (about 150 MB)</button>
             </div>
           </div>
