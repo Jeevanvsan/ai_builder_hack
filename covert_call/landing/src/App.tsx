@@ -58,8 +58,8 @@ export default function App() {
       <Nav />
       <main>
         <Hero />
-        <Problem />
         <Recognition />
+        <Problem />
         <Disguise />
         <HowItWorks />
         <DeepDives />

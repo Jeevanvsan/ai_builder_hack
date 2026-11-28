@@ -454,8 +454,8 @@ export function Footer() {
   )
 }
 
-// Awards: one tile per award, article or mention (newest first). `badge` is an image in public/brand/recognition/
-// (shown in greyscale); `href` is optional. The arrows appear only when the tiles overflow the row.
+// Awards: one tile per award, article or mention (newest first). `badge` is an image in public/brand/recognition/;
+// `href` is optional. The arrows appear only when the tiles overflow the row.
 type Award = { year: string; badge: string; title: string; href?: string }
 const AWARDS: Award[] = [
   { year: '2026', badge: '/brand/recognition/ai-builder-cup-trophy.png', title: 'AI Builder Cup 2026 · Top 50 shortlisted' },
@@ -472,13 +472,18 @@ export function Recognition() {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-  const scroll = (dir: number) => row.current?.scrollBy({ left: dir * 260, behavior: 'smooth' })
+  const scroll = (dir: number) => row.current?.scrollBy({ left: dir * 220, behavior: 'smooth' })
   return (
-    <section id="recognition" className="awards">
+    <section id="recognition" className="dark">
       <div className="container">
-        <h2 className="awards-head">Awards</h2>
+        <Reveal>
+          <div className="section-head" style={{ marginInline: 'auto', textAlign: 'center' }}>
+            <span className="eyebrow">Recognition</span>
+            <h2>Built for people in danger. <span className="grad">Noticed on the way.</span></h2>
+          </div>
+        </Reveal>
         <div className="awards-row" ref={row} style={{ justifyContent: overflow ? 'flex-start' : 'center' }}>
-          {AWARDS.map((a) => {
+          {AWARDS.map((a, i) => {
             const inner = (
               <>
                 <span className="award-year">{a.year}</span>
@@ -486,9 +491,13 @@ export function Recognition() {
                 <span className="award-title">{a.title}</span>
               </>
             )
-            return a.href
-              ? <a key={a.title} className="award" href={a.href} target="_blank" rel="noreferrer">{inner}</a>
-              : <div key={a.title} className="award">{inner}</div>
+            return (
+              <Reveal key={a.title} delay={i * 0.08}>
+                {a.href
+                  ? <a className="award" href={a.href} target="_blank" rel="noreferrer">{inner}</a>
+                  : <div className="award">{inner}</div>}
+              </Reveal>
+            )
           })}
         </div>
         {overflow && (
