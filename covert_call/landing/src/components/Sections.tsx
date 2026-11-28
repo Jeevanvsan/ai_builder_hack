@@ -454,24 +454,31 @@ export function Footer() {
   )
 }
 
-// Recognition: a minimal dark band. Add one line per award, article or mention (newest first); `href` is optional.
-type Recognition = { text: string; href?: string }
+// Recognition: a logo row. One entry per award, article or mention (newest first).
+// `logo` is an image in public/brand/recognition/ (monochrome works best); without it the name shows as a wordmark.
+type Recognition = { name: string; caption: string; logo?: string; href?: string }
 const RECOGNITION: Recognition[] = [
-  { text: 'Top 50 shortlisted in AI Builder Cup 2026' },
+  { name: 'AI Builder Cup 2026', caption: 'Top 50 shortlisted' },
 ]
 
 export function Recognition() {
   return (
-    <section id="recognition" className="recog-band">
+    <section id="recognition" className="recog">
       <div className="container">
-        <Reveal>
-          {RECOGNITION.map((r) => (
-            <p key={r.text} className="recog-line">
-              {r.href ? <a href={r.href} target="_blank" rel="noreferrer">{r.text}</a> : r.text}
-            </p>
-          ))}
-          <p className="recog-sub">Grand Finale · Singapore · 4 December 2026</p>
-        </Reveal>
+        <p className="recog-head">Recognised by</p>
+        <div className="recog-row">
+          {RECOGNITION.map((r) => {
+            const inner = (
+              <>
+                {r.logo ? <img src={r.logo} alt={r.name} className="recog-logo" /> : <span className="recog-word">{r.name}</span>}
+                <span className="recog-cap">{r.caption}</span>
+              </>
+            )
+            return r.href
+              ? <a key={r.name} className="recog-item" href={r.href} target="_blank" rel="noreferrer">{inner}</a>
+              : <div key={r.name} className="recog-item">{inner}</div>
+          })}
+        </div>
       </div>
     </section>
   )

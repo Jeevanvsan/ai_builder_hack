@@ -801,8 +801,11 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
 .qb-logo { height: 20px; width: auto; display: block; }
 
 /* Recognition */
-.recog-band { background: var(--ink); color: #fff; padding: 64px 0; text-align: center; }
-.recog-line { margin: 0; font-size: clamp(24px, 3.4vw, 40px); font-weight: 700; letter-spacing: -.02em; line-height: 1.25; }
-.recog-line + .recog-line { margin-top: 10px; }
-.recog-line a { color: inherit; text-decoration: none; }
-.recog-sub { margin: 14px 0 0; color: #9aa4b6; font-size: 15px; letter-spacing: .04em; }
+.recog { padding: 48px 0; text-align: center; }
+.recog-head { margin: 0 0 22px; font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--tone); }
+.recog-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 28px 64px; }
+.recog-item { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text); text-decoration: none; opacity: .85; transition: opacity .2s; }
+.recog-item:hover { opacity: 1; }
+.recog-word { font-size: 22px; font-weight: 800; letter-spacing: -.01em; text-transform: uppercase; }
+.recog-logo { height: 36px; width: auto; filter: grayscale(1); }
+.recog-cap { font-size: 13px; color: var(--muted); }
