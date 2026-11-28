@@ -20,6 +20,7 @@ export function Nav() {
           <a href="/#gallery">Gallery</a>
           <a href="/#download">Download</a>
           <a href="/manual" className={location.pathname.startsWith('/manual') ? 'active' : ''}>User manual</a>
+          <a className="btn btn-primary nav-menu-cta" href={LINKS.web} target="_blank" rel="noreferrer">Open the web app</a>
         </div>
         <div className="nav-cta">
           <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open the web app</a>

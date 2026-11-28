@@ -877,3 +877,9 @@ button.award { font: inherit; cursor: pointer; }
   .nav-links.open a:first-child { border-top: 0; }
 }
 @media (max-width: 420px) { .nav-cta .btn-primary { padding: 9px 12px; font-size: 12.5px; } }
+/* Phone top bar: logo + menu only; the web-app button lives in the menu */
+.nav-menu-cta { display: none; }
+@media (max-width: 900px) {
+  .nav-cta .btn-primary { display: none; }
+  .nav-links.open .nav-menu-cta { display: flex; justify-content: center; margin-top: 12px; padding: 13px 18px; border-top: 0; color: #fff; }
+}
