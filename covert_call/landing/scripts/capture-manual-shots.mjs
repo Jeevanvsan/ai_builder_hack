@@ -20,6 +20,7 @@ const WEB = process.env.QB_WEB_URL || 'https://quickbite-5cde0.web.app'
 // QB_DASH_URL points the dashboard steps at another site (e.g. the staging dashboard).
 const DASH = process.env.QB_DASH_URL || 'https://quickbite-5cde0-dashboard.web.app'
 const OUT = fileURLToPath(new URL('../public/shots/manual/', import.meta.url))
+const OUT_LANDING = fileURLToPath(new URL('../public/shots/', import.meta.url))
 const SCRATCH = join(tmpdir(), 'quickbite-manual-shots')
 const RUN_FILE = join(SCRATCH, 'incidents.json')
 const CHROME = process.env.CHROME_PATH || join(homedir(), '.cache/puppeteer/chrome/linux-153.0.8010.36/chrome-linux64/chrome')
@@ -30,7 +31,7 @@ const SHOWCASE = ['INC-MUZNKM7N', 'INC-MUZKKVL1'] // linked from the deck and RE
 
 const args = process.argv.slice(2)
 const withIncidents = args.includes('--with-incidents')
-const SAFE = ['phone', 'codes', 'mic', 'dashboard']
+const SAFE = ['phone', 'codes', 'mic', 'dashboard', 'landing', 'placed']
 const RISKY = ['order', 'plain', 'silent', 'sos', 'demo', 'call', 'ai-covert', 'ai-chase']
 const picked = args.filter((a) => !a.startsWith('--'))
 const steps = picked.length ? picked : SAFE
@@ -392,6 +393,74 @@ const STEPS = {
     await quiet(page)
     await privacyScan(page, 'dash-analytics')
     await shot(page, 'dash-analytics')
+  },
+
+  // The landing page's own screenshots (public/shots/*.png), from existing incidents only: nothing is created.
+  // QB_BOARD_ID: the incident on the extraction/map/responder shots; QB_CODED_ID / QB_SILENT_ID: existing coded-order
+  // and silent-tap incidents for the manual's dash-coded-order / dash-silent-tap.
+  async landing(browser) {
+    const png = (name) => ({ path: join(OUT_LANDING, `${name}.png`), type: 'png', quality: undefined })
+    const page = await phone(browser)
+    await page.waitForSelector('.call-cta')
+    await shot(page, 'qb-home (landing)', png('qb-home'))
+    await openItem(page, 'Extra Pepperoni')
+    await hold(page, '.sheet-img', 800, () => shot(page, 'qb-item', png('qb-item')))
+    await closeSheet(page)
+    await addViaSheet(page, 'Farmhouse Veggie Pizza')
+    await addViaSheet(page, 'Extra Pepperoni')
+    await page.click('.cart-bar')
+    await page.waitForSelector('.checkout-bar')
+    await page.click('.checkout-bar')
+    await waitText(page, 'Delivery time')
+    await shot(page, 'qb-checkout', png('qb-checkout'))
+    await page.browserContext().close()
+
+    const dash = await dashboard()
+    await dash.goto(DASH + '/', { waitUntil: 'networkidle2' })
+    await sleep(3000)
+    await quiet(dash)
+    await privacyScan(dash, 'queue')
+    await shot(dash, 'queue', png('queue'))
+    const legend = await badges(dash, [
+      { n: 1, sel: '.stats', at: 'left' },
+      { n: 2, sel: '.incident-card', at: 'left' },
+      { n: 3, sel: 'input[placeholder^="Describe"]', at: 'left' },
+      { n: 4, sel: 'select', at: 'left' },
+    ])
+    console.log('    dash-queue legend:', legend.join(' | '))
+    await shot(dash, 'dash-queue')
+    await clearBadges(dash)
+    const board = process.env.QB_BOARD_ID || 'INC-MUL8HBGM'
+    await openIncident(dash, board)
+    await privacyScan(dash, 'extraction')
+    for (const n of ['extraction', 'map', 'responder']) await shot(dash, n, png(n))
+    for (const [env, name] of [['QB_CODED_ID', 'dash-coded-order'], ['QB_SILENT_ID', 'dash-silent-tap']]) {
+      if (!process.env[env]) { console.log(`    (skip ${name}: set ${env})`); continue }
+      await openIncident(dash, process.env[env])
+      await privacyScan(dash, name)
+      await shot(dash, name)
+    }
+    await dash.goto(DASH + '/analytics', { waitUntil: 'networkidle2' })
+    await sleep(6000)
+    await quiet(dash)
+    await shot(dash, 'analytics', png('analytics'))
+  },
+
+  // "Order placed" from an ORDINARY order: raises no incident.
+  async placed(browser) {
+    const page = await phone(browser)
+    await page.waitForSelector('.call-cta')
+    await addViaSheet(page, 'Margherita Pizza')
+    await page.click('.cart-bar')
+    await page.waitForSelector('.checkout-bar')
+    await page.click('.checkout-bar')
+    await waitText(page, 'Delivery time')
+    await clickText(page, '.checkout-bar', 'Place order')
+    check(await waitText(page, 'Order placed!', 30_000), 'ordinary order shows "Order placed!"')
+    await sleep(800)
+    await shot(page, 'qb-order-placed')
+    check(page.incidentIds.size === 0, 'the ordinary order wrote no incident', [...page.incidentIds].join(', '))
+    await page.browserContext().close()
   },
 
   async order(browser) {
