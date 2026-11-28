@@ -56,7 +56,7 @@ export default function Hero() {
             <span>✦ Gemini Live</span>
             <span>⚡ Real-time dashboard</span>
             <span>🗺️ Google Maps</span>
-            <span>🏆 Top 50 finalist · Singapore</span>
+            <a href="/#recognition">🏆 Top 50 finalist · Singapore</a>
           </motion.div>
         </div>
 

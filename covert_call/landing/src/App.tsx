@@ -5,7 +5,7 @@ import { Gallery } from './components/Gallery'
 import Hero from './components/Hero'
 import Manual from './components/Manual'
 import Privacy from './components/Privacy'
-import { Compare, DemoSlider, Disguise, Download, Footer, HowItWorks, Marquee, Nav, Problem, SplitView } from './components/Sections'
+import { Compare, DemoSlider, Disguise, Download, Footer, HowItWorks, Marquee, Nav, Problem, Recognition, SplitView } from './components/Sections'
 import { APK_URL, LINKS, Modal } from './components/ui'
 
 export default function App() {
@@ -59,6 +59,7 @@ export default function App() {
       <main>
         <Hero />
         <Problem />
+        <Recognition />
         <Disguise />
         <HowItWorks />
         <DeepDives />
