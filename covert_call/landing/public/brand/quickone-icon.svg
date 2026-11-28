@@ -1,2 +1,8 @@
-<!-- PLACEHOLDER QuickOne icon: replace this file with the final art (keep the name). -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#d9480f"/><circle cx="32" cy="32" r="16" fill="none" stroke="#fff" stroke-width="7"/><circle cx="32" cy="32" r="4.5" fill="#fff"/></svg>
+<!-- QuickOne mark: takeaway bag whose fold reveals a "1". Light theme. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 108 108">
+  <g fill="#e8590c" stroke="#e8590c" stroke-width="4" stroke-linejoin="round">
+    <path d="M30 4 H70 Q76 4 79 10 L86 25 L62 32 H38 L14 25 L21 10 Q24 4 30 4 Z"/>
+    <path d="M10 32 L38 38 H62 L90 32 Q94 32 95 37 L99 84 Q99 96 87 96 H13 Q1 96 1 84 L5 37 Q6 32 10 32 Z"/>
+  </g>
+  <path d="M47 11 H58 V58 H47 V25 L38 31 V22 Z" fill="#fff" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+</svg>
