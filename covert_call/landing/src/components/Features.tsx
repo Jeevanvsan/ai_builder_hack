@@ -292,10 +292,10 @@ export function DeepDives() {
 
 /* ---------- bento grid with lightbox ---------- */
 
-type Card = { ico: string; title: string; body: string; shot: string; cls?: string }
+type Card = { ico: string; title: string; body: string; shot: string; extra?: string; cls?: string }
 const CARDS: Card[] = [
   { ico: '📝', title: 'Delivery instructions', body: 'A silent, tap-only path styled as rider instructions: chips, a note for the rider and a photo that Gemini vision reads. There is no call button on it.', shot: 'silent', cls: 'span-2' },
-  { ico: '📍', title: 'Smart location', body: 'GPS, then IP fallback, then an address confirmed through a normal "delivery address" question.', shot: 'map', cls: 'row-2' },
+  { ico: '📍', title: 'Smart location', body: 'GPS, then IP fallback, then an address confirmed through a normal "delivery address" question. Addresses and nearby police, hospitals and fire stations come from Google Maps.', shot: 'map', extra: 'google-maps', cls: 'row-2' },
   { ico: '🧭', title: 'Movement-aware routing', body: 'Navigation is relayed only when the caller is followed or on the move, never otherwise.', shot: 'route' },
   { ico: '🎥', title: 'Live video + Drive', body: 'Peer-to-peer WebRTC to the dashboard, with a copy saved to the team Drive during the call.', shot: 'video' },
   { ico: '👂', title: 'Seen & heard', body: 'Gunshots, screams, other voices, and what the camera shows, logged separately from what the caller says.', shot: 'seen' },
@@ -349,9 +349,16 @@ export function Bento() {
       <Modal open={!!open} onClose={() => setOpen(null)} wide>
         {open && (
           <div>
-            <Browser url={`covert call · ${open.title.toLowerCase()}`}>
+            <Browser url={`quickone · ${open.title.toLowerCase()}`}>
               <Shot name={open.shot} alt={open.title} fallback={mockFor(open.shot) ?? <MockGeneric title={open.title} lines={[open.body]} />} />
             </Browser>
+            {open.extra && (
+              <div style={{ marginTop: 18 }}>
+                <Browser url={`quickone · ${open.title.toLowerCase()} · google maps`}>
+                  <Shot name={open.extra} alt={`${open.title} on Google Maps`} fallback={<MockGeneric title={open.title} lines={[open.body]} />} />
+                </Browser>
+              </div>
+            )}
             <h3 style={{ marginTop: 18 }}>{open.ico} {open.title}</h3>
             <p style={{ marginBottom: 0 }}>{open.body}</p>
           </div>
