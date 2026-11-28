@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Architecture</title>
+<link rel="stylesheet" href="figures.css">
+<style>
+  #fig { width: 1600px; height: 990px; background: #fbfcfe; }
+  .box { position: absolute; background: #fff; border: 3px solid; border-radius: 20px; padding: 22px 24px; box-shadow: 0 10px 26px rgba(31, 42, 68, 0.08); }
+  .box h3 { font-size: 27px; font-weight: 800; letter-spacing: -0.01em; }
+  .box .sub { font-size: 19px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+  .box ul { margin-top: 12px; list-style: none; }
+  .box li { font-size: 20px; line-height: 1.45; color: var(--ink-2); font-weight: 500; }
+  .box li::before { content: "•"; color: var(--muted); margin-right: 8px; }
+  .gem { left: 60px; top: 60px; width: 400px; height: 214px; border-color: var(--blue); }
+  .phone-b { left: 60px; top: 384px; width: 400px; height: 232px; border-color: var(--accent); }
+  .fs { left: 620px; top: 412px; width: 400px; height: 176px; border-color: var(--amber); }
+  .con { left: 1180px; top: 384px; width: 360px; height: 232px; border-color: #44506a; }
+  .maps { left: 60px; top: 742px; width: 470px; height: 188px; border-color: var(--green); }
+  .post { left: 620px; top: 742px; width: 400px; height: 188px; border-color: var(--blue); border-style: dashed; }
+  .apps { left: 1110px; top: 742px; width: 430px; height: 188px; border-color: #9aa3b5; }
+  .note { position: absolute; }
+  .note .k { font-size: 17px; font-weight: 800; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; }
+  .rules { left: 620px; top: 70px; width: 470px; }
+  .rules p { margin-top: 14px; font-size: 22px; font-weight: 700; line-height: 1.35; display: flex; gap: 12px; }
+  .rules p b { flex: 0 0 34px; height: 34px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 18px; display: inline-flex; align-items: center; justify-content: center; }
+  .host { left: 1180px; top: 70px; width: 360px; }
+  .host p { margin-top: 14px; font-size: 20px; line-height: 1.5; color: var(--ink-2); font-weight: 500; }
+  .lbl { position: absolute; font-size: 17px; font-weight: 700; color: var(--ink-2); background: #fbfcfe; padding: 2px 8px; line-height: 1.3; }
+  svg { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<div id="fig">
+  <svg width="1600" height="990" viewBox="0 0 1600 990">
+    <defs>
+      <marker id="a" markerUnits="userSpaceOnUse" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto-start-reverse"><path d="M0,0 L18,9 L0,18 z" fill="#3d3830"/></marker>
+    </defs>
+    <!-- Gemini Live <-> phone -->
+    <path d="M 260 274 L 260 384" stroke="#2f6fde" stroke-width="4" fill="none" marker-start="url(#a)" marker-end="url(#a)"/>
+    <!-- live video phone <-> console (peer-to-peer) -->
+    <path d="M 460 404 L 1180 404" stroke="#44506a" stroke-width="3" stroke-dasharray="10 8" fill="none" marker-start="url(#a)" marker-end="url(#a)"/>
+    <!-- phone -> Firestore -->
+    <path d="M 460 500 L 620 500" stroke="#e2a200" stroke-width="4" fill="none" marker-end="url(#a)"/>
+    <!-- Firestore -> console -->
+    <path d="M 1020 500 L 1180 500" stroke="#e2a200" stroke-width="4" fill="none" marker-end="url(#a)"/>
+    <!-- phone <-> maps -->
+    <path d="M 260 616 L 260 742" stroke="#1f8a55" stroke-width="4" fill="none" marker-start="url(#a)" marker-end="url(#a)"/>
+    <!-- phone -> after the call -->
+    <path d="M 460 590 C 560 590, 640 660, 700 742" stroke="#2f6fde" stroke-width="3" stroke-dasharray="10 8" fill="none" marker-end="url(#a)"/>
+    <!-- after the call -> Firestore -->
+    <path d="M 900 742 L 900 588" stroke="#e2a200" stroke-width="3" fill="none" marker-end="url(#a)"/>
+    <!-- after the call -> Apps Script -->
+    <path d="M 1020 836 L 1110 836" stroke="#9aa3b5" stroke-width="3" fill="none" marker-end="url(#a)"/>
+  </svg>
+
+  <div class="box gem"><h3>Gemini Live API</h3><div class="sub">gemini-3.8-live · "Mia"</div>
+    <ul><li>Hears, sees and speaks</li><li>13 function-calling tools</li><li>Silent observer for the SOS</li></ul></div>
+  <div class="box phone-b"><h3>Caller's phone</h3><div class="sub">QuickOne web app · React + Vite</div>
+    <ul><li>Mic, camera, GPS</li><li>Runs every function call</li><li>Creates the incident first</li></ul></div>
+  <div class="box fs"><h3>Cloud Firestore</h3><div class="sub">One document per incident</div>
+    <ul><li>Every fact, written live</li><li>Rules validate each write</li></ul></div>
+  <div class="box con"><h3>Responder console</h3><div class="sub">React · Firebase Auth</div>
+    <ul><li>Rings, map, evidence</li><li>Live video and listen-in</li><li>Message the caller</li></ul></div>
+  <div class="box maps"><h3>Google Maps Platform</h3>
+    <ul><li>Places: addresses, landmarks, stations</li><li>Routes: walking, two-wheeler, car</li><li>Maps JS + Street View on the console</li></ul></div>
+  <div class="box post"><h3>After the call</h3>
+    <ul><li>3.5 Flash-Lite: summary, bulletin</li><li>3.1 Flash-Lite: linking, photos</li></ul></div>
+  <div class="box apps"><h3>Apps Script · Gmail · Drive</h3>
+    <ul><li>Case report by email</li><li>Call recordings</li></ul></div>
+
+  <div class="note rules"><div class="k">Two rules</div>
+    <p><b>1</b>During a call, only the phone talks to Gemini Live.</p>
+    <p><b>2</b>Only Firestore connects the phone and the console.</p></div>
+  <div class="note host"><div class="k">Firebase</div>
+    <p>Hosting for the caller app, the console and the landing page · Auth for responders · Security rules on every write</p></div>
+
+  <span class="lbl" style="left:274px;top:298px">audio + frames ⇄<br>voice + function calls</span>
+  <span class="lbl" style="left:620px;top:376px">live video and listen-in · peer-to-peer WebRTC</span>
+  <span class="lbl" style="left:500px;top:468px">writes</span>
+  <span class="lbl" style="left:1050px;top:468px">real-time</span>
+  <span class="lbl" style="left:274px;top:664px">addresses, routes</span>
+  <span class="lbl" style="left:520px;top:640px">transcript</span>
+  <span class="lbl" style="left:912px;top:652px">summary saved</span>
+</div>
+</body>
+</html>
