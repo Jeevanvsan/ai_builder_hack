@@ -454,48 +454,24 @@ export function Footer() {
   )
 }
 
-// Recognition: add one entry per award, article or mention. Newest first. `href` is optional.
-type Recognition = { icon: string; kind: string; title: string; detail: string; date: string; href?: string }
+// Recognition: a minimal dark band. Add one line per award, article or mention (newest first); `href` is optional.
+type Recognition = { text: string; href?: string }
 const RECOGNITION: Recognition[] = [
-  {
-    icon: '🏆', kind: 'Award', title: 'Top 50 finalist',
-    detail: 'Picked from about 17,000 entries in a global AI challenge. Live demo at the Grand Finale in Singapore.',
-    date: 'Grand Finale · 4 Dec 2026',
-  },
+  { text: 'Top 50 shortlisted in AI Builder Cup 2026' },
 ]
 
 export function Recognition() {
   return (
-    <section id="recognition" style={{ paddingTop: 40 }}>
+    <section id="recognition" className="recog-band">
       <div className="container">
         <Reveal>
-          <div className="section-head">
-            <span className="eyebrow">Recognition</span>
-            <h2>Noticed for <span className="grad">the people it helps.</span></h2>
-          </div>
+          {RECOGNITION.map((r) => (
+            <p key={r.text} className="recog-line">
+              {r.href ? <a href={r.href} target="_blank" rel="noreferrer">{r.text}</a> : r.text}
+            </p>
+          ))}
+          <p className="recog-sub">Grand Finale · Singapore · 4 December 2026</p>
         </Reveal>
-        <div className="recog-grid">
-          {RECOGNITION.map((r, i) => {
-            const body = (
-              <>
-                <span className="recog-ico">{r.icon}</span>
-                <div>
-                  <span className="recog-kind">{r.kind}</span>
-                  <h3>{r.title}</h3>
-                  <p>{r.detail}</p>
-                  <cite>{r.date}{r.href ? ' · Read more ↗' : ''}</cite>
-                </div>
-              </>
-            )
-            return (
-              <Reveal key={r.title} delay={i * 0.1}>
-                {r.href
-                  ? <a className="recog-card" href={r.href} target="_blank" rel="noreferrer">{body}</a>
-                  : <div className="recog-card">{body}</div>}
-              </Reveal>
-            )
-          })}
-        </div>
       </div>
     </section>
   )
