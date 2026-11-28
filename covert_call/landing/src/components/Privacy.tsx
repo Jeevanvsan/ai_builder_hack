@@ -69,7 +69,7 @@ const SECTIONS: { h: string; body: ReactNode }[] = [
   },
   {
     h: 'Your choices',
-    body: <p>You can ask us to access, correct or delete data about you. Because callers never sign in, please include enough detail (such as the approximate date, time and place) for us to find the right record. Contact us through our <a href={LINKS.github} target="_blank" rel="noreferrer">GitHub repository</a>.</p>,
+    body: <p>You can ask us to access, correct or delete data about you. Because callers never sign in, please include enough detail (such as the approximate date, time and place) for us to find the right record. Contact Team NexMind with your request.</p>,
   },
   {
     h: 'Children',

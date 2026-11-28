@@ -22,7 +22,6 @@ export function Nav() {
         </div>
         <div className="nav-cta">
           <a className="nav-manual-mobile" href="/manual">Manual</a>
-          <a className="btn btn-ghost" href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a>
           <a className="btn btn-primary" href={LINKS.web} target="_blank" rel="noreferrer">Open the web app</a>
         </div>
       </div>
@@ -426,7 +425,6 @@ export function Download({ onDownload }: { onDownload: () => void }) {
             </div>
             <div className="dl-options" style={{ position: 'relative' }}>
               <a className="dl-opt dl-primary" href={LINKS.web} target="_blank" rel="noreferrer"><span className="ico">🛍️</span><span><b>Open QuickOne web app <em className="rec-pill">Recommended</em></b><small>Quickest access, nothing to install · quickbite-5cde0-staging.web.app</small></span><span className="go">↗</span></a>
-              <a className="dl-opt" href={LINKS.github} target="_blank" rel="noreferrer"><span className="ico">💻</span><span><b>Source on GitHub</b><small>Public repository</small></span><span className="go">↗</span></a>
               <button className="dl-sub" onClick={onDownload}>Prefer an Android app? <b>Download the APK</b> (about 150 MB)</button>
             </div>
           </div>
@@ -448,7 +446,7 @@ export function Footer() {
           </div>
           <div><h4>Product</h4><ul><li><a href="/#disguise">Disguise</a></li><li><a href="/#how">How it works</a></li><li><a href="/#features">Features</a></li><li><a href="/#demo">Demo</a></li></ul></div>
           <div><h4>Try it</h4><ul><li><a href={LINKS.web} target="_blank" rel="noreferrer">Web app</a></li><li><a href="/#download">Android APK</a></li></ul></div>
-          <div><h4>Project</h4><ul><li><a href={LINKS.github} target="_blank" rel="noreferrer">GitHub</a></li><li>Team: NexMind</li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
+          <div><h4>Project</h4><ul><li>Team: NexMind</li><li><a href="/privacy">Privacy Policy</a></li></ul></div>
         </div>
         <div className="footer-note"><span>© 2026 Team NexMind · <a href="/privacy">Privacy Policy</a></span></div>
       </div>

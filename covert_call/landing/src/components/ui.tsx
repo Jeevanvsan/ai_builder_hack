@@ -10,7 +10,6 @@ export const APK_URL = 'https://drive.usercontent.google.com/download?id=1sSKiKm
 
 export const LINKS = {
   web: 'https://quickbite-5cde0-staging.web.app',
-  github: 'https://github.com/Jeevanvsan/ai_builder_hack',
 }
 
 /** Fades + lifts children in when they scroll into view. */
