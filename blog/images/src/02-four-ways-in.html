@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Four ways in</title>
+<link rel="stylesheet" href="figures.css">
+<style>
+  #fig { width: 1600px; height: 1020px; background: var(--cream); padding: 56px 70px 0; }
+  .cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 44px; margin-top: 40px; }
+  .col { display: flex; flex-direction: column; align-items: center; }
+  .phone { width: 300px; }
+  .label { margin-top: 30px; width: 320px; }
+  .num { display: inline-flex; width: 34px; height: 34px; border-radius: 50%; background: var(--ink); color: #fff; font-weight: 800; font-size: 19px; align-items: center; justify-content: center; margin-right: 10px; vertical-align: middle; }
+  .name { font-size: 24px; font-weight: 800; letter-spacing: -0.015em; vertical-align: middle; white-space: nowrap; }
+  .when { margin-top: 12px; font-size: 22px; line-height: 1.35; color: var(--ink-2); font-weight: 500; }
+  .sos { height: 597px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 36px; }
+  .sos span { color: #3a3735; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; }
+  .heart { position: absolute; top: -18px; right: -18px; width: 62px; height: 62px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 30px; box-shadow: 0 8px 20px rgba(224, 99, 31, 0.4); }
+  .heart small { position: absolute; bottom: -6px; right: -8px; background: var(--ink); color: #fff; font-size: 15px; font-weight: 800; border-radius: 999px; padding: 3px 8px; }
+</style>
+</head>
+<body>
+<div id="fig">
+  <div class="title">Four ways in, matched to what you can safely do</div>
+  <div class="subtitle">Every way of ordering reaches a response team. None of them looks like asking for help.</div>
+  <div class="cols">
+    <div class="col">
+      <div class="phone"><div class="screen"><img src="assets/phone-home-food.png" alt=""><div class="ring" style="left:158px;top:546px;width:110px;height:42px"></div></div></div>
+      <div class="label"><span class="num">1</span><span class="name">Call to order</span><p class="when">You can speak, even if someone is listening. Mia takes the "order".</p></div>
+    </div>
+    <div class="col">
+      <div class="phone"><div class="screen"><img src="assets/phone-item-food.png" alt=""><div class="ring" style="left:4px;top:410px;width:268px;height:32px"></div></div></div>
+      <div class="label"><span class="num">2</span><span class="name">Click &amp; order</span><p class="when">You can tap but not speak. Coded items raise an incident; hold one to see its meaning.</p></div>
+    </div>
+    <div class="col">
+      <div class="phone"><div class="screen"><img src="assets/phone-instructions.png" alt=""><div class="ring" style="left:14px;top:252px;width:248px;height:52px"></div></div></div>
+      <div class="label"><span class="num">3</span><span class="name">Delivery instructions</span><p class="when">You have a few seconds. Each option carries a meaning, like "a weapon is present".</p></div>
+    </div>
+    <div class="col">
+      <div class="phone"><div class="screen sos"><span>screen looks switched off</span></div><div class="heart">♥<small>×2</small></div></div>
+      <div class="label"><span class="num">4</span><span class="name">Heart double-tap</span><p class="when">You can't touch the phone again. It goes dark, while streaming sound and video.</p></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

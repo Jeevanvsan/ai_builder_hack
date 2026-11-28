@@ -228,7 +228,8 @@ flowchart LR
 | Gemini API (Google AI Studio keys) | Live calls, summaries, vision, linking, console AI | Free-tier key first, paid key on quota errors |
 | Cloud Firestore, Firebase Auth, Hosting | Data, realtime sync, sign-in, the four sites | Firebase project `quickbite-5cde0` |
 | Google Apps Script, Drive, Gmail | Recordings, case-report email, trusted-contact alerts | No billing |
-| OpenStreetMap: Nominatim, Photon, OSRM, tiles | Geocoding, nearby help, routes, maps | Free, no keys |
+| Google Maps Platform: Maps JavaScript (map, Satellite, 3D, Street View), Places (New), Routes | Maps, spoken addresses and landmarks, nearby help with phone numbers, walking or driving routes (Epic 34, when a key is set) | Monthly free allowance per API; needs a billing account ([setup](../setup/google-maps.md)) |
+| OpenStreetMap: Nominatim, Photon, OSRM, tiles | The same, when there is no Google key or Google can't answer | Free, no keys |
 | IP lookup: geojs, ipwho.is, ipapi.co | Rough location when there is no GPS | Free, no keys |
 | Google STUN | Connecting the peer-to-peer video | Free |
 
@@ -237,10 +238,10 @@ flowchart LR
 | Component | Tech | Deployed at | Key files |
 |---|---|---|---|
 | QuickBite web app | React 19, Vite, TypeScript | `quickbite-5cde0.web.app` | `covert_call/web/src/pages/`, `web/src/lib/gemini/liveSession.ts`, `tools.ts`, `persona.ts` |
-| Responder console | React 19, Vite, ECharts, Leaflet | `quickbite-5cde0-dashboard.web.app` | `covert_call/dashboard/src/`, `dashboard/firestore.rules` |
+| Responder console | React 19, Vite, ECharts, Google Maps (vis.gl) with a Leaflet fallback | `quickbite-5cde0-dashboard.web.app` | `covert_call/dashboard/src/`, `dashboard/firestore.rules` |
 | Covert Call website | React, Vite | `quickbite-5cde0-landing.web.app` | `covert_call/landing/src/` |
 | Shared incident client | TypeScript, Firebase SDK | runs inside the apps | `covert_call/shared/incidents/client.ts`, `types.ts`, `severity.ts` |
-| Location and routing | Nominatim, Photon, OSRM | runs inside the apps | `covert_call/shared/incidents/geocode.ts`, `location.ts`, `shared/nav/` |
+| Location and routing | Google Places, Geocoding, Routes; Nominatim, Photon, OSRM as fallback | runs inside the apps | `covert_call/shared/google/maps.ts`, `shared/incidents/geocode.ts`, `location.ts`, `position.ts`, `trail.ts`, `shared/nav/` |
 | Live video | WebRTC, Firestore signalling | runs inside the apps | `covert_call/shared/video/publisher.ts`, `signaling.ts` |
 | Model map and key pool | Gemini API | runs inside the apps | `covert_call/shared/aiModels.ts`, `shared/gemini/keyPool.ts` |
 | Drive uploader, mailer | Google Apps Script | Apps Script web apps | `covert_call/docs/setup/drive-uploader.md`, `trusted-alert-Code.gs` |

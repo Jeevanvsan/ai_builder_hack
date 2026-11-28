@@ -24,7 +24,7 @@ npm run seed -- --reset  # delete ALL incidents via the Firebase CLI (your login
 npm run simulate-call  # play a scripted 30s call through shared/incidents/client.ts: open /incident/<id> and watch it update live
 ```
 
-The incident map uses Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is set in `.env.local` (not committed), and falls back to OpenStreetMap (free, no key) otherwise.
+The incident map uses Google Maps when `VITE_GOOGLE_MAPS_API_KEY` is set in `.env.local` (not committed), and falls back to OpenStreetMap (free, no key) otherwise. With Google, the board map also has a Map / Satellite / 3D switch, and the side panel a Street view tab; `VITE_GOOGLE_MAP_ID` sets the cloud-styled map. Setup: [`../docs/setup/google-maps.md`](../docs/setup/google-maps.md).
 
 ## Deploy (Firebase Hosting, second site)
 

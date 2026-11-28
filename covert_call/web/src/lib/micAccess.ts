@@ -1,3 +1,4 @@
+import { APP_NAME } from './brand'
 // Microphone access before a call: why it failed and how the caller can fix it on their phone.
 //
 // Callers reported that some phones never showed the permission box. The box only appears when the browser is
@@ -75,7 +76,7 @@ export function micHelp(issue: MicIssue): MicHelp {
   const app = inAppBrowser()
   if (issue === 'in-app') {
     return {
-      title: 'Open QuickBite in your browser',
+      title: `Open ${APP_NAME} in your browser`,
       intro: `${app === 'this app' || !app ? 'This app' : app}'s built-in browser can't use the microphone, so calls to order won't work here.`,
       steps: [
         p === 'ios' ? 'Tap the ••• or share button and choose "Open in Safari" (or "Open in browser").' : 'Tap the ⋮ menu and choose "Open in Chrome" (or "Open in browser").',
@@ -89,7 +90,7 @@ export function micHelp(issue: MicIssue): MicHelp {
     return {
       title: 'Your browser can’t place calls',
       intro: 'Calls to order need a recent browser.',
-      steps: ['Open QuickBite in Chrome (Android) or Safari (iPhone).', 'Copy the link below if you need it.'],
+      steps: [`Open ${APP_NAME} in Chrome (Android) or Safari (iPhone).`, 'Copy the link below if you need it.'],
       canCopyLink: true,
     }
   }
@@ -107,7 +108,7 @@ export function micHelp(issue: MicIssue): MicHelp {
   if (p === 'ios') {
     return {
       title: 'Allow the microphone',
-      intro: 'Your phone blocked the microphone for QuickBite, so the call can’t start.',
+      intro: `Your phone blocked the microphone for ${APP_NAME}, so the call can’t start.`,
       steps: [
         'Safari: tap "aA" in the address bar → Website Settings → Microphone → Allow.',
         'Chrome on iPhone: open the iPhone Settings app → Chrome → turn on Microphone.',
@@ -119,10 +120,10 @@ export function micHelp(issue: MicIssue): MicHelp {
   if (p === 'android') {
     return {
       title: 'Allow the microphone',
-      intro: 'Your phone blocked the microphone for QuickBite, so the call can’t start.',
+      intro: `Your phone blocked the microphone for ${APP_NAME}, so the call can’t start.`,
       steps: [
         'Tap the icon left of the web address (🔒 or ⚙) → Permissions → Microphone → Allow.',
-        'Not listed? Chrome ⋮ menu → Settings → Site settings → Microphone → make sure it’s on, and remove QuickBite from "Blocked".',
+        `Not listed? Chrome ⋮ menu → Settings → Site settings → Microphone → make sure it’s on, and remove ${APP_NAME} from "Blocked".`,
         'Still nothing? Phone Settings → Apps → Chrome → Permissions → Microphone → Allow.',
         'Come back here: the call connects by itself (or tap "Allow microphone").',
       ],
@@ -130,7 +131,7 @@ export function micHelp(issue: MicIssue): MicHelp {
   }
   return {
     title: 'Allow the microphone',
-    intro: 'Your browser blocked the microphone for QuickBite.',
+    intro: `Your browser blocked the microphone for ${APP_NAME}.`,
     steps: ['Click the icon left of the web address → Microphone → Allow.', 'Then click "Allow microphone".'],
   }
 }

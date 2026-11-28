@@ -1,7 +1,11 @@
+import { computeRoute, googleMapsEnabled, type TravelMode } from '../google/maps.ts'
 import { nearbyServices, type NearbyService, type ServiceKind } from './nearbyServices.ts'
 import { affirmed } from '../incidents/severity.ts'
 
-// Driving routes via the free public OSRM server (no key, fair-use demo service — fine for a prototype).
+export type { TravelMode }
+
+// Google Routes (walking, two-wheeler or car) when the app has set a Google Maps key. Otherwise, or when Google
+// can't answer, driving routes from the free public OSRM server (no key, fair-use demo service, car profile only).
 const OSRM = 'https://router.project-osrm.org/route/v1/driving'
 
 export type LatLng = { lat: number; lng: number }
@@ -16,6 +20,8 @@ export type SafeRoute = {
   stepIndex: number
   requestedBy: 'ai' | 'responder'
   updatedAt: string
+  // How the route was planned. Absent on routes from before 2026-11-21 and on OSRM routes (always by car).
+  travelMode?: TravelMode
 }
 
 type OsrmStep = {
@@ -48,6 +54,30 @@ function instructionOf(s: OsrmStep, next?: OsrmStep): string {
       if (mod === 'straight') return `Go straight${road}`
       return `Turn ${mod.replace('slight ', 'slightly ').replace('sharp ', 'sharply ')}${road}`
   }
+}
+
+// A route in the given mode: Google when available; otherwise the OSRM car route (travelMode then says DRIVE, so the
+// caller and dashboard know a walker got a car route).
+export async function routeBetween(from: LatLng, to: LatLng, mode: TravelMode = 'DRIVE') {
+  if (googleMapsEnabled()) {
+    const r = await computeRoute(from, to, mode)
+    if (r) return { ...r, travelMode: mode }
+  }
+  const r = await drivingRoute(from, to)
+  return r ? { ...r, travelMode: 'DRIVE' as const } : null
+}
+
+// How the caller is travelling, for the route: the phone's own speed first (it can't be fooled by a car that is
+// following them), then the phone's "running" motion signal, then their own words ("on foot", "in an auto").
+// Unknown is a car route, as before, since a walking route can send a car the wrong way down a one-way street.
+export function travelModeFor(opts: { speedMps?: number | null; running?: boolean; situation?: string | null }): TravelMode {
+  const s = (opts.situation ?? '').toLowerCase()
+  if (opts.speedMps != null && opts.speedMps >= 7) return 'DRIVE'
+  if (/\b(on (a|an|my|the|his|her) (bike|motorbike|motorcycle|scooter|scooty|two.?wheeler)|riding)\b/.test(s)) return 'TWO_WHEELER'
+  if (/\b(i'?m|i am|caller is|she is|he is|they are|we are)\s+(driving|in (a|an|my|the) (car|auto|rickshaw|taxi|cab|bus|jeep|van))\b/.test(s)) return 'DRIVE'
+  if (opts.running || /\b(on foot|by foot|walking|running|ran|run)\b/.test(s)) return 'WALK'
+  if (opts.speedMps != null && opts.speedMps <= 3) return 'WALK'
+  return 'DRIVE'
 }
 
 export async function drivingRoute(from: LatLng, to: LatLng) {
@@ -91,16 +121,23 @@ export function kindForSituation(indicators: string[]): ServiceKind {
   return 'police'
 }
 
-// Nearest stations of the right kind; route to the 3 closest and keep the shortest by driving time. The 3
-// candidate routes are requested IN PARALLEL, not one after another — this was the main cause of routing feeling
+// Nearest stations of the right kind; route to the 3 closest and keep the quickest in the caller's travel mode. The
+// 3 candidate routes are requested IN PARALLEL, not one after another — this was the main cause of routing feeling
 // slow (up to 3 sequential OSRM round-trips, on top of the Overpass lookup, could add up to several seconds).
-export async function bestSafeRoute(from: LatLng, kind: ServiceKind, reason: string, requestedBy: 'ai' | 'responder', target?: NearbyService): Promise<SafeRoute | null> {
+export async function bestSafeRoute(
+  from: LatLng,
+  kind: ServiceKind,
+  reason: string,
+  requestedBy: 'ai' | 'responder',
+  target?: NearbyService,
+  mode: TravelMode = 'DRIVE',
+): Promise<SafeRoute | null> {
   const all = target ? [target] : await nearbyServices(from)
   // The right kind first; if none was found, the nearest other help (a hospital or fire station is a safe, staffed,
   // lit place) rather than no route at all.
   const ofKind = all.filter((s) => s.kind === kind)
   const candidates = (ofKind.length ? ofKind : all).slice(0, 3)
-  const results = await Promise.all(candidates.map(async (c) => ({ c, r: await drivingRoute(from, c) })))
+  const results = await Promise.all(candidates.map(async (c) => ({ c, r: await routeBetween(from, c, mode) })))
   let best: SafeRoute | null = null
   for (const { c, r } of results) {
     if (!r) continue

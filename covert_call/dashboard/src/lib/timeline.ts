@@ -11,7 +11,9 @@ export function buildTimeline(i: Incident): TimelineEvent[] {
       ? {
           at: i.location.rough.capturedAt,
           kind: 'location',
-          label: `Approximate location captured (${i.location.rough.source === 'gps' ? 'GPS' : 'IP fallback'})`,
+          label: `Location when the session started (${i.location.rough.source === 'gps'
+            ? `GPS${i.location.rough.accuracyM != null ? ` ±${i.location.rough.accuracyM} m` : ''}`
+            : 'IP fallback'})`,
         }
       : null,
     i.location.confirmed ? { at: i.location.confirmed.confirmedAt, kind: 'address', label: `Address confirmed: ${i.location.confirmed.address}` } : null,

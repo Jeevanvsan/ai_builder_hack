@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { DELIVERY_ADDRESS, OUTLET } from '../data/menu'
+import { DELIVERY_ADDRESS, serviceOf } from '../data/menu'
+import { cartService } from '../data/services'
+import { APP_NAME } from '../lib/brand'
 import { BillDetails } from '../components/disguise/BillDetails'
 import { PageHeader } from '../components/disguise/PageHeader'
 import { ClockIcon, HomeIcon, WalletIcon } from '../components/disguise/icons'
 import { computeBill, formatRupees, useCart } from '../state/cart'
 import { db } from '../lib/firebase'
 import { decodeOrder } from '../../../shared/codes'
-import { startIncident, updateLiveFields } from '../../../shared/incidents/client.ts'
+import { setCover, startIncident, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Severity } from '../../../shared/incidents/types.ts'
 
 type Payment = 'cod' | 'upi'
@@ -17,20 +19,15 @@ const PAYMENT_OPTIONS: { id: Payment; label: string; hint: string }[] = [
   { id: 'upi', label: 'UPI on delivery', hint: 'Scan and pay with any UPI app at your door' },
 ]
 
-// The delivery-speed choice doubles as the urgency signal for a coded "click & order" (Epic 8, Story 8.2):
-// an ordinary-looking "how soon do you want it" maps straight to how urgently a responder should act.
-const DELIVERY_OPTIONS: { id: Severity; label: string; hint: string }[] = [
-  { id: 'low', label: 'Standard', hint: 'Arrives in 30–40 min' },
-  { id: 'medium', label: 'Priority', hint: 'Bumped up the queue, ~20 min' },
-  { id: 'high', label: 'As soon as possible', hint: 'Fastest available rider' },
-]
-
 export function CheckoutPage() {
   const cart = useCart()
   const navigate = useNavigate()
   const [payment, setPayment] = useState<Payment>('cod')
   const [deliveryUrgency, setDeliveryUrgency] = useState<Severity>('low')
   const [placing, setPlacing] = useState(false)
+  // QuickOne (Epic 33): wording and speed options follow the service the cart's items come from.
+  const { service, mixed } = cartService(cart.lines)
+  const outletName = mixed ? APP_NAME : service.outlet.name
 
   // placeOrder() clears the cart right after navigating to /order-placed. React Router runs that navigation as a
   // transition, so the cleared cart renders first: redirecting home here would replace the order-placed screen.
@@ -45,9 +42,10 @@ export function CheckoutPage() {
   const placeOrder = async () => {
     if (placing) return
     setPlacing(true)
+    // A coded grocery/pharmacy/home item is named by its own label in the notes; food keeps the menu label.
     const codedLines = cart.lines
       .filter((l) => l.item.code)
-      .map((l) => ({ codeId: l.item.code as string, qty: l.qty }))
+      .map((l) => ({ codeId: l.item.code as string, qty: l.qty, label: serviceOf(l.item) === 'food' ? undefined : l.item.name }))
 
     let incidentId: string | null = null
     if (codedLines.length > 0) {
@@ -55,6 +53,8 @@ export function CheckoutPage() {
         const decoded = decodeOrder(codedLines, deliveryUrgency)
         const { id } = await startIncident(db, { channel: 'click-order' })
         incidentId = id
+        // Which service's catalog the coded items came from, for the dashboard (best-effort).
+        void setCover(db, id, service.id).catch(() => {})
         await updateLiveFields(db, id, {
           dangerIndicators: decoded.dangerIndicators,
           peopleCount: decoded.peopleCount,
@@ -67,20 +67,21 @@ export function CheckoutPage() {
       }
     }
 
-    // Pass the incident id so the order-tracking screen can mirror the responder's progress in disguise (Epic 8.3).
-    navigate('/order-placed', { replace: true, state: incidentId ? { incidentId } : undefined })
+    // Pass the incident id so the order-tracking screen can mirror the responder's progress in disguise (Epic 8.3),
+    // and the service so it is worded for it.
+    navigate('/order-placed', { replace: true, state: { ...(incidentId ? { incidentId } : {}), service: service.id } })
     cart.clear()
   }
 
   return (
     <div className="page page-sub">
-      <PageHeader title="Checkout" subtitle={`${cart.count} item${cart.count > 1 ? 's' : ''} · ${OUTLET.name}`} backTo="/cart" />
+      <PageHeader title="Checkout" subtitle={`${cart.count} item${cart.count > 1 ? 's' : ''} · ${outletName}`} backTo="/cart" />
 
       <section className="card">
         <div className="info-row">
           <HomeIcon size={20} className="info-icon" />
           <div className="info-copy">
-            <strong>Deliver to {DELIVERY_ADDRESS.label}</strong>
+            <strong>{service.addressTitle} {DELIVERY_ADDRESS.label}</strong>
             <span>{DELIVERY_ADDRESS.line}</span>
           </div>
           <button type="button" className="link-btn">
@@ -90,15 +91,17 @@ export function CheckoutPage() {
         <div className="info-row">
           <ClockIcon size={20} className="info-icon" />
           <div className="info-copy">
-            <strong>Delivery in {OUTLET.eta}</strong>
-            <span>Standard delivery</span>
+            <strong>{service.etaLabel} {service.outlet.eta}</strong>
+            <span>{service.etaSub}</span>
           </div>
         </div>
       </section>
 
+      {/* The speed choice doubles as the urgency signal for a coded "click & order" (Epic 8, Story 8.2): an
+          ordinary-looking "how soon do you want it" maps straight to how urgently a responder should act. */}
       <section className="card">
-        <h2 className="card-title">Delivery time</h2>
-        {DELIVERY_OPTIONS.map((d) => (
+        <h2 className="card-title">{service.speedTitle}</h2>
+        {service.speeds.map((d) => (
           <label key={d.id} className={`pay-option ${deliveryUrgency === d.id ? 'is-selected' : ''}`}>
             <ClockIcon size={20} className="info-icon" />
             <span className="info-copy">
@@ -124,7 +127,7 @@ export function CheckoutPage() {
         ))}
       </section>
 
-      <BillDetails subtotal={cart.subtotal} />
+      <BillDetails subtotal={cart.subtotal} service={service} />
 
       <div className="bottom-bar">
         <button type="button" className="checkout-bar" disabled={placing} onClick={() => void placeOrder()}>
@@ -132,7 +135,7 @@ export function CheckoutPage() {
             <strong>{formatRupees(total)}</strong>
             <span>{payment === 'cod' ? 'Cash on delivery' : 'UPI on delivery'}</span>
           </span>
-          <span className="cart-bar-cta">{placing ? 'Placing…' : 'Place order'}</span>
+          <span className="cart-bar-cta">{placing ? service.placingCta : service.placeCta}</span>
         </button>
       </div>
     </div>

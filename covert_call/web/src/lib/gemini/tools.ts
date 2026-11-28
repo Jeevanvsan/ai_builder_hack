@@ -1,4 +1,5 @@
 import { AI_FEATURES } from '../../../../shared/aiFeatures.ts'
+import type { CoverPack } from '../../../../shared/covers/index.ts'
 import { Behavior, FunctionResponseScheduling, Type, type FunctionDeclaration, type FunctionResponse, type Tool } from '@google/genai'
 
 // Record-only tools: Mia never needs their result, so their responses are SILENT (see toolResponse below).
@@ -239,6 +240,44 @@ export const END_CALL: FunctionDeclaration = {
 export const LIVE_CALL_TOOLS: Tool[] = [
   { functionDeclarations: [REPORT_SITUATION, CONFIRM_ADDRESS, REPORT_STRESS_LEVEL, REPORT_SCENE_OBSERVATION, REPORT_CALLER_ESTIMATE, REPORT_ADVICE, GET_ROUTE_GUIDANCE, REPORT_VEHICLE_NUMBER, REPORT_COERCION_SIGNAL, CONFIRM_MESSAGE_DELIVERED, SEND_CASE_REPORT, END_CALL] },
 ]
+
+// QuickOne (Epic 33): the caller asked for a different service mid-call. The reply is that service's sheet
+// (buildCoverSheet in persona.ts), so Mia carries on in its words without a new system instruction. Not part of
+// LIVE_CALL_TOOLS: the React Native app and the eval import that list and keep today's 12 tools.
+export const SET_SERVICE: FunctionDeclaration = {
+  name: 'set_service',
+  description:
+    'Call this in the same turn the caller asks for a different service than the one this call is on: food, ' +
+    'groceries, medicines, a home repair, or anything else (a cab, laundry, a salon…). Say one short natural line ' +
+    '("sure, one sec"), then use only the words of the sheet this returns. Only when the caller asks; never suggest ' +
+    'another service yourself.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      service: {
+        type: Type.STRING,
+        enum: ['food', 'grocery', 'pharmacy', 'home', 'other'],
+        description: '"pharmacy" for medicines, "home" for a repair or any home service, "other" for anything else',
+      },
+      name: { type: Type.STRING, description: 'The caller\'s own word for the service, e.g. "cab", "laundry" (needed for "other")' },
+    },
+    required: ['service'],
+  },
+}
+
+// The call tools for one cover. Food without switching is LIVE_CALL_TOOLS itself. Other covers swap the two food
+// examples (the delivery address, "your order's on its way"); `switchable` adds set_service, in the same Tool so the
+// session still declares a single function list.
+export function liveCallTools(pack: CoverPack, switchable = false): Tool[] {
+  if (pack.id === 'food' && !switchable) return LIVE_CALL_TOOLS
+  const declarations = (LIVE_CALL_TOOLS[0].functionDeclarations ?? []).map((d) => {
+    if (pack.id === 'food') return d
+    if (d === CONFIRM_ADDRESS) return { ...d, description: d.description?.replace('their delivery address', `their ${pack.address}`) }
+    if (d === END_CALL) return { ...d, description: d.description?.replace('"your order\'s on its way, thanks for calling"', '"thanks for calling, take care"') }
+    return d
+  })
+  return [{ functionDeclarations: switchable ? [...declarations, SET_SERVICE] : declarations }]
+}
 
 // Tools for the silent SOS observer (Epic 11.3): report what it sees/hears, but no conversation-only tools
 // (no address confirmation, no end_call — the person ends the SOS with the secret gesture).

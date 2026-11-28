@@ -1,3 +1,5 @@
+import { coverPack } from '../../../shared/covers/index.ts'
+
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     month: 'short',
@@ -26,6 +28,12 @@ export function channelLabel(channel: string): string {
     default:
       return channel
   }
+}
+
+// QuickOne (Epic 33): the service whose code words a call or coded order used ("Pharmacy"), for a badge. Null for
+// food, the original cover, which is also what older incidents and the native app use.
+export function coverLabel(cover: string | undefined): string | null {
+  return cover && cover !== 'food' ? coverPack(cover).label : null
 }
 
 export function formatElapsed(fromIso: string, now: number): string {

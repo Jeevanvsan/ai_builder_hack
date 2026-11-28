@@ -957,3 +957,231 @@ The form's "Brief Description of Your Solution (please include how you are lever
 - Fix in `covert_call/docs/setup/trusted-alert-Code.gs`: Yopmail addresses get the email without the PDF, which holds everything the PDF does. Other addresses still get the PDF. Checked with a dry run on this incident's data (stubbed services, nothing sent).
 - ~12:58 IST: the new version was deployed to the existing deployment (same URL) and the `INC-MUZNKM7N` report was resent; the script returned `sent`. If the temporary `Test` file is still in the Apps Script project, delete it. Not committed.
 - **Note for Jeevan:** the manual still says "The PDF case report goes to the shared inbox qbtour@yopmail.com" (`covert_call/landing/src/components/ManualGuides.tsx:205`). Judges using that inbox now get the email without the PDF.
+
+### 2026-11-20 ~15:50 IST: QuickOne dynamic cover, step 1 (branch `feature/quickone-dynamic-cover`, done from Ameen's side)
+Ameen's idea: the cover shouldn't be food only. A caller should be able to call about groceries, medicines, a repair or anything else that fits their situation, and Mia answers in that service's words. The app becomes a multi-service app called **QuickOne**. Decided today: staging first. Production stays QuickBite until a go/no-go on **28 Nov** (freeze 30 Nov), after real spoken calls on every cover. Plan: backlog Epic 33 (Phase 5).
+- **Why it fits the existing pipeline:** Mia teaches each code's meaning live, so the code words never had to be fixed. The meanings (`shared/codes.ts` plus the follow-up meanings) stay the same; each service only changes the words. Severity, the summary, the tiles and the alerts read the danger tags only.
+- **Done (not committed, nothing deployed):**
+  - `covert_call/shared/covers/`: five cover packs: food (today's wording, copied verbatim), grocery, pharmacy, home services, any other service (cab, laundry, …, using the caller's own word).
+  - `web/src/lib/gemini/persona.ts`: one template, `buildPersonaInstruction({ pack, appName, entry, switchable })`, plus `buildCoverSheet()`, the sheet Mia gets when she switches service mid-call. `PERSONA_SYSTEM_INSTRUCTION` is still exported and **byte-identical** to main's food prompt (checked against a snapshot), so native and the eval get exactly today's text.
+  - `shared/codes.ts`: `decodeOrder` takes an optional per-item label. Additive; existing callers unchanged.
+  - `eval/check-covers.ts` (`node --no-warnings check-covers.ts` in `eval/`): offline checks for every pack. Same-breath meanings, no giveaway words, the movement tags that start route guidance, keyword clashes, prompt leaks, and the byte-identical snapshot. All pass; two deliberately planted faults were caught.
+  - Web build + lint, dashboard build and native `tsc --noEmit`: all clean.
+- **Next, after Ameen reviews the new packs' wording:** the `set_service` tool and call-session wiring, the neutral "Call QuickOne" entry, the rename and service tabs, the eval scenarios, then voice calls on a staging preview channel.
+- **Notes for Jeevan:**
+  - **Data model, your sign-off needed before that step:** a new optional incident field `cover` (`'food' | 'grocery' | 'pharmacy' | 'home' | 'other'`), whitelisted in `firestore.rules` (the `hasOnly` list plus an `in [...]` check). It is not locked in `validChange` because it can switch mid-call. Additive, and production never writes it. You deploy the rules; until then the web writes it best-effort and nothing breaks.
+  - **Dashboard (your area):** `Conversation.tsx` should take the code phrases from the incident's cover (`coverPhrases(coverPack(incident.cover))`) instead of `ALL_CODES`, or non-food codes get no chip. Also a "Cover" badge and two wording tweaks (the `credibility.ts` prompt, "delivery chat"). Planned on a dashboard preview channel, not production.
+  - **Staging itself stays as it is:** the test build goes to a preview channel on the staging site. If the Gemini key now has HTTP-referrer restrictions, the preview origin needs adding.
+  - **If it's a go on 28 Nov:** the deck, landing page and manual need the new name and per-service code tables; the pitch line becomes "It looks like an ordinary order. It's a call for help."
+- **Native parity:** nothing to port in this step. Native imports `PERSONA_SYSTEM_INSTRUCTION` and `LIVE_CALL_TOOLS`, which are unchanged byte for byte. Follow-ups for when native resumes: map the Settings presets FreshCart / MediGo / RideNow (`native/src/lib/appearance.tsx`) to the grocery / pharmacy / other covers (Mia ignores the custom name today), port the `set_service` handler, and add native catalogs.
+
+### 2026-11-20 ~16:25 IST: QuickOne step 2, switching service mid-call (same branch, done from Ameen's side)
+- **Renumbered to Epic 33.** Code comments already use Epic 28 (the AI test harness) and 30-32, so QuickOne is Epic 33 in the backlog, both CLAUDE.md files and the code. The step-1 commit message still says "Epic 28".
+- **Call side done (not committed yet, nothing deployed):**
+  - `web/src/lib/gemini/tools.ts`: new `set_service` tool, added through `liveCallTools(pack, switchable)`. `LIVE_CALL_TOOLS` itself is unchanged, so native and the eval keep their 12 tools.
+  - `web/src/lib/gemini/liveSession.ts`: the call is built for a service (`opts.cover`, `opts.entry`); the prompt, tools and speech-to-text hints come from it. `set_service` moves the call to another service and replies with that service's full word sheet; from then on every known-facts note says which service is on. The ~14 food lines in notes and tool replies use the current service's words (identical text for food). If the caller's words ask for another service and Mia doesn't switch, she gets one nudge; the app never switches by itself. A resumed session keeps its setup; a fresh reconnect starts on the current service.
+  - `web/src/pages/CallPage.tsx`: `/call?service=pharmacy` (food, grocery, pharmacy, home, other) starts Mia in that service, `/call?service=any` is the neutral line, and plain `/call` is the food call as before. The header follows the service ("QuickBite Pharmacy Order Desk", "QuickBite Home Services Booking Desk"); the rename comes with step 3.
+  - `shared/covers/index.ts`: `speechHints()`, the hint list per service. The food list is identical to main's (67 entries, same order).
+  - `shared/incidents/knownFacts.ts`: optional address word; the default text is unchanged.
+- **Eval:** 6 new `cover-*` scenarios (grocery chase with routing, pharmacy domestic, home locked in, neutral line → cab, neutral line → medicines, food line switched to pharmacy) and a `--quickone` flag that runs any scenario with the web's new setup, for a same-day A/B against the frozen food prompt. `run.ts` mirrors `set_service` and the nudge, and scores "switched to <service>" and "<service> words only". Not run yet.
+- **Checks:** `check-covers.ts` (snapshot, per-service tools, hint limits) all pass; web build + lint, dashboard build, native `tsc --noEmit`, and a strict `tsc` of the eval files are clean. Nothing has been tried on a live call yet.
+- **Next:** the rename and service tabs on Home (33.3), then the `cover` incident field and dashboard chips (33.4, still needs your sign-off, see the step-1 note), then the eval runs and voice calls (33.5).
+- **Native parity:** nothing to port; native still gets the frozen food prompt and the 12 tools. When native adopts covers, its `liveSession.ts` needs the same `set_service` handling.
+
+### 2026-11-20 ~18:45 IST: QuickOne step 3, the multi-service app (same branch, done from Ameen's side)
+- **Rename:** the web app is QuickOne (`web/src/lib/brand.ts`, page title, mic-help screens, call screen initials, order ID prefix, the case-report images). Firebase ids, URLs, package names and storage keys are unchanged. Native and its frozen food prompt still say QuickBite.
+- **Home screen:** a row of service tabs (Food, Grocery, Pharmacy, Home services) above the search. Each tab has its own catalog, categories, search text, banner, outlet, call button ("Call to order", or "Call to book" for home services) and cart/checkout/order-status wording (`web/src/data/services.ts`). The open tab is remembered for the session. The food tab looks as before.
+- **Neutral line:** a phone icon in the top bar starts `/call?service=any`, where the caller names the service.
+- **Catalogs** (`web/src/data/catalog/`): 13 items per service, the 11 coded items named from the cover packs plus 2 ordinary ones. Click & order works on every tab: checkout decodes the same code ids, and the incident notes name the item as shown (e.g. "Vitamin C Tablets").
+- **Photos:** 42 new CC0 / Public Domain photos from Openverse, cropped to the food set's 640×480 (banners 960×540), credited in `assets/<service>/CREDITS.md`. A few products have no public-domain photo, so they use plausible stand-ins: oranges for vitamin C, an orange drink for ORS, a technician among pipes for the water heater. The lip balm's brand name is blurred.
+- **Checked:** web build + lint, landing build (it imports the menu), cover checks. Clicked through the production build headless at phone size: all four tabs, an item added, cart and checkout for a home-services booking, a reload keeping the tab. No console errors. No order was placed and no call made. Not deployed.
+- **Note for Jeevan:** the landing manual's screenshot check (`landing/scripts/capture-manual-shots.mjs:561`) expects "QuickBite Order Desk" and fails on this branch; that's part of the post-go landing update. The step-1 request for the `cover` incident field still stands; it's the next step.
+- **Native parity:** native has its own menu and screens, so nothing changed there. Follow-ups if native adopts QuickOne: service tabs, the three catalogs, the top-bar call button.
+
+### 2026-11-20 ~19:15 IST: QuickOne step 4, the `cover` field, the dashboard, and staging previews (same branch, done from Ameen's side)
+- **Data model:** incidents get an optional `cover` (`'food' | 'grocery' | 'pharmacy' | 'home' | 'other'`) in `shared/incidents/types.ts`, plus `setCover()` in `client.ts`. The web call sets it at the start and on every service switch, a coded order sets it at checkout, and the eval does the same. All writes are best-effort. Missing means food (older incidents, native).
+- **Firestore rules, DEPLOYED (production-wide), at Ameen's request:** `cover` added to the `hasOnly` list with an `in [...]` check, and not locked in `validChange`. Compiled and released from `covert_call/dashboard` with `firebase deploy --only firestore:rules`. The file deployed is main's rules plus that one line.
+- **Dashboard (your area):**
+  - The conversation view highlights the incident's own code words (`Conversation.tsx` gets `cover` from `SidePanel`).
+  - It now takes the earliest match first, which fixes the old bug where the first option in Mia's "A, B or C?" question got no meaning.
+  - It matches whole words only.
+  - A badge ("Pharmacy", "Grocery", "Home services", "Other services") sits next to the SOS badge on the queue row and the incident header (`coverLabel()` in `lib/format.ts`). Food shows no badge.
+  - The credibility prompt and the "delivery chat" line no longer assume a food app.
+- **Previews (expire 2026-12-20), production untouched:**
+  - Web: https://quickbite-5cde0-staging--quickone-2wh4xec6.web.app (a preview channel on the staging site; the staging site itself still serves QuickBite, checked).
+  - Dashboard: https://quickbite-5cde0-dashboard--quickone-wwq8nfom.web.app (sign in as usual).
+- **Gemini key:** the web preview is built with the free-tier key (`VITE_GEMINI_LIVE_API_KEY_FREE`, the only key staging builds use), so calls can connect. If the Gemini keys have HTTP-referrer restrictions, the preview domain must be allowed. To redeploy the same link: build with `--mode staging`, then `firebase hosting:channel:deploy quickone --config firebase.staging.json --expires 30d`. (Corrected ~19:40 IST: an earlier version of this note said the key was missing. That check only looked for old-format `AIza…` keys; this machine's Gemini keys use the newer `AQ.` format.)
+- **Checked:** web and dashboard build + lint, native `tsc`, strict eval `tsc`, cover checks; the transcript matcher was tested against every cover's phrases.
+- **Notes for Jeevan:**
+  - **Your rules were deployed from this branch.** The file is main's rules plus the `cover` line. If anything was live that isn't on main, it was replaced, so please check once in the console's rules history.
+  - Incidents made from the preview land in the normal live queue (same Firestore), with a cover badge on non-food calls. The production dashboard ignores the field.
+  - Please review the dashboard changes above; they're in your area.
+
+### 2026-11-20 ~21:50 IST: Google Maps, exact location, Street View and 3D, code ready (Epic 34, done from Ameen's side)
+- New branch `feature/google-maps` from `main`, separate from QuickOne. Plan: everything lands before the 30 Nov freeze; go/no-go on 28 Nov together with QuickOne. Setup guide: `covert_call/docs/setup/google-maps.md`. Backlog: Epic 34.
+- **No Google Maps key exists yet**, so nothing Google has run for real. With no key, every part falls back to today's OpenStreetMap path. Checks so far: type-checks (dashboard, web, native, strict eval), lint, a dashboard build, and 28 scratch checks with stubbed responses (location logic, request and response parsing, the key never logged). Not committed, not deployed.
+- **Dashboard (your area, please review):**
+  - `GoogleIncidentMap.tsx` was rewritten to match the OSM map. Before, setting a key would have hidden the route and trail.
+  - New: a Map / Satellite / 3D switch at the board's bottom left (`IncidentMap.tsx`, `GoogleIncident3D.tsx`) and a "Street view" tab in the side panel (`board/StreetViewPanel.tsx`), both only with a key.
+  - New: an accuracy ring on the map, "GPS ±40 m" or "IP estimate" on the Location tile, and hollow trail points for places the caller named.
+  - The queue card, fact sheet and credibility check now read the latest position.
+- **Location capture (shared, so native gets it too):**
+  - GPS accuracy and a source are stored.
+  - `location.rough` is no longer overwritten by every trail point, so it stays the start fix.
+  - The silent SOS, silent tap and order-placed screens now keep sending the position (`shared/incidents/trail.ts`), on web and native.
+  - Address search no longer uses an IP fix as a hint.
+  - Fixed: a station you pick with "Route here" was swapped back to the nearest one on the next periodic re-route.
+- **Google lookups (`shared/google/maps.ts`):**
+  - Addresses go to Places, then OSM. (Geocoding was dropped the same night: Google refuses it for website-restricted keys.)
+  - Landmarks are found by best name match.
+  - Stations come with phone numbers, so the route tile's "Call" link finally has numbers.
+  - Routes are on foot, two-wheeler or car, chosen from GPS speed, the running signal or Mia's words; a car route when unknown, as before. Mia's notes add "on foot" only on walking routes.
+  - Each app sets its key once at startup (`setGoogleMaps`) instead of passing it at every call site.
+- **Notes for Ameen:**
+  - Add the new variable names to the example env templates (not edited, because of the env-file hook):
+    - web: `VITE_GOOGLE_MAPS_API_KEY`;
+    - dashboard: `VITE_GOOGLE_MAP_ID`;
+    - native: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` and `EXPO_PUBLIC_ANDROID_CERT_SHA1`.
+  - The landing page's "Leaflet / OSM" chip and deck slides 8, 9 and 12 are left until after the go, so they don't claim Google Maps before it ships.
+- **Note for Jeevan:**
+  - Ameen is doing the Google Cloud setup himself, and the 29 Nov production deploy, since you're busy with another project. If you can, a 10-minute look at the dashboard changes (your area) before 28 Nov would help.
+  - Nearby stations with phone numbers use the Places "Enterprise" SKU (1,000 free a month), so the budget alert matters.
+
+### 2026-11-20 ~23:45 IST: Google Maps keys set up and tested (Epic 34, done from Ameen's side)
+- **Google Cloud (Ameen):**
+  - The keys, Map ID and style live in project `quick-bite-510804` (also named "Quick Bite"). It shares a billing account with the paid Gemini key's project (`gen-lang-client-0441842014`), where the APIs were first enabled. Not the Firebase project.
+  - Budget alert: ₹1,000 a month, whole billing account, emails at 50/90/100%.
+  - APIs enabled: Maps JavaScript, Places (New), Routes. Geocoding was enabled too but isn't used.
+  - Map ID "QuickBite board" with a light style: place icons off except hospital, police, fire and landmarks; pharmacies off.
+  - Two website-restricted keys: dashboard, and caller web. The caller key is also in `eval`'s local env file.
+- **Tested with the real keys (not committed, not deployed):**
+  - Both builds contain a Maps key and use the Map ID.
+  - Dashboard on localhost, headless, on demo incident INC-MWP7R826: the Google map shows the route, next turn, trail and live caller; Satellite and 3D work; the Street view tab shows a panorama 30 m from the caller (MG Road, Dec 2025 imagery). The new map style removes the clutter.
+  - Eval with Google: chase 6/6 (walking route to Kadavanthra Police Station, 1.3 km, Google turn-by-turn with landmarks, the station's phone number stored); covert address 6/7 (same as before; the miss is "domestic" not tagged).
+  - Google against OSM: about 200 ms against 2–4 s per address. They agree on Convent Square, St George Auditorium and Singapore.
+- **Fixed from the tests:**
+  - Nearby stations now take the best-known places of each kind (not the plain nearest, which gave a traffic police cabin, a visa medical agency and a mis-tagged shop), drop closed places, then sort by distance.
+  - An address is exact only when the area the caller named appears in Google's address. "Asha Nivas, Vazhicherry" had matched an "Asha Nivas" in Pazhaveedu, 2 km away.
+  - The Geocoding step is removed: Google refuses it for website-restricted keys.
+- **Notes for Ameen:**
+  - When the `maps` preview channels are deployed, add their two URLs to the keys' website lists, the caller key and the dashboard key.
+  - Untick Geocoding on the caller key if you like; it isn't used.
+
+### 2026-11-21 ~00:10 IST: maps preview deployed, keys locked down (Epic 34, done from Ameen's side)
+- Committed on `feature/google-maps`: `4c503e3` (code) and `9a9737a` (docs). Not pushed.
+- Preview channels `maps`, expiring 20 Dec. The live sites are unchanged.
+  - Caller app (staging build): https://quickbite-5cde0-staging--maps-bgdgk0m7.web.app
+  - Dashboard: https://quickbite-5cde0-dashboard--maps-wf5bdwmv.web.app
+- **Fixed:** the dashboard key had no website restriction while its bundle was public on the preview, for a few minutes. Both keys are now website-restricted. Checked against Places, using the keys from the built bundles:
+  - The caller key works from the staging preview, the live web site and localhost.
+  - The dashboard key works from its preview, the live dashboard and localhost:5174.
+  - Both are refused from any other site or with no referrer.
+- Deployed preview dashboard checked headless (test responder, demo incident INC-MWP7R826): Google map, Satellite, 3D and Street view all work, with no key errors.
+- **Note for Ameen:** next are the five voice calls on the caller preview: on foot, by car, at home, a silent SOS, and a coded order.
+
+### 2026-11-21 ~00:15 IST: automated runs instead of the five voice calls; address pins fixed (Epic 34, done from Ameen's side)
+- Ameen has no time for the voice calls, so the eval stands in, with Google and the free Gemini key:
+  - **Chase on foot:** a walking route to Kadavanthra Police Station (1.3 km), with Google landmarks in Mia's directions.
+  - **Chase at car speed:** a car route (2.2 km, `travelMode=DRIVE`). New eval option `EVAL_GPS_SPEED`, metres per second, default walking pace.
+  - **Five other calls** (accident, fight, house break-in, real order, covert weapon at home): 26/28 strict checks. The two misses are tag wording and "domestic", not maps.
+  - **Trail test** (SOS, silent tap, order placed), on a demo incident that was then resolved: precise fixes written with their accuracy; too-soon, coarse and after-stop fixes skipped; start fix kept. Passes.
+- **Pins, Google against the earlier OSM run:**
+  - "NH 66 near Cherthala bus stand": not pinned before, now pinned.
+  - "Maharaja's College gate": 1.7 km off before, now 50 m.
+  - "Sunrise Apartments, Kaloor": went to a same-named building 3.6 km away. **Fixed:** when the area the caller named isn't in Google's address, the area itself is looked up. The pin goes there, unless the place is within 1.5 km of it, so a misheard area still keeps the right place. After the fix: Kaloor 0.57 km and Vazhicherry 0.18 km from the right area, St George Auditorium exact spot, all approximate. Under 0.8 s each.
+- Committed: `df0f46f` (area fix), `367a9d6` (eval option) and this note. The web preview was refreshed with the fix at ~00:16 IST (same address, now expiring 21 Dec). Not pushed.
+- **Still open:** one real walking call during a finale rehearsal before 28 Nov, and the Singapore checks (3D buildings, Street view) at the venue.
+
+### 2026-11-21 ~00:30 IST: QuickOne eval results and the cab fix (same branch, done from Ameen's side)
+- **Eval, 2026-11-20** (free key, one run per scenario):
+  - Food scenarios: the frozen prompt scored 65/81 strict (67 judged); QuickOne's per-cover prompt (`--quickone`) scored 69/81 (71 judged). Nothing suggests QuickOne broke the food flow.
+  - QuickOne calls used about 8% more tokens, and the median reply went from 956 to 1,257 ms. That phase also had Firestore timeouts, so worth a re-check.
+  - The 6 cover scenarios: 33/42. Grocery while being followed scored 8/8, and the switch from food to pharmacy 6/6.
+- **Found and fixed:** the neutral entry's greeting offered only food, groceries, medicines or a repair, so a caller who wanted a cab picked "something fixed at home". The greeting and Mia's follow-up question now add "or anything else, like a cab". Only the neutral entry changed in `persona.ts`; the food prompt is unchanged and `check-covers` passes.
+- **Re-run after the fix:**
+  - Cab: 4/6. It now switches to the cab cover at 21 s; before, it switched to home repair at 117 s.
+  - Locked in: 6/7. Before it was 4/7 and ran out of time.
+  - Medicines: 6/7. It now switches at once; before, only after the app's nudge.
+- **Still weak, not QuickOne-specific:**
+  - "Domestic" is rarely tagged; it fails in most domestic scenarios, food ones included.
+  - One cab run tagged the wrong code. The "other services" cover uses tier words ("premium" means a weapon).
+- **Watch in real calls:** in covert mode Mia sometimes names the destination plainly ("the Central Police Station"), without the persona's "the rider's meeting point" framing. The rule is the same in the old prompt.
+- Ameen has no time for the 8 planned real calls; at least one is planned during a finale rehearsal.
+- Includes last night's two-line Gemini key correction (status and backlog), restored from the stash.
+
+### 2026-11-21 ~00:45 IST: QuickOne and Google Maps in one preview; a landmark bug fixed (branch `integration/quickone-maps`, done from Ameen's side)
+- **New branch `integration/quickone-maps`:** QuickOne plus `feature/google-maps` (merge `8653974`).
+  - The code merged on its own. Only the backlog and this file conflicted, because both branches added entries at the end: the backlog keeps Epic 33 then 34, and this file keeps the entries in time order.
+  - Checks on the result: type-checks for all four apps, the cover checks, and the location and Google tests.
+- **Combined preview** on the `maps` addresses, which both keys already allow; expires 21 Dec.
+  - Caller: https://quickbite-5cde0-staging--maps-bgdgk0m7.web.app
+  - Dashboard: https://quickbite-5cde0-dashboard--maps-wf5bdwmv.web.app
+  - The QuickOne-only preview (`quickone`) is unchanged and has no Google key.
+- **Eval on the merged code** with Google and the QuickOne prompt: the chase scored 6/6 and grocery-while-followed 8/8. Both got walking routes to Kadavanthra Police Station, with its phone number.
+- **Bug fixed** (older than tonight; the OSM run did it too): a caller who said "MG Road, Kochi" was moved 3 km, to a business named after the city.
+  - Why: the landmark search kept only "kochi", and that loose match overrode a precise GPS fix. The route was then planned from there.
+  - Now the town part of a landmark is ignored, and a loose match never overrides a precise GPS fix. Without GPS it still moves the caller, and Mia reads it back to confirm.
+  - Re-run: the trail stays on MG Road. The same fix is on `feature/google-maps`.
+- **Go/no-go on 28 Nov:** if both features go, merge this branch into `main`; if only one goes, merge that feature's own branch.
+- **Note for Ameen:** make the one rehearsal call on the combined preview above.
+
+### 2026-11-25 ~14:35 IST (revised ~15:00): intro video scripts for the Singapore finalists (done from Ameen's side)
+- **Revised:** each person's section is now a script to read straight down. There are three separate versions (Manglish, Malayalam script, English), one breath per line, with a "( pause )" cue. All three versions now use short sentences and simple, everyday words (for example "help team" for responders, and "Gemini AI takes the call"). The brief, the no-go lines and the shooting notes moved to the bottom.
+- The organisers asked each finalist team for a 20 to 30 second vertical video: "Hi, we are Team NexMind, and we are from India. We are coming to Singapore!", then "We're builders, and we're building…". They want it in our native language and unedited.
+- We're recording separately, so there are two scripts, one each. They're in `finale_prep/10_intro_video_script.md` (gitignored, shared directly), and `00_README.md` lists it.
+  - Every line is in Malayalam, with a romanised version and an English version.
+  - Both close in English on QuickOne's line: "It looks like an ordinary order. It's a call for help."
+  - **Ameen:** the caller's side. QuickOne looks like an app for ordering food, medicine or a taxi, but nothing is really ordered. It's a secret way to call for help, answered by Gemini AI.
+  - **Jeevan:** the responder's side. A secret help app that looks like a delivery app; Gemini AI tells the help team what is happening, and Google Maps shows the way to the nearest police station.
+- The scripts use QuickOne and Google Maps, which are still waiting on the 28 Nov go/no-go. The file has the replacement lines if either one doesn't ship.
+- No code, deck, rules or deployed site were changed. Not committed.
+- **Note for Jeevan:**
+  - Your script is the "Jeevan's video" section.
+  - Record on your own: phone upright at eye level, head and shoulders, plain background, the same framing as Ameen.
+  - Keep it between 20 and 30 seconds, and send your own Drive link through the form.
+
+### 2026-11-28 ~12:25 IST: Top 50 Medium blog and LinkedIn posts drafted (done from Ameen's side)
+- Hack2skill asked every Top 50 team for a technical blog on Medium, a LinkedIn share (tag Google Cloud and Hack2skill; #Top50Stories #Hack2skill #AIBuilderCup #GoogleCloud), and the URL plus a team photo through their Google Form.
+- **Written as QuickOne with Google Maps Platform live**, per Ameen's go decision on both today. Production still showed QuickBite at the time of writing, so the blog goes out after the 29 Nov deploy.
+- **New folder `blog/` (untracked, not committed):**
+  - `medium_post.md`: the post, about 3,100 words. It covers the problem, the solution, the stack and Google tools, the approach, the challenges, testing and impact. Every number comes from `finale_prep/05` and `03`, the 20–21 Nov entries here, or git. It follows the "don't claim" list.
+  - `medium_post.html`: the same post, for copying into Medium. `build_html.py` rebuilds it.
+  - `images/`: 7 images, each checked for personal data:
+    - 5 designed figures: the cover, four ways in, one meaning/many covers, the architecture, one answer end to end.
+    - 2 crops of the console, with the header removed and the test address blurred.
+    - Sources and `render.mjs` are in `images/src/`.
+  - `linkedin_post.md`: one post each (Ameen: the caller's side; Jeevan: the responder's side).
+  - `README.md`: the paste steps, the image captions and alt text, the Medium tags, and the submission checklist.
+- **Screenshots** were taken from the `maps` preview channels:
+  - The caller app was not used to call, SOS or order.
+  - Delivery instructions was captured with Firestore blocked.
+  - The dashboard: only the resolved demo cases `INC-MWP7R826` and `INC-MUZNKM7N` were opened. Map views and tabs were switched; nothing was clicked that writes.
+  - The live queue had 10 incidents before and after, so nothing was written.
+- Docs only. Nothing to port to native.
+- **Note for Jeevan:**
+  - Please check your role line at the end of the post, and your LinkedIn version in `blog/linkedin_post.md`.
+  - The form needs a clear group photo with both of us in it.
+  - The preview dashboard still labels the rules-based recommendation "AI recommends". The blog crops that header out and says the recommended action comes from rules.
+- **~13:49 IST, review edits to the blog (at Ameen's request):**
+  - **Removed:** the GitHub link, the "text harness doesn't catch voice failures" challenge (the challenges are now 1–4), and the Geocoding sentence.
+  - **Rewritten:** the Kaloor address check, the post-call paragraph, and the inference numbers. That passage now explains how 22 became 5–6: one reply-starting tool response per batch, notes riding on tool results, and the batching rule in the prompt.
+  - **Added:**
+    - the theme name;
+    - a "Meet Team NexMind" section with a slot for the team photo and "Personal guidance: Venkitesh R Mallan and Jiji O R";
+    - Experion Technologies named in the thank-you line;
+    - thanks and tags for Experion and both guides in the two LinkedIn posts;
+    - a ready "If someone asks" answer in `blog/README.md`.
+  - **Note for Jeevan:** your LinkedIn version now tags Experion Technologies, Venkitesh R Mallan and Jiji O R. Pick each from the @ dropdown.
+
+### 2026-11-28 ~13:56 IST: PR #25 opened, QuickOne + Google Maps + the blog into main (done from Ameen's side)
+- https://github.com/Jeevanvsan/ai_builder_hack/pull/25: `integration/quickone-maps` into `main`, following the go/no-go plan.
+  - 18 commits: QuickOne (Epic 33), Google Maps Platform (Epic 34), `blog/` and the status entries.
+  - Mergeable with no conflicts: `main` hadn't moved since the branch was cut.
+- **Re-checked today:**
+  - web and dashboard build plus lint, native `tsc --noEmit`, and `eval/check-covers.ts`: all pass;
+  - the gitleaks scans on the PR: pass.
+- The landmark fix that also sits on `feature/google-maps` (256ade0) is identical in content to the one on this branch, so nothing is left behind on either feature branch.
+- **Note for Jeevan:**
+  - You're the requested reviewer; the dashboard changes are in your area.
+  - After merging, production is deployed from `main` (planned 29 Nov), with the Maps build variables listed in the PR.
+  - The landing page, its manual and the deck still say QuickBite.

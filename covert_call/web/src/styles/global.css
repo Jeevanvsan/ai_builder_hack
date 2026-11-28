@@ -253,6 +253,43 @@ img {
   color: #fff;
 }
 
+/* ---------- QuickOne service tabs (Epic 33) ---------- */
+
+.service-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 16px 2px;
+}
+
+.service-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 4px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.service-tab span {
+  max-width: 100%;
+}
+
+.service-tab.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
 /* ---------- Promo banner + outlet ---------- */
 
 .promo {

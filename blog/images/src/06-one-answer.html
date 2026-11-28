@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>One answer, end to end</title>
+<link rel="stylesheet" href="figures.css">
+<style>
+  #fig { width: 1600px; height: 900px; background: var(--cream); padding: 56px 70px 0; }
+  .card { position: absolute; background: var(--card); border: 2px solid var(--line); border-radius: 22px; padding: 24px 26px; box-shadow: 0 14px 32px rgba(28, 26, 22, 0.08); }
+  .step { font-size: 18px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .bubble { margin-top: 14px; background: var(--accent-soft); border-radius: 18px; padding: 16px 18px; font-size: 22px; line-height: 1.4; color: var(--ink); font-weight: 500; }
+  .bubble.caller { background: #fff; border: 2px solid var(--line); font-size: 30px; font-weight: 700; }
+  .note { margin-top: 14px; font-size: 20px; color: var(--ink-2); line-height: 1.4; font-weight: 500; }
+  pre { margin-top: 14px; background: var(--night); color: #f4efe6; border-radius: 16px; padding: 18px 20px; font-size: 19px; line-height: 1.5; }
+  pre .k { color: #ffb487; }
+  pre .s { color: #9fe0b5; }
+  ul { margin-top: 12px; list-style: none; }
+  li { font-size: 21px; line-height: 1.45; font-weight: 600; color: var(--ink); margin-top: 6px; }
+  li code { font-size: 19px; background: var(--slate); padding: 1px 6px; border-radius: 6px; }
+  .chip { display: inline-block; font-size: 18px; font-weight: 800; letter-spacing: 0.06em; border-radius: 8px; padding: 5px 10px; margin: 10px 8px 0 0; }
+  .chip.red { background: var(--red-soft); color: var(--red); }
+  .chip.green { background: var(--green-soft); color: var(--green); }
+  .chip.dark { background: var(--ink); color: #fff; }
+  .room { position: absolute; font-size: 17px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-dark); }
+  .measured { position: absolute; left: 70px; top: 828px; width: 1460px; font-size: 21px; font-weight: 600; color: var(--ink-2); }
+  .measured b { color: var(--ink); }
+  svg { position: absolute; left: 0; top: 0; }
+</style>
+</head>
+<body>
+<div id="fig">
+  <div class="title">One answer, end to end</div>
+  <div class="subtitle">The room hears a food order. Responders see a located, high-severity chase.</div>
+
+  <svg width="1600" height="900" viewBox="0 0 1600 900">
+    <defs><marker id="a" markerUnits="userSpaceOnUse" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto"><path d="M0,0 L18,9 L0,18 z" fill="#1c1a16"/></marker></defs>
+    <path d="M 520 331 L 576 331" stroke="#1c1a16" stroke-width="4" marker-end="url(#a)"/>
+    <path d="M 1030 331 L 1086 331" stroke="#1c1a16" stroke-width="4" marker-end="url(#a)"/>
+    <path d="M 1310 476 C 1310 520, 824 508, 824 554" stroke="#1c1a16" stroke-width="4" fill="none" marker-end="url(#a)"/>
+    <path d="M 1050 674 L 1086 674" stroke="#1c1a16" stroke-width="4" marker-end="url(#a)"/>
+    <path d="M 596 690 L 552 690" stroke="#1c1a16" stroke-width="4" marker-end="url(#a)"/>
+    <path d="M 290 582 L 290 480" stroke="#c4521a" stroke-width="4" stroke-dasharray="10 8" fill="none" marker-end="url(#a)"/>
+  </svg>
+
+  <div class="card" style="left:70px;top:186px;width:450px;height:290px">
+    <div class="step">1 · Mia asks, in food words</div>
+    <div class="bubble">"…extra spicy, extra pepperoni, or garlic bread? Extra spicy means someone is hurting you right now, … <b>garlic bread means someone is following or chasing you</b>."</div>
+  </div>
+  <div class="card" style="left:580px;top:186px;width:450px;height:290px">
+    <div class="step">2 · The caller answers</div>
+    <div class="bubble caller">"Garlic bread, please."</div>
+    <p class="note">The person in the room hears someone ordering dinner. Nothing was memorised in advance.</p>
+  </div>
+  <div class="card" style="left:1090px;top:186px;width:440px;height:290px">
+    <div class="step">3 · Gemini Live calls a tool</div>
+<pre><span class="k">report_situation</span>({
+  dangerIndicators: [
+    <span class="s">"being followed or chased"</span>
+  ],
+  urgency: <span class="s">"high"</span>
+})</pre>
+  </div>
+
+  <div class="card" style="left:70px;top:584px;width:478px;height:208px">
+    <div class="step">Back to Mia</div>
+    <p class="note" style="font-size:22px;color:var(--ink);font-weight:600">The tool's answer carries the known facts, so she never asks twice, and she guides the caller turn by turn.</p>
+  </div>
+  <div class="card" style="left:598px;top:556px;width:452px;height:236px">
+    <div class="step">4 · Rules in our code decide</div>
+    <ul>
+      <li><code>deriveSeverity()</code> → HIGH</li>
+      <li>Caller moving → route to the nearest police station (Routes API)</li>
+      <li>Written to Firestore in a transaction</li>
+    </ul>
+  </div>
+  <div class="card" style="left:1090px;top:556px;width:440px;height:236px">
+    <div class="step">5 · The console updates</div>
+    <div><span class="chip dark">SIREN RINGS</span><span class="chip red">HIGH</span></div>
+    <div><span class="chip red">BEING FOLLOWED OR CHASED</span></div>
+    <div><span class="chip green">LIVE ROUTE TO SAFETY</span></div>
+  </div>
+
+  <p class="measured">Measured on 8 full voice calls: <b>the danger tag reached the console 2 to 3.5 seconds before the caller's words appeared in the transcript.</b></p>
+</div>
+</body>
+</html>

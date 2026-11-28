@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { DELIVERY_ADDRESS } from '../../data/menu'
 import { APP_NAME } from '../../lib/brand'
 import { DEMO_LONG_PRESS_MS } from '../../lib/demo'
-import { ChevronDownIcon, HeartIcon, PinIcon, UserIcon } from './icons'
+import { primeMic } from '../../lib/micAccess'
+import { ChevronDownIcon, HeartIcon, PhoneIcon, PinIcon, UserIcon } from './icons'
 
 export function TopBar() {
   const navigate = useNavigate()
@@ -21,6 +22,14 @@ export function TopBar() {
     } else {
       lastTapRef.current = now
     }
+  }
+
+  // QuickOne (Epic 33): the general customer line. The caller tells Mia what they need (food, groceries, medicines,
+  // a repair, a cab…) and she answers in that service's words. The mic is asked for inside the tap, as on "Call to order".
+  const callAnyService = () => {
+    primeMic()
+    void requestMotionPermission()
+    navigate('/call?service=any')
   }
 
   // Long-pressing the logo is the hidden trigger for a demo call (Epic 25), which never reaches the dashboard.
@@ -49,6 +58,9 @@ export function TopBar() {
           {APP_NAME}
         </div>
         <div className="topbar-actions">
+          <button type="button" className="icon-btn" aria-label={`Call ${APP_NAME}`} onClick={callAnyService}>
+            <PhoneIcon size={18} />
+          </button>
           <button type="button" className="icon-btn" aria-label="Favourites" onClick={onHeartTap}>
             <HeartIcon size={19} />
           </button>

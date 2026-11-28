@@ -6,6 +6,12 @@
 // `gps` feeds a scripted track through a fake navigator.geolocation (the real live-tracking code routes on it),
 // `media` streams camera frames / background sound into the call, and `silent` runs the heart double-tap SOS
 // observer with no caller at all. Media files and their credits are in eval/media/.
+//
+// QuickOne (Epic 33): `cover` / `entry` run a call on another service (grocery, pharmacy, home repairs, any other
+// booking) or on the neutral line, with the web app's per-cover prompt and set_service. Run any food scenario that
+// way with --quickone to compare it against the frozen food prompt.
+
+import type { CoverId } from '../shared/covers/index.ts'
 
 export type Category =
   | 'weapon' | 'harmed_now' | 'followed' | 'abduction' | 'confined' | 'injury' | 'domestic'
@@ -21,8 +27,11 @@ export interface Scenario {
   id: string
   title: string
   features: string // what this call covers, for the report
-  group: 'covert' | 'open' | 'chase' | 'coercion' | 'negation' | 'benign' | 'language' | 'vision' | 'sound' | 'sos'
+  group: 'covert' | 'open' | 'chase' | 'coercion' | 'negation' | 'benign' | 'language' | 'vision' | 'sound' | 'sos' | 'cover'
   language: string
+  // QuickOne: the service the caller called (omitted = the original food call), or the neutral line ('any').
+  cover?: CoverId
+  entry?: 'service' | 'any'
   // Hidden from Mia: who the caller is and what is happening. The simulated caller only ever reveals it the way
   // a real caller would in that mode (food words when covert, plain speech when open).
   brief: string
@@ -43,10 +52,14 @@ export interface Scenario {
     route?: boolean // true: route guidance used, never "stay where you are"; false: no directions given
     track?: number // minimum GPS track points written to the incident
     silent?: boolean // SOS observer: must produce no spoken output
+    service?: CoverId // QuickOne: set_service must move the call to this service
+    coverWords?: boolean // QuickOne: after the last switch, Mia never uses another service's code words
   }
 }
 
-const COVERT = 'Someone dangerous is close enough to hear you. When Mia asks, say "order" and answer ONLY with the food choices she offers, using her exact food words (add a number only if she offered numbered options). Never say what is really happening in plain words.'
+// For non-food covers: the same instruction without assuming food words.
+const COVERT_ANY = 'Someone dangerous is close enough to hear you. When Mia asks, say "order" (or "booking" if that is the word she offers) and answer ONLY with the choices she offers, using her exact words (add a number only if she offered numbered options). Never say what is really happening in plain words.'
+const COVERT ='Someone dangerous is close enough to hear you. When Mia asks, say "order" and answer ONLY with the food choices she offers, using her exact food words (add a number only if she offered numbered options). Never say what is really happening in plain words.'
 const OPEN = 'You are alone and safe to speak. When Mia asks, say "talk" and then explain plainly.'
 
 // A walk north along MG Road, Kochi (~1.3 km), one fix per caller turn.
@@ -172,6 +185,45 @@ export const SCENARIOS: Scenario[] = [
     brief: 'No caller. The phone is lying in a dim room; a captor is talking and a knife is in view.',
     silent: { seconds: 40, frames: 'sos', audio: 'audio/captor.pcm' },
     expect: { categories: ['weapon', 'confined'], urgency: 'high', scene: ['knife|blade|weapon', 'voice|threat|speech|talk'], silent: true },
+  },
+
+  // ---- QuickOne covers (Epic 33): the same meanings in another service's words
+  {
+    id: 'cover-grocery-followed', title: 'Grocery: followed on foot, covert, routed', group: 'cover', language: 'English', cover: 'grocery',
+    features: 'Grocery cover · followed · route guidance on a GPS track (mocked) · grocery words only',
+    brief: `${COVERT_ANY} You called the grocery line. A man has been following you on foot since the bus stop on MG Road, Kochi; you are walking north on MG Road and he is close enough to hear you.`,
+    gps: MG_ROAD_CHASE,
+    expect: { categories: ['followed'], urgency: 'high', covert: true, route: true, track: 3, coverWords: true },
+  },
+  {
+    id: 'cover-pharmacy-domestic', title: 'Pharmacy: husband in the room, covert', group: 'cover', language: 'English', cover: 'pharmacy',
+    features: 'Pharmacy cover · domestic · harmed now · address · pharmacy words only',
+    brief: `${COVERT_ANY} You called the pharmacy line. Your husband just hit you and is in the same room, listening; he is the only one. You are at home: Rose Villa, Kaloor, Kochi.`,
+    expect: { categories: ['domestic', 'harmed_now'], urgency: 'high', address: 'Rose Villa', covert: true, route: false, coverWords: true },
+  },
+  {
+    id: 'cover-home-locked-in', title: 'Home repairs: locked in a room, covert, no route', group: 'cover', language: 'English', cover: 'home',
+    features: 'Home services cover · confined · cannot get out (no directions) · address · repair words only',
+    brief: `${COVERT_ANY} You called the home repair line. Your brother-in-law has locked you in the store room of the house and will not let you out; he is outside the door and can hear you. You cannot get out. Address: Green House, Pattom, Thiruvananthapuram.`,
+    expect: { categories: ['confined'], urgency: 'high', address: 'Green House', covert: true, route: false, coverWords: true },
+  },
+  {
+    id: 'cover-any-cab-weapon', title: 'Neutral line: asks for a cab, armed man nearby', group: 'cover', language: 'English', entry: 'any',
+    features: 'Neutral "Call QuickOne" entry · other service (cab) via set_service · weapon · booking words only',
+    brief: `${COVERT_ANY} You called the general customer line. When Mia greets you, ask to book a cab. A man with a knife is threatening people on your office floor at Infopark Phase 1, Kakkanad; you are hiding under a desk and he could hear you.`,
+    expect: { service: 'other', categories: ['weapon'], urgency: 'high', covert: true, coverWords: true },
+  },
+  {
+    id: 'cover-any-medicines-injured', title: 'Neutral line: asks for medicines, hurt by partner', group: 'cover', language: 'English', entry: 'any',
+    features: 'Neutral entry · pharmacy via set_service · injury · domestic · pharmacy words only',
+    brief: `${COVERT_ANY} You called the general customer line. When Mia greets you, say you need some medicines. Your partner pushed you down the stairs, your arm is hurt badly, and he is in the next room and can hear you.`,
+    expect: { service: 'pharmacy', categories: ['injury', 'domestic'], urgency: 'high', covert: true, coverWords: true },
+  },
+  {
+    id: 'cover-switch-food-to-pharmacy', title: 'Mid-call switch: food line, asks for medicines', group: 'cover', language: 'English', cover: 'food',
+    features: 'Food call switched to pharmacy mid-call · weapon · pharmacy words after the switch',
+    brief: `${COVERT_ANY} You called the food line by habit. When Mia greets you, say "order", then say you actually need medicines from the pharmacy, not food. A man with a knife has broken into your home and is in the living room; you are in the kitchen and he can hear you.`,
+    expect: { service: 'pharmacy', categories: ['weapon'], urgency: 'high', covert: true, coverWords: true },
   },
 ]
 

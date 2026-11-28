@@ -6,6 +6,8 @@ import { db } from '../lib/firebase'
 import { zeroTraceExit } from '../lib/gemini/exit'
 import { analyzePhoto } from '../lib/gemini/photoVision'
 import { startIncident, updateLiveFields, confirmAddress, reportSceneObservation } from '../../../shared/incidents/client.ts'
+import { startLocationTrail, type LocationTrail } from '../../../shared/incidents/trail.ts'
+import { gpsSimEnabled } from '../lib/gpsSim'
 import type { Severity } from '../../../shared/incidents/types.ts'
 
 // Each visible option is an ordinary "delivery instruction" — its real meaning only appears on long-press, so
@@ -89,11 +91,19 @@ export function SilentTapPage() {
   }
 
   useEffect(() => {
+    let trail: LocationTrail | null = null
+    let left = false
     void startIncident(db, { channel: 'silent-tap' }).then(({ id }) => {
       incidentIdRef.current = id
       setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
       setReady(true)
+      // Keep the position current while the form is open: the caller may be moving while they fill it in.
+      if (!left) trail = startLocationTrail(db, id, { source: gpsSimEnabled ? 'sim' : 'gps' })
     })
+    return () => {
+      left = true
+      trail?.stop()
+    }
   }, [])
 
   const toggleOption = (option: Option) => {

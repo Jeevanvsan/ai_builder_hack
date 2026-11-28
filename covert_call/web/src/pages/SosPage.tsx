@@ -14,6 +14,8 @@ import {
   recordMotionEvent,
 } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
+import { startLocationTrail, type LocationTrail } from '../../../shared/incidents/trail.ts'
+import { gpsSimEnabled } from '../lib/gpsSim'
 import { doc, getDoc } from 'firebase/firestore'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { acquireSosMedia, videoOnly } from '../lib/gemini/media'
@@ -48,6 +50,7 @@ export function SosPage() {
   const incidentIdRef = useRef<string | null>(null)
   const observerRef = useRef<SilentObserverHandle | null>(null)
   const motionRef = useRef<MotionWatch | null>(null)
+  const trailRef = useRef<LocationTrail | null>(null)
   const alertStopRef = useRef<(() => void) | null>(null)
   const publisherStopsRef = useRef<(() => Promise<void>)[]>([])
   const recordersRef = useRef<{ facing: 'back' | 'front'; rec: VideoRecorderHandle }[]>([])
@@ -58,6 +61,8 @@ export function SosPage() {
   // Secret exit: three taps anywhere on the screen within 1.5s.
   const tapCountRef = useRef(0)
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => trailRef.current?.stop(), [])
 
   useEffect(() => {
     if (startedRef.current) return
@@ -74,6 +79,8 @@ export function SosPage() {
       incidentIdRef.current = id
       setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
       watchDemoControl(db, id) // demo recording only (?demoInject=1); no-op otherwise
+      // Follow the caller for the whole SOS (a hostage may be moved), not just the one reading taken at the start.
+      if (!endingRef.current) trailRef.current = startLocationTrail(db, id, { source: gpsSimEnabled ? 'sim' : 'gps' })
 
       // Keep the screen awake so the OS doesn't lock and pause the camera/mic. Best-effort.
       try {
@@ -162,6 +169,7 @@ export function SosPage() {
     const id = incidentIdRef.current
 
     motionRef.current?.stop()
+    trailRef.current?.stop()
     alertStopRef.current?.()
     if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
     // Stop the Drive recorders while the camera tracks are still live, then kick off uploads in the background.

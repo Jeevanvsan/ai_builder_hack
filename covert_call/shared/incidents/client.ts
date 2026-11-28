@@ -2,9 +2,10 @@ import { addDoc, arrayUnion, collection, doc, getDoc, increment, onSnapshot, ord
 import { AI_USAGE_FIELDS, type AiTaskUsage } from '../aiModels.ts'
 import { geocodeAddress } from './geocode.ts'
 import { gpsLocation, ipLocation } from './location.ts'
+import { latestFix } from './position.ts'
 import { deriveSeverity, deriveRecommendation, describeSeverityChange, maxSeverity } from './severity.ts'
 import { decodePlateRegion, normalisePlate } from './plate.ts'
-import type { Channel, FieldConfidence, Incident, MotionKind, ResponderMessage, RoughLocation } from './types.ts'
+import type { Channel, FieldConfidence, Incident, MotionKind, ResponderMessage, RoughLocation, TrackPoint } from './types.ts'
 
 // Write side of the incident pipeline (Epic 3), called by the QuickBite app. The dashboard only reads.
 
@@ -219,13 +220,17 @@ export async function replaceTranscriptLine(db: Firestore, id: string, old: Tran
   return entry
 }
 
-// Live GPS point while the call is open; also keeps location.rough on the latest fix so maps follow the caller.
-export function appendTrackPoint(db: Firestore, id: string, p: { lat: number; lng: number; speed?: number | null }): Promise<void> {
-  const at = now()
-  return updateDoc(ref(db, id), {
-    'location.track': arrayUnion({ lat: p.lat, lng: p.lng, at, speed: p.speed ?? null }),
-    'location.rough': { lat: p.lat, lng: p.lng, source: 'gps', capturedAt: at },
-  })
+// One point of the caller's live trail. location.rough is left alone: it stays the fix from when the session
+// started (it used to be overwritten with every point, so the "call started here" pin, the timeline and the case
+// sketch all showed where the caller ended up instead). Maps follow the trail through livePosition().
+export function appendTrackPoint(
+  db: Firestore,
+  id: string,
+  p: { lat: number; lng: number; speed?: number | null; accuracyM?: number | null; source?: TrackPoint['source'] },
+): Promise<void> {
+  const point: TrackPoint = { lat: p.lat, lng: p.lng, at: now(), speed: p.speed ?? null, source: p.source ?? 'gps' }
+  if (p.accuracyM != null && Number.isFinite(p.accuracyM)) point.accuracyM = Math.round(p.accuracyM)
+  return updateDoc(ref(db, id), { 'location.track': arrayUnion(point) })
 }
 
 export function setSafeRoute(db: Firestore, id: string, route: NonNullable<Incident['safeRoute']>): Promise<void> {
@@ -233,29 +238,29 @@ export function setSafeRoute(db: Firestore, id: string, route: NonNullable<Incid
 }
 
 // Turns the caller's spoken "delivery address" into a pinned location. If geocoding fails, the spoken address is
-// still stored (it's what a responder most needs) against the rough coordinates, marked uncertain.
-export async function confirmAddress(
-  db: Firestore,
-  id: string,
-  spokenAddress: string,
-  opts: { googleMapsKey?: string } = {},
-): Promise<Incident['location']['confirmed']> {
+// still stored (it's what a responder most needs), pinned at the phone's precise GPS fix if there is one, marked
+// uncertain. Google Places is used when the app has set a Google Maps key (setGoogleMaps), else
+// OpenStreetMap.
+export async function confirmAddress(db: Firestore, id: string, spokenAddress: string): Promise<Incident['location']['confirmed']> {
   const current = (await getDoc(ref(db, id))).data() as Omit<Incident, 'id'> | undefined
-  const rough = current?.location.rough ?? null
+  // Where the phone is, only if it measured that precisely. An IP fix is not used even as a search hint: it can be
+  // tens of km off (it put a Muhamma caller in Kochi), and the looser searches drop any match more than 25 km
+  // from the hint, so a wrong hint threw away the right street.
+  const fix = latestFix(current?.location)
   // The same address saved again (the caller's "yes" to the read-back) keeps its pin: a second lookup that failed
   // (the free map server rate-limits) wiped a good pin (INC-MUXMUWBA).
   const prev = current?.location.confirmed
   if (prev && prev.address === spokenAddress && prev.lat != null) return prev
-  const hit = await geocodeAddress(spokenAddress, { near: rough, googleMapsKey: opts.googleMapsKey })
+  const hit = await geocodeAddress(spokenAddress, { near: fix })
   // If geocoding genuinely fails, the caller's IP-based rough location can be many km off (it has put callers in
   // the wrong town entirely) — using it as "confirmed" coordinates silently produced a wrong pin and a wrong
   // route with no sign anything was off. Better to save the spoken address as text with NO pin than a wrong one
   // that looks identical to a real fix; the dashboard shows it as unlocated instead of confidently wrong.
-  // The phone's own GPS fix (not the IP guess) is where the caller is: a caller at home is at their address, so
-  // when the map servers can't match a house name or a misspelt area ("Vazhichery", INC-MUXN9EK5) it is pinned
-  // there, marked uncertain, instead of no pin at all.
-  if (!hit && rough?.source === 'gps') {
-    const confirmed = { address: spokenAddress, lat: rough.lat, lng: rough.lng, confidence: 'uncertain' as const, confirmedAt: now() }
+  // The phone's own precise GPS fix (not the IP guess, not a laptop's Wi-Fi guess) is where the caller is: a caller
+  // at home is at their address, so when the map servers can't match a house name or a misspelt area
+  // ("Vazhichery", INC-MUXN9EK5) it is pinned there, marked uncertain, instead of no pin at all.
+  if (!hit && fix) {
+    const confirmed = { address: spokenAddress, lat: fix.lat, lng: fix.lng, confidence: 'uncertain' as const, confirmedAt: now() }
     await updateDoc(ref(db, id), { 'location.confirmed': confirmed })
     return confirmed
   }
@@ -290,6 +295,12 @@ export function markHasRecording(db: Firestore, id: string): Promise<void> {
 // Records which cameras an SOS captured (Epic 11.2).
 export function setCameraMode(db: Firestore, id: string, mode: 'dual' | 'alternating' | 'back-only'): Promise<void> {
   return updateDoc(ref(db, id), { cameraMode: mode })
+}
+
+// QuickOne (Epic 33): the service a call or coded order is on, so the dashboard reads its code words. Set at the
+// start and again on a mid-call switch. Best-effort for callers: it never blocks or breaks the call.
+export function setCover(db: Firestore, id: string, cover: NonNullable<Incident['cover']>): Promise<void> {
+  return updateDoc(ref(db, id), { cover })
 }
 
 // A scene observation whose wording signals immediate danger is also promoted to a danger indicator so it lifts

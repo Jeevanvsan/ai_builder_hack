@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
-import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import type { MapProps } from './mapTypes'
+import { DEST_COLOR, MIN_RING_M, type MapProps } from './mapTypes'
 
 function FollowTarget({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap()
@@ -50,8 +50,6 @@ function FitRoute({ route, target, backdrop }: { route: NonNullable<MapProps['ro
   return null
 }
 
-const DEST_COLOR = { police: '#2c4a9e', fire: '#b8391f', hospital: '#1f7a45' } as const
-
 // Free fallback (no key, no billing) used when no Google Maps key is configured.
 export default function OsmIncidentMap({ rough, confirmed, target, live, backdrop, track, route }: MapProps) {
   const locked = backdrop
@@ -86,13 +84,29 @@ export default function OsmIncidentMap({ rough, confirmed, target, live, backdro
       )}
       {moving && <Polyline positions={track!.map((p) => [p.lat, p.lng] as [number, number])} pathOptions={{ color: '#0b57d0', weight: 5, opacity: 0.9, dashArray: '1 9', lineCap: 'round' }} interactive={false} />}
       {moving && track!.slice(-12, -1).map((p, k, arr) => (
-        <CircleMarker key={`${p.lat},${p.lng},${k}`} center={[p.lat, p.lng]} radius={3 + (k / arr.length) * 3} interactive={false} pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#0b57d0', fillOpacity: 0.35 + (k / arr.length) * 0.6 }} />
+        p.source === 'landmark'
+          // A place the caller named, not a GPS fix: a hollow ring, so it isn't read as a measured position.
+          ? (
+            <CircleMarker key={`${p.lat},${p.lng},${k}`} center={[p.lat, p.lng]} radius={6} pathOptions={{ color: '#0b57d0', weight: 2.5, fillColor: '#fff', fillOpacity: 1 }}>
+              <Tooltip>Place the caller named</Tooltip>
+            </CircleMarker>
+          )
+          : <CircleMarker key={`${p.lat},${p.lng},${k}`} center={[p.lat, p.lng]} radius={3 + (k / arr.length) * 3} interactive={false} pathOptions={{ color: '#fff', weight: 1.5, fillColor: '#0b57d0', fillOpacity: 0.35 + (k / arr.length) * 0.6 }} />
       ))}
+      {/* How far off the phone's fix may be: the caller is somewhere inside this ring. */}
+      {current && target.accuracyM != null && target.accuracyM >= MIN_RING_M && (
+        <Circle center={[current.lat, current.lng]} radius={target.accuracyM} interactive={false} pathOptions={{ color: '#0b57d0', weight: 1, opacity: 0.45, fillColor: '#0b57d0', fillOpacity: 0.07 }} />
+      )}
       {current && <CircleMarker center={[current.lat, current.lng]} radius={24} interactive={false} className="live-pulse" pathOptions={{ stroke: false, fillColor: '#0b57d0', fillOpacity: 0.2 }} />}
       {!current && !confirmed && rough && (
-        <CircleMarker center={[rough.lat, rough.lng]} radius={9} pathOptions={{ color: '#5f6673', fillColor: '#8a919c', fillOpacity: 0.9, weight: 2 }}>
-          <Tooltip>Approximate location</Tooltip>
-        </CircleMarker>
+        <>
+          {rough.accuracyM != null && rough.accuracyM >= MIN_RING_M && (
+            <Circle center={[rough.lat, rough.lng]} radius={rough.accuracyM} interactive={false} pathOptions={{ color: '#5f6673', weight: 1, opacity: 0.5, fillColor: '#8a919c', fillOpacity: 0.1 }} />
+          )}
+          <CircleMarker center={[rough.lat, rough.lng]} radius={9} pathOptions={{ color: '#5f6673', fillColor: '#8a919c', fillOpacity: 0.9, weight: 2 }}>
+            <Tooltip>{rough.source === 'gps' ? `Approximate location (GPS${rough.accuracyM != null ? ` ±${rough.accuracyM} m` : ''})` : 'Approximate location (IP estimate, can be km off)'}</Tooltip>
+          </CircleMarker>
+        </>
       )}
       {confirmed && !current && (
         <>

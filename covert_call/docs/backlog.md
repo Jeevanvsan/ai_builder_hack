@@ -769,3 +769,84 @@ fields except where noted.*
 
 - [ ] Move all Gemini calls off public `VITE_GEMINI_*` keys onto Firebase AI Logic, with App Check enforced
 - [ ] Stopgap until then: restrict each key to the Generative Language API + the app's HTTP referrers in Google Cloud Console
+
+---
+
+# PHASE 5 (planned 2026-11-20)
+
+*One meaning set, one vocabulary per service. Numbered 33 because 28-32 are already used in code comments (28 is the AI test harness). Branch `feature/quickone-dynamic-cover`. Tested on a staging preview channel; production stays QuickBite until the 28 Nov go/no-go (freeze 30 Nov). Agree the `cover` incident field (`shared/incidents/types.ts`, `dashboard/firestore.rules`) with Person B before writing it. Native imports the persona and tools from web: `PERSONA_SYSTEM_INSTRUCTION` and `LIVE_CALL_TOOLS` stay byte-identical, so native is unchanged until it adopts covers.*
+
+## EPIC 33 — QuickOne: dynamic cover 🔴
+
+### User Story 33.1
+**As a caller, I want to call about whatever fits my situation right now (food, groceries, medicines, a repair, a cab), so that the call sounds normal to whoever is listening.**
+- [x] Cover packs in `shared/covers/` (food = today's wording; grocery, pharmacy, home services, any other service) over the unchanged meanings in `shared/codes.ts`
+- [x] `buildPersonaInstruction()` in `persona.ts`; `PERSONA_SYSTEM_INSTRUCTION` stays the byte-identical food prompt
+- [x] `eval/check-covers.ts`: same-breath meanings, no giveaway words, movement tags, keyword clashes, byte-identical snapshot
+- [x] Ameen reviews the new packs' wording (approved 2026-11-20)
+
+### User Story 33.2
+**As a caller, I want Mia to follow me if I ask for a different service mid-call, so that I am never stuck with a cover that doesn't fit.**
+- [x] `set_service` tool (`SET_SERVICE`, added through `liveCallTools()`, not to `LIVE_CALL_TOOLS`); the new service's sheet comes back in the tool reply; SERVICE line in the known-facts note
+- [x] Code-side nudge when the caller's words ask for another service (once per service, covert mode only, never switches by itself)
+- [x] Neutral entry in the call: `/call?service=any`; the caller names the service in their first answer
+- [x] Neutral "Call QuickOne" button: the phone icon in the top bar (`/call?service=any`)
+
+### User Story 33.3
+**As a caller, I want the app to look like an ordinary multi-service app, so that having it on my phone proves nothing.**
+- [x] Rename to QuickOne (`brand.ts`, page title, mic help, call screen, order ID, case images)
+- [x] Service tabs (Food, Grocery, Pharmacy, Home services) with catalogs, banners, wording and a call button per service (`data/services.ts`)
+- [x] Coded items in each catalog (click & order) with the pack's labels, 13 items per service, CC0/PDM photos (`assets/<service>/CREDITS.md`)
+
+### User Story 33.4 (Person B)
+**As a responder, I want to see which cover a call used, so that I read the transcript's codes correctly.**
+- [x] `cover` incident field + Firestore rules (rules deployed 2026-11-20 from Ameen's side)
+- [x] Transcript chips use the incident's cover phrases (earliest match first, whole words); "Cover" badge on the incident and the queue row
+- [x] Credibility prompt and "delivery chat" wording made service-neutral
+
+### User Story 33.5
+**As the team, we want proof that every cover works before the finale, so that the proven demo is never put at risk.**
+- [x] Eval: 6 cover scenarios (`cover-*`) and the `--quickone` flag (any scenario with the web's per-cover prompt + set_service)
+- [x] Eval run 2026-11-20: the food scenarios 65/81 strict plain, 69/81 with `--quickone` (about 8% more tokens, median reply 956 → 1,257 ms); the 6 cover scenarios 33/42
+- [x] Fix from the run: the neutral greeting offers "or anything else, like a cab" (a cab caller had picked home repair); re-run: the cab switches at 21 s, locked-in 6/7, medicines switches at once
+- [x] Staging previews deployed (web + dashboard, expire 2026-12-20)
+- [ ] Real spoken calls on the staging preview (8 planned: every cover, neutral entry, a mid-call switch, open mode; Ameen has no time, so at least one during a finale rehearsal)
+- [ ] Go/no-go on 28 Nov
+- [ ] Native follow-ups logged: Settings presets → covers, `set_service` handler, native catalogs
+
+## EPIC 34 — Google Maps, exact caller location, Street View and 3D 🔴 (before the 30 Nov freeze)
+
+Branch `feature/google-maps`. Setup: [`setup/google-maps.md`](setup/google-maps.md). Every part falls back to the free
+OpenStreetMap services when there is no key. Epic 33 is QuickOne (branch `feature/quickone-dynamic-cover`).
+
+### User Story 34.1
+**As a responder, I want the Google map to show everything the OSM map does, so that switching maps never hides the route.**
+- [x] `GoogleIncidentMap.tsx` at parity: route with casing, next turn, destination by kind, trail with fading points, live caller with pulse, pin rules, follow, fit-to-route, centre-only zoom on the board
+- [x] Checked with the key, headless, on demo incident INC-MWP7R826 (locally and on the `maps` preview): route, next turn, trail and live caller as on the OSM map
+- [x] Map ID with a light style (`VITE_GOOGLE_MAP_ID`): place icons off except hospitals, police, fire stations and landmarks
+- [ ] Analytics map on Google (second on the cut list)
+
+### User Story 34.2
+**As a responder, I want to see the caller's surroundings, so that I can recognise the place before I arrive.**
+- [x] Map / Satellite / 3D switch on the board map (3D is photorealistic where Google has buildings, such as Singapore, and satellite over terrain elsewhere)
+- [x] Street view tab: a free imagery check within 100 m, then a panorama from the nearest road facing the caller, with the imagery date or a "no imagery" message; re-checked after a 75 m move
+- [x] Kerala checked: Street view 30 m from the caller on MG Road, Ernakulam; 3D draws the route and pins
+- [ ] Singapore (3D buildings, Street view) at the finale venue, during a rehearsal
+
+### User Story 34.3
+**As a responder, I want to know how precise the caller's position is and to follow them on every channel, so that I send help to the right spot.**
+- [x] GPS accuracy stored on the start fix and on every trail point; trail points tagged `gps`, `landmark` or `sim`
+- [x] `location.rough` stays the start fix, so the timeline, case sketch, analytics map and repeat-location linking get the real start
+- [x] Accuracy ring on the map; "GPS ±40 m", "IP estimate" or "a landmark the caller named" on the Location tile; landmark points drawn hollow
+- [x] Silent SOS, silent tap and the order-placed screen keep sending the position, on web and native (closes 22.4's open sub-task)
+- [x] Address search is biased only by a precise phone fix, never an IP guess; the GPS fallback pin needs 100 m accuracy or better
+- [x] A station the dispatcher picked survives the periodic re-route
+
+### User Story 34.4
+**As a caller, I want Mia to find the place I name and route me the way I'm travelling, so that her directions work on foot.**
+- [x] `shared/google/maps.ts`: Places Text and Nearby Search and Routes, set once per app with `setGoogleMaps` (the Geocoding API refuses website-restricted keys, so it is not used)
+- [x] Addresses: Places, then OSM; exact only when the area the caller named is in Google's address. Landmarks: best name match in the 3 km box. Stations: the best-known of each kind, nearest first, with phone numbers. A recognisable place at each turn
+- [x] Travel mode from GPS speed, the running motion signal and Mia's own words (on foot, two-wheeler or car); a car route when unknown, as before
+- [x] Eval with Google: the chase on foot (walking route) and at car speed (`EVAL_GPS_SPEED=12`, car route) 6/6 each; five other calls (four gave an address), 26/28 strict checks, with both misses unrelated to maps; pins compared with the OSM run
+- [x] Instead of the voice calls (no time for them): the eval calls above, and a trail test for the SOS, silent-tap and order-placed screens on a demo incident (passes)
+- [ ] One real walking call during a finale rehearsal, before the 28 Nov go/no-go

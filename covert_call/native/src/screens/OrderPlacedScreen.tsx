@@ -8,6 +8,7 @@ import type { RootStackParamList } from '../../App'
 import { OUTLET } from '../data/menu'
 import { db } from '../lib/firebase'
 import { INCIDENTS } from '../../../shared/incidents/client'
+import { startLocationTrail } from '../../../shared/incidents/trail'
 import type { ResponseStatus } from '../../../shared/incidents/types'
 import { CheckIcon } from '../components/disguise/icons'
 import { colors, radius, shadowBar, shadowCard } from '../theme'
@@ -36,6 +37,14 @@ export function OrderPlacedScreen() {
       const s = snap.data()?.response?.status as ResponseStatus | undefined
       if (s) setStatus(s)
     })
+  }, [incidentId])
+
+  // After a coded order, keep sending the caller's position while this screen is open (like a delivery app
+  // tracking the drop-off point), so responders can follow them if they move. A real order has no incident.
+  useEffect(() => {
+    if (!incidentId) return
+    const trail = startLocationTrail(db, incidentId)
+    return () => trail.stop()
   }, [incidentId])
 
   // Map the responder's real status onto believable delivery milestones.

@@ -1,4 +1,5 @@
 import type { Incident } from '../../../shared/incidents/types.ts'
+import { APP_NAME } from './brand'
 
 // The case report's scene sketch: an OpenStreetMap map of the incident with where the caller started, the address
 // they gave, their movement trail, the route to safety and the destination. Drawn in the caller's browser when the
@@ -143,7 +144,7 @@ export async function buildCaseSketch(id: string, i: Omit<Incident, 'id'>): Prom
   ctx.fillRect(0, 0, W, 38)
   ctx.fillStyle = '#fff'
   ctx.font = 'bold 16px Arial'
-  ctx.fillText(`QuickBite case ${id}: map`, 12, 25)
+  ctx.fillText(`${APP_NAME} case ${id}: map`, 12, 25)
   ctx.font = '12px Arial'
   const legend = `${route ? `Route ${Math.round(route.distanceM)} m to ${route.destination.kind}` : 'No route'}${track.length ? ` · trail ${track.length} points` : ''}`
   ctx.fillText(legend, W - ctx.measureText(legend).width - 12, 24)

@@ -1,5 +1,5 @@
 import type { Incident } from '../../../shared/incidents/types'
-import { livePosition } from './livePosition'
+import { livePosition, precisionLabel } from './livePosition'
 import { isNegatedIndicator } from '../../../shared/incidents/severity.ts'
 import { AI_FEATURES } from '../../../shared/aiFeatures.ts'
 
@@ -87,15 +87,17 @@ export function deriveEvidence(i: Incident, now: number, nearbyIds: string[] = [
     // landmark), the tile says so, so it no longer contradicts the map by showing a stale or unpinned address.
     const movedOn = pos?.source === 'track'
     const ago = movedOn && pos.at ? Math.max(0, Math.round((now - Date.parse(pos.at)) / 1000)) : null
+    // "GPS ±40 m", "IP estimate, can be km off", "placed from a landmark the caller named": how far to trust the dot.
+    const precision = precisionLabel(pos)
     out.location = {
       kind: 'location',
       label: 'Location',
       values: [c ? c.address : pos ? `≈ ${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}` : 'Unknown'],
       sub: movedOn
-        ? `Moving — live position ${ago != null && ago < 90 ? `updated ${ago}s ago` : 'on the map'}${c ? ' · last address given above' : ''}`
+        ? `Moving — live position ${ago != null && ago < 90 ? `updated ${ago}s ago` : 'on the map'}${precision ? ` · ${precision}` : ''}${c ? ' · last address given above' : ''}`
         : i.groundedContext ?? (pinned
           ? (c?.confidence === 'uncertain' ? 'Approximate — the exact street could not be matched, area only' : undefined)
-          : c ? "Couldn't pin this address on the map — showing what the caller said" : 'Approximate — waiting for the caller'),
+          : c ? "Couldn't pin this address on the map — showing what the caller said" : `Approximate${precision ? ` (${precision})` : ''} — waiting for the caller`),
       tone: pinned || movedOn ? 'live' : 'neutral',
       // Local conditions (weather/traffic) are paused (AI_FEATURES.groundedContext), so nothing is coming: no spinner.
       pending: AI_FEATURES.groundedContext && !i.groundedContext && pinned && endedRecently ? 'Checking local conditions…' : undefined,

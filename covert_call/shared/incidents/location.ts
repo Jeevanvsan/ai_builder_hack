@@ -2,12 +2,16 @@ import type { RoughLocation } from './types.ts'
 
 const now = () => new Date().toISOString()
 
+// The fix's accuracy radius in whole metres, or null when the platform didn't give one.
+export const accuracyOf = (pos: GeolocationPosition): number | null =>
+  Number.isFinite(pos.coords.accuracy) ? Math.round(pos.coords.accuracy) : null
+
 // Resolves null if GPS is unavailable or denied. May stay pending while the permission prompt is open.
 export function gpsLocation(): Promise<RoughLocation | null> {
   if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(null)
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, source: 'gps', capturedAt: now() }),
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, source: 'gps', capturedAt: now(), accuracyM: accuracyOf(pos) }),
       () => resolve(null),
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
     )

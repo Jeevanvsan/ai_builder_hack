@@ -1,7 +1,8 @@
 // Epic 16.6: once an incident's location is confirmed, look up nearby police, fire and hospital services so a
-// responder doesn't have to search for who to actually dispatch. Free OpenStreetMap data (Photon first, then
-// Overpass / Nominatim) — no billing,
-// consistent with the project's existing free-tier-first pattern (Nominatim geocoding, free map tiles).
+// responder doesn't have to search for who to actually dispatch. Google Places (with phone numbers) when the app
+// has set a Google Maps key; otherwise, or when Google can't answer, free OpenStreetMap data (Photon first, then
+// Overpass / Nominatim).
+import { boxAround, googleMapsEnabled, placesNearby, placesTextSearch, type Place } from '../google/maps.ts'
 import { affirmed } from '../incidents/severity.ts'
 
 export type ServiceKind = 'police' | 'fire' | 'hospital'
@@ -115,6 +116,21 @@ async function viaPhoton(near: { lat: number; lng: number }): Promise<{ elements
   return { partial: lists.some((l) => l === undefined), elements: lists.flatMap((l) => l ?? []).filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lon)) }
 }
 
+// ---- Google Places: police, fire and hospitals within 5 km, one request per kind in parallel (so a city full of
+// hospitals can't crowd out the one police station), with phone numbers a responder can call. The best-known places
+// of each kind, then nearest first (sorted below): the plain nearest were traffic cabins, clinics and mis-tagged shops.
+const GOOGLE_TYPES: Record<ServiceKind, string> = { police: 'police', fire: 'fire_station', hospital: 'hospital' }
+async function viaGooglePlaces(near: { lat: number; lng: number }): Promise<{ elements: OverpassElement[]; partial?: boolean } | null> {
+  const lists = await Promise.all(
+    (Object.entries(GOOGLE_TYPES) as [ServiceKind, string][]).map(async ([kind, type]) => {
+      const places = await placesNearby(near, RADIUS_M, [type], { max: 10, withPhone: true, prominent: true })
+      return places?.map((p) => ({ lat: p.lat, lon: p.lng, tags: { amenity: QUERY_TAGS[kind].split('=')[1], name: p.name, phone: p.phone ?? '' } }))
+    }),
+  )
+  if (lists.every((l) => l === undefined)) return null
+  return { partial: lists.some((l) => l === undefined), elements: lists.flatMap((l) => l ?? []) }
+}
+
 const NOMINATIM_TYPES: Record<ServiceKind, string> = { police: 'police', fire: 'fire_station', hospital: 'hospital' }
 
 async function viaNominatim(near: { lat: number; lng: number }): Promise<{ elements: OverpassElement[] } | null> {
@@ -210,8 +226,9 @@ async function fetchNearbyServices(near: { lat: number; lng: number }): Promise<
       })
     }
   })
-  // Photon first (works from browsers today); Overpass and Nominatim stay as fallbacks.
-  let data = await viaPhoton(near)
+  // Google Places when there's a key; then Photon (works from browsers today); Overpass and Nominatim stay as fallbacks.
+  let data = googleMapsEnabled() ? await viaGooglePlaces(near) : null
+  if (!data?.elements.length) data = await viaPhoton(near)
   if (!data?.elements.length) data = await overpassRace()
   if (!data) data = await viaNominatim(near)
   if (!data) throw new Error('No station lookup service reachable')
@@ -264,7 +281,29 @@ export function suggestedServiceKind(dangerIndicators: string[]): ServiceKind {
 // ("LKJ8X8G QC R6*"), which reached the dashboard's location card and Mia's directions.
 const isReadableName = (n?: string): n is string => !!n && !/[+*]/.test(n) && (/\p{Ll}/u.test(n) || !/\d/.test(n))
 
+// Google place types a caller would recognise from the street, and how to name them in a direction.
+const SEEN_FROM_STREET: [RegExp, string][] = [
+  [/gas_station/, 'petrol pump'], [/bank|atm/, 'bank'], [/(hindu_temple|church|mosque|place_of_worship)/, 'place of worship'],
+  [/bus_station|bus_stop|transit_station/, 'bus stop'], [/hospital/, 'hospital'], [/pharmacy/, 'pharmacy'], [/school/, 'school'],
+  [/supermarket|grocery|store|shop/, 'shop'], [/restaurant|cafe|bakery/, 'restaurant'], [/police/, 'police station'],
+]
+const streetKind = (types: string[]) => SEEN_FROM_STREET.find(([re]) => types.some((t) => re.test(t)))?.[1] ?? null
+
+// The nearest recognisable Google place within ~150 m, e.g. "Federal Bank (bank)". Undefined when Google is off or
+// unreachable (the OSM lookups then run); null when Google answered and there is nothing worth naming.
+async function landmarkNearGoogle(p: { lat: number; lng: number }): Promise<string | null | undefined> {
+  if (!googleMapsEnabled()) return undefined
+  const places = await placesNearby(p, 150, [], { max: 10 })
+  if (!places) return undefined
+  const best = places.find((x: Place) => isReadableName(x.name) && streetKind(x.types)) ?? places.find((x: Place) => isReadableName(x.name) && !x.types.includes('route'))
+  if (!best) return null
+  const kind = streetKind(best.types)
+  return `${best.name}${kind ? ` (${kind})` : ''}`
+}
+
 export async function landmarkNear(p: { lat: number; lng: number }): Promise<string | null> {
+  const google = await landmarkNearGoogle(p)
+  if (google !== undefined) return google
   // Photon reverse: named places within ~150 m; prefer a shop/amenity/junction a caller can actually see.
   const feats = await photon(`/reverse?lat=${p.lat}&lon=${p.lng}&limit=8&radius=0.15`)
   if (feats?.length) {
@@ -303,7 +342,11 @@ export type LandmarkHit = { lat: number; lng: number; name: string; confidence: 
 // could just as easily be a same-named place further out that got missed), or the weaker Nominatim fallback path
 // rather than an exact OSM name match.
 export async function locateLandmark(text: string, near: { lat: number; lng: number }): Promise<LandmarkHit | null> {
-  const words = text
+  // "MG Road, Kochi": the last part is the town, not the landmark. Searching for "kochi" alone (MG and Road are too
+  // short or too generic) matched a business named after the city, 3 km away across the water (INC-MWPCLSVB).
+  const parts = text.split(',').map((s) => s.trim()).filter(Boolean)
+  const phrase = parts.length > 1 ? parts.slice(0, -1).join(' ') : text
+  const words = phrase
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)
@@ -311,6 +354,19 @@ export async function locateLandmark(text: string, near: { lat: number; lng: num
     .slice(0, 3)
   if (!words.length) return null
   const weakMatch = words.length < 2
+  // Google Places inside the same ~3 km box: the best name match (most of the caller's words in the name), nearest
+  // first among equals, rather than simply the nearest hit. If Google finds nothing, the OSM searches still run.
+  if (googleMapsEnabled()) {
+    const places = await placesTextSearch(words.join(' '), { within: boxAround(near, 0.03), max: 5 })
+    const scored = (places ?? [])
+      .map((p) => ({ p, words: words.filter((w) => p.name.toLowerCase().includes(w)).length }))
+      .sort((a, b) => b.words - a.words || haversineKm(near, a.p) - haversineKm(near, b.p))
+    const best = scored[0]
+    if (best) {
+      const confidence = weakMatch || best.words === 0 || haversineKm(near, best.p) > 1.5 ? 'low' : 'high'
+      return { lat: best.p.lat, lng: best.p.lng, name: best.p.name, confidence }
+    }
+  }
   // Photon search inside ~3 km of where they were last known.
   const pfeats = await photon(`/api/?q=${encodeURIComponent(words.join(' '))}&bbox=${bbox(near, 0.03)}&limit=5`)
   const phits = (pfeats ?? [])

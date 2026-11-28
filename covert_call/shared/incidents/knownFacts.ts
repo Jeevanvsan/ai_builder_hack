@@ -12,7 +12,9 @@ export const isCallerMoving = (i: Live) => i.extractedFieldsLive.dangerIndicator
 
 const hasWeaponOrInjury = (tags: string[]) => tags.some((d) => /weapon|gun|knife|blade|injur|bleed|hurt|blunt|no (weapon|injur)/i.test(d))
 
-export function knownFactsNote(i: Live): string {
+// `addressWord` is the cover's own word for the address (QuickOne, Epic 33: "address for the visit" on a repair
+// booking); native and the eval use the default, so their note is unchanged.
+export function knownFactsNote(i: Live, addressWord = 'delivery address'): string {
   const tags = affirmed(i.extractedFieldsLive.dangerIndicators)
   const allTags = i.extractedFieldsLive.dangerIndicators
   const known: string[] = []
@@ -20,7 +22,7 @@ export function knownFactsNote(i: Live): string {
 
   const address = i.location.confirmed?.address
   if (address) known.push(`location = ${address}`)
-  else needed.push(isCallerMoving(i) ? 'where they are right now (a landmark) and which way they are heading' : 'the delivery address (house name or number, area, town) — ask it next')
+  else needed.push(isCallerMoving(i) ? 'where they are right now (a landmark) and which way they are heading' : `the ${addressWord} (house name or number, area, town) — ask it next`)
 
   if (tags.length) known.push(`situation = ${tags.slice(-6).join('; ')}`)
   else needed.push('what is happening')

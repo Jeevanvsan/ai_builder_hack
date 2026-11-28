@@ -9,12 +9,13 @@ import { checkCameraFrame } from './photoVision.ts'
 import { setMiaAudio } from '../demoInject.ts'
 import { gpsSimEnabled } from '../gpsSim.ts'
 import { startFrameSampler, type FrameSampler } from './frames.ts'
-import { PERSONA_SYSTEM_INSTRUCTION } from './persona.ts'
-import { ALL_CODES } from '../../../../shared/codes.ts'
+import { buildCoverSheet, buildPersonaInstruction } from './persona.ts'
+import { COVERS, coverPack, isCoverId, serviceAskedFor, speechHints, type CoverId, type CoverPack } from '../../../../shared/covers/index.ts'
+import { APP_NAME } from '../brand.ts'
 import { startCallRecording, type CallRecorder } from './recorder.ts'
 import { isCallerMoving, knownFactsNote } from '../../../../shared/incidents/knownFacts.ts'
 import type { Incident } from '../../../../shared/incidents/types.ts'
-import { LIVE_CALL_TOOLS, SILENT_TOOL_NAMES, batchResponses, toolResponse } from './tools.ts'
+import { SILENT_TOOL_NAMES, batchResponses, liveCallTools, toolResponse } from './tools.ts'
 import { currentLiveTier, geminiConfigured, liveConnect } from './aiLogic.ts'
 import type { MotionKind } from '../../../../shared/incidents/types.ts'
 import { startLiveTracking, type LiveTracker } from '../nav/liveTracking.ts'
@@ -39,11 +40,12 @@ export type LiveCallHandle = {
 }
 
 // Notes sent into the call when the phone's sensors feel something (Epic 30). Context only, never read out.
-const MOTION_NOTES: Partial<Record<MotionKind, string>> = {
+// Worded for the call's current cover (QuickOne, Epic 33); the food wording is unchanged.
+const motionNotes = (p: CoverPack): Partial<Record<MotionKind, string>> => ({
   running: 'System note (phone motion sensor, not said by the caller): the caller appears to be RUNNING. If they are getting away, treat them as on the move: report_situation (e.g. "caller running / escaping") and call get_route_guidance. Stay in character.',
-  snatched: 'System note (phone motion sensor): the phone was just grabbed or thrown. Do NOT react out loud. If a different person now speaks, keep it a normal food order and keep listening; report_coercion_signal if they try to cancel.',
-  fall: 'System note (phone motion sensor): a possible fall or the phone was dropped. If the caller speaks again, check on them gently in character (covert: "all okay with the order?").',
-}
+  snatched: `System note (phone motion sensor): the phone was just grabbed or thrown. Do NOT react out loud. If a different person now speaks, keep it a normal ${p.kind} and keep listening; report_coercion_signal if they try to cancel.`,
+  fall: `System note (phone motion sensor): a possible fall or the phone was dropped. If the caller speaks again, check on them gently in character (covert: "all okay with the ${p.order}?").`,
+})
 
 type LiveCallCallbacks = {
   onStatusChange: (status: CallStatus) => void
@@ -55,6 +57,9 @@ type LiveCallCallbacks = {
   // still close out the incident (save the recording, run consolidation, mark it ended) exactly as if the caller
   // had said goodbye, since otherwise it's left stuck 'active' forever with nothing telling a responder why.
   onCallDropped: () => void
+  // QuickOne (Epic 33): the call moved to another service (Mia called set_service). `name` is the caller's own word
+  // for an "other" service ("cab"). The page shows it on the call screen.
+  onCover?: (cover: CoverId, name?: string) => void
 }
 
 // Opens a Gemini Live session for the disguised call, streams the mic to it, plays the response back, and wires
@@ -65,9 +70,21 @@ export async function startLiveCall(
   callbacks: LiveCallCallbacks,
   // The caller can pass a mic stream it already opened (Epic 9 opens the mic and the back camera together); when
   // omitted, the mic is opened here as before. `videoStream` (Epic 10) turns on ~1 fps camera frames to Gemini.
-  opts: { micStream?: MediaStream; videoStream?: MediaStream } = {},
+  // `cover` (QuickOne, Epic 33) is the service the caller called (default food); `entry: 'any'` is the neutral
+  // "Call QuickOne" line, where the caller names the service in their first answer.
+  opts: { micStream?: MediaStream; videoStream?: MediaStream; cover?: CoverId; entry?: 'service' | 'any' } = {},
 ): Promise<LiveCallHandle> {
   if (!geminiConfigured) throw new Error('Gemini Live is not configured')
+  // The service the call is on. Mia's prompt is built for the starting one; set_service moves the call to another
+  // and its sheet arrives in the tool reply (Gemini Live can't swap the system instruction mid-call on this API).
+  const entry = opts.entry ?? 'service'
+  const startCover: CoverPack = entry === 'any' ? COVERS.other : coverPack(opts.cover)
+  let cover = startCover
+  let serviceName: string | undefined
+  // True once the call's words come from a set_service sheet instead of the starting prompt.
+  let switched = false
+  // The cover the open session's setup was built with: a resumed session keeps it, a fresh one takes the current one.
+  let setupCover = startCover
   // Epic 27: with Firebase AI Logic on, the call goes through Firebase's proxy (App Check protected) and no Gemini
   // key is in the bundle; otherwise the original key-based connection is used.
   // Live GPS + route to safety; started once the session is open (turn notes are sent into it).
@@ -390,7 +407,7 @@ export async function startLiveCall(
       case 'send_case_report': {
         // Location comes before the email, always (INC-MUXPXKUJ asked the email and never the address).
         if (lastAddressSaved === null && !movementReported) {
-          return 'Not yet: you have not taken their address. Ask the delivery address now and ask them to spell it (covert: "And the delivery address, so the rider finds you? Please spell the house name and area for me."), read it back and confirm it, call confirm_address, and only then ask for the email again.'
+          return `Not yet: you have not taken their address. Ask the ${cover.address} now and ask them to spell it (covert: "And the ${cover.address}, so the ${cover.courier} finds you? Please spell the house name and area for me."), read it back and confirm it, call confirm_address, and only then ask for the email again.`
         }
         emailAsked = true
         // Mia decides the address: she heard the caller spell it and corrections. Parsing transcripts ourselves
@@ -422,7 +439,7 @@ export async function startLiveCall(
         // Mandatory: the caller spells it. Asked once (speech-to-text sometimes joins spelled letters into a word).
         if (!emailSpellAsked && !callerSpelled()) {
           emailSpellAsked = true
-          return 'Not saved yet. MANDATORY: the caller has not spelled the email. Ask them now to spell it letter by letter (covert: "Can you spell that for me, letter by letter, so the receipt reaches you?"). Then call send_case_report with exactly their letters and read it back.'
+          return `Not saved yet. MANDATORY: the caller has not spelled the email. Ask them now to spell it letter by letter (covert: "Can you spell that for me, letter by letter, so the ${cover.receipt} reaches you?"). Then call send_case_report with exactly their letters and read it back.`
         }
         return `Not saved yet. Read exactly this address back, letter by letter for the part before the @: ${email}. Then ask "Is that right?". If they say yes, call send_case_report again with confirmed=true and this same address. If they correct anything, FIRST call send_case_report with the corrected address (their spelled letters are final), then read that back; repeat until they say yes.`
       }
@@ -439,7 +456,7 @@ export async function startLiveCall(
         // Mandatory: the caller spells the address. Asked once; never while they are on the move.
         if (args.confirmed !== true && !movementReported && !addressSpellAsked && !callerSpelled()) {
           addressSpellAsked = true
-          return 'Saved for now. MANDATORY: the caller has not spelled it. Ask them now to spell the house name and the area letter by letter (covert: "Can you spell the house name and area for me, so the rider finds it?"). Then call confirm_address with exactly their spelling and read it back.'
+          return `Saved for now. MANDATORY: the caller has not spelled it. Ask them now to spell the house name and the area letter by letter (covert: "Can you spell the house name and area for me, so the ${cover.courier} finds it?"). Then call confirm_address with exactly their spelling and read it back.`
         }
         if (args.confirmed !== true) {
           return `Saved for now. If the caller spelled any name letter by letter, use exactly their letters (e.g. "N I V A S" is "Nivas", not "Niwas") and call confirm_address again with that spelling first. Read it back to the caller, spelling every house, building, street and place name letter by letter (e.g. "Jeevan Nivas — J, E, E, V, A, N, N, I, V, A, S"): "${address}". Ask "Is that right?". If they correct anything, call confirm_address again with the corrected address and read it back again; repeat until they say yes, then call confirm_address with confirmed=true.`
@@ -517,6 +534,14 @@ export async function startLiveCall(
           enqueueWrite(() => markMessageDelivered(db, incidentId, args.messageId as string, args.spokenAs as string))
         }
         break
+      }
+      case 'set_service': {
+        // QuickOne (Epic 33): the caller asked for another service. The reply is the new service's whole sheet, so
+        // every later covert choice, address, receipt and goodbye uses its words; the meanings don't change.
+        if (!isCoverId(args.service)) return `Unknown service "${String(args.service)}": use food, grocery, pharmacy, home (a repair) or other (anything else, with the caller's own word as name).`
+        const name = typeof args.name === 'string' && args.name.trim() ? args.name.trim().slice(0, 40) : undefined
+        switchCover(args.service, name)
+        return buildCoverSheet(cover, APP_NAME, serviceName)
       }
       case 'end_call': {
         // The tool call can arrive before its own closing-line audio has finished playing (or even before
@@ -605,7 +630,7 @@ export async function startLiveCall(
     console.info('[QuickBite call] another person in the room:', sentence)
     handleToolCall({ name: 'report_scene_observation', args: { source: 'sound', kind: 'second voice', category: 'sound_event', confidence: 80, detail: `Another person near the caller (likely the abuser) said: "${sentence}"` } } as FunctionCall)
     handleToolCall({ name: 'report_coercion_signal', args: { kind: 'second voice', confidence: 80, detail: `Someone else in the room questioned the caller: "${sentence}"` } } as FunctionCall)
-    extraNotes.push(`(Background, not the caller: another person in the room just said "${sentence}". Someone may be controlling the caller and listening. Stay fully in character, never react to it out loud, keep the order normal and short.)`)
+    extraNotes.push(`(Background, not the caller: another person in the room just said "${sentence}". Someone may be controlling the caller and listening. Stay fully in character, never react to it out loud, keep the ${cover.order} normal and short.)`)
   }
   const noteMode = (text: string) => {
     callerHeard = `${callerHeard} ${text}`.slice(-160)
@@ -614,11 +639,67 @@ export async function startLiveCall(
     if (COVERT_SIGNAL.test(callerHeard)) openMode = false
     if (before !== openMode) { callerHeard = ''; if (lastIncident) pendingFacts = factsWithMode(lastIncident) }
   }
+  // QuickOne (Epic 33): move the call to another service. Called by set_service; the page shows the new desk name.
+  const switchCover = (id: CoverId, name?: string) => {
+    dropServiceNote(id)
+    const nextName = id === 'other' ? name : undefined
+    if (id === cover.id && nextName === serviceName) return
+    cover = COVERS[id]
+    serviceName = nextName
+    switched ||= entry === 'any' || id !== startCover.id
+    console.info('[QuickBite call] service:', id, nextName ?? '')
+    callbacks.onCover?.(id, nextName)
+    if (lastIncident) pendingFacts = factsWithMode(lastIncident)
+  }
+  // The caller's words ask for another service ("actually, I need some medicines") but Mia didn't call set_service:
+  // she is reminded once per service. A keyword can be innocent, so the app never switches by itself, and only in
+  // covert mode (open mode has no cover). The note rides on the next tool response; if none comes within 5 s and
+  // she is quiet, it goes out on its own.
+  let serviceHeard = ''
+  const servicesNudged = new Set<CoverId>()
+  // Reminders still waiting to go out, by service. Dropped once Mia switches to that service herself, so she is
+  // never told to call set_service after she already has.
+  const serviceNotes = new Map<CoverId, string>()
+  const dropServiceNote = (id: CoverId) => {
+    const n = serviceNotes.get(id)
+    if (!n) return
+    serviceNotes.delete(id)
+    const i = extraNotes.indexOf(n)
+    if (i >= 0) extraNotes.splice(i, 1)
+  }
+  const noteService = (text: string) => {
+    if (openMode) return
+    serviceHeard = `${serviceHeard} ${text}`.slice(-160)
+    const asked = serviceAskedFor(serviceHeard, cover.id)
+    if (!asked || servicesNudged.has(asked)) return
+    servicesNudged.add(asked)
+    serviceHeard = ''
+    const note = `(System note, not the caller: the caller may be asking for ${COVERS[asked].label.toLowerCase()} ("${text.trim().slice(0, 80)}"). If they want that service, call set_service now and carry on in its words; if not, ignore this. Say only the words meant for the caller.)`
+    extraNotes.push(note)
+    serviceNotes.set(asked, note)
+    setTimeout(() => {
+      const i = extraNotes.indexOf(note)
+      if (finished || cover.id === asked || i < 0) return
+      if (player.isPlaying() || toolsPending > 0 || routesPending > 0 || !canSend()) return // stays queued for the next tool response
+      extraNotes.splice(i, 1)
+      serviceNotes.delete(asked)
+      nudge(note)
+    }, 5_000)
+  }
   // After danger, Mia is told in advance to ask for the report email in the same reply where the caller says they
   // are safe: a prompt sent after that reply came too late (INC-MUWN5ZK9 ended on "take care").
-  const EMAIL_NOTE = " (When the caller says they are safe or have arrived, in that same reply ask once for an email address (and ask them to spell it letter by letter) to send their case report to, with a reference number for the police; covert mode: offer to email the order receipt. Call send_case_report with it, read the address back and ask if it is right; only after they say yes call send_case_report again with confirmed=true.)"
+  const emailNote = () => ` (When the caller says they are safe or have arrived, in that same reply ask once for an email address (and ask them to spell it letter by letter) to send their case report to, with a reference number for the police; covert mode: offer to email the ${cover.orderReceipt}. Call send_case_report with it, read the address back and ask if it is right; only after they say yes call send_case_report again with confirmed=true.)`
+  const openNote = () =>
+    cover.id === 'food'
+      ? "(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO food words, NO menu codes, NO 'rider', 'order' or sizes. Switch back only if they say they can't talk or someone is coming.) "
+      : `(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO ${cover.words}, NO codes, NO '${cover.courier}', '${cover.order}' or sizes. Switch back only if they say they can't talk or someone is coming.) `
+  // After a switch the starting prompt's words are wrong: every note repeats which sheet is in use.
+  const serviceNote = () =>
+    switched && !openMode
+      ? `(SERVICE: ${cover.label.toLowerCase()}${serviceName ? ` (${serviceName})` : ''}. Every covert choice, question, address, receipt and goodbye uses ONLY the words of the ${cover.label.toLowerCase()} sheet from your set_service reply, never the words of the service this call started on.) `
+      : ''
   const factsWithMode = (data: Omit<Incident, 'id'>) =>
-    (dangerReported && !emailAsked ? EMAIL_NOTE : '') + (openMode ? "(MODE: OPEN — the caller said they can talk freely. For the rest of the call ask plain, direct questions only: NO food words, NO menu codes, NO 'rider', 'order' or sizes. Switch back only if they say they can't talk or someone is coming.) " : '') + knownFactsNote(data)
+    (dangerReported && !emailAsked ? emailNote() : '') + (openMode ? openNote() : '') + serviceNote() + knownFactsNote(data, cover.address)
   let lastIncident: Omit<Incident, 'id'> | undefined
 
   // AI usage for the staging /ai-usage page: every Live message reports the tokens of the inference that produced
@@ -652,6 +733,7 @@ export async function startLiveCall(
       callerSpokeAt = Date.now()
       nudgedForTurn = false
       noteMode(callerText)
+      noteService(callerText)
       noteThirdParty()
       confirmEmailIfYes(transcriptLines.at(-1)?.text ?? callerText)
       fixAddressOnYes(transcriptLines.at(-1)?.text ?? callerText)
@@ -706,6 +788,11 @@ export async function startLiveCall(
     if (calls?.length) {
       const routeCalls = calls.filter((c) => c.name === 'get_route_guidance')
       const others = calls.filter((c) => c.name !== 'get_route_guidance')
+      // A set_service in this batch answers any queued reminder for that service: drop it before the notes go out.
+      for (const c of others) {
+        const svc = c.args?.service
+        if (c.name === 'set_service' && isCoverId(svc)) dropServiceNote(svc)
+      }
       const facts = takeFacts()
       const outputs = others.map((call, i) => (handleToolCall(call) ?? 'ok') + (i === 0 ? facts : ''))
       // Tools run asynchronously on gemini-3.8-live, so a tool call usually arrives just BEFORE the audio of the
@@ -769,8 +856,23 @@ export async function startLiveCall(
   let session: Session
   callbacks.onStatusChange('connecting')
 
-  const openSession = (resume?: string) =>
-    liveConnect({
+  // The prompt, tools and speech-to-text hints for a session on one cover. A resumed session keeps the setup it was
+  // opened with (its context already holds any set_service sheet); a fresh one starts on the current service.
+  const sessionSetup = (resume?: string) => {
+    if (!resume) setupCover = cover
+    const p = setupCover
+    const neutral = entry === 'any' && !switched
+    return {
+      systemInstruction: buildPersonaInstruction({ pack: p, appName: APP_NAME, entry: neutral ? 'any' : 'service', switchable: true }),
+      tools: liveCallTools(p, true),
+      // The Live API accepts 75 entries (probed 2026-09-28); more would fail the whole setup, so never send more.
+      customVocabulary: speechHints(p, APP_NAME, neutral).slice(0, 75),
+    }
+  }
+
+  const openSession = (resume?: string) => {
+    const setup = sessionSetup(resume)
+    return liveConnect({
       model: LIVE_MODEL,
       config: {
         responseModalities: [Modality.AUDIO],
@@ -786,20 +888,10 @@ export async function startLiveCall(
         // even on calls where the audio itself worked fine, breaking consolidation/leakage-check downstream.
         // Hints for the caller-side speech-to-text: likely languages (short words were being detected as German or
         // Spanish) and local place names / code words that were being misheard ("Vazhicherry" → "Veterinary").
+        // Built per cover in sessionSetup() above (the food cover gives the same list as before cover packs).
         inputAudioTranscription: {
           languageCodes: ['en-IN', 'ml-IN', 'hi-IN', 'ta-IN'],
-          customVocabulary: [
-            'QuickBite', 'Mia', 'talk', 'order',
-            // Every code phrase plus the answers to Mia's follow-ups, so a whispered "cola" isn't heard as "Kola".
-            ...ALL_CODES.map((c) => c.food),
-            'cola', 'lemon', 'orange', 'a few napkins', 'a whole pack', 'small', 'medium', 'large', 'one pizza', 'two pizzas',
-            'a few', 'hand it to me', 'leave it at the door', 'right now', 'pre-order', 'as soon as possible', 'within the hour',
-            'whenever', 'pick up', 'bike', 'car', 'barbecue', 'mayo', 'ketchup', 'regular crust', 'large crust', 'the usual',
-            'collect it outside', 'bring it in', 'for myself', 'for someone else', 'one address', 'moving around',
-            'Alappuzha', 'Alleppey', 'Vazhicherry', 'Muhamma', 'Mullakkal', 'Kalavoor', 'Cherthala', 'Kochi', 'Ernakulam',
-            'Kottayam', 'Thiruvananthapuram', 'Kozhikode', 'Thrissur', 'Bengaluru', 'HSR Layout', 'Koramangala',
-            'petrol pump', 'junction', 'police station',
-          ],
+          customVocabulary: setup.customVocabulary,
         },
         outputAudioTranscription: {},
         // Scared callers pause mid-answer. Low end-sensitivity + a longer silence window stop Gemini from taking its
@@ -816,8 +908,8 @@ export async function startLiveCall(
         },
         // Low keeps replies quick on a live call; the model still thinks in the background while speaking.
         ...(USE_PLAIN_LIVE ? {} : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
-        systemInstruction: PERSONA_SYSTEM_INSTRUCTION,
-        tools: LIVE_CALL_TOOLS,
+        systemInstruction: setup.systemInstruction,
+        tools: setup.tools,
         // Session resumption lets a dropped connection (bad signal, a backgrounded tab, a network blip) reopen
         // transparently instead of silently ending the call — this used to be video-only, but a dropped
         // audio-only call is the far more common real case and previously had NO reconnect at all: onclose just
@@ -861,7 +953,8 @@ export async function startLiveCall(
                 // Reconnecting mid-conversation needs a nudge (the model has no memory of "we just reconnected")
                 // so Mia picks the thread back up instead of greeting the caller again as if this were a new call.
                 s.sendClientContent({
-                  turns: '(System note, not the caller: the connection dropped briefly and has just reconnected. Do NOT greet them again or restart the call — say one short line like "sorry, I lost you for a second — are you still there?" and continue exactly where you left off.)',
+                  turns: '(System note, not the caller: the connection dropped briefly and has just reconnected. Do NOT greet them again or restart the call — say one short line like "sorry, I lost you for a second — are you still there?" and continue exactly where you left off.' +
+                    (switched ? ` This call is on the ${cover.label.toLowerCase()} line now: keep using only its words.` : '') + ')',
                 })
               })
               .catch(() => {
@@ -878,6 +971,7 @@ export async function startLiveCall(
         },
       },
     })
+  }
 
   try {
     session = await openSession()
@@ -949,7 +1043,7 @@ export async function startLiveCall(
     if (!budgetNoted && elapsed >= WRAP_UP_MS) {
       budgetNoted = true
       session.sendClientContent({
-        turns: '(System note, not the caller — time: the call is 2 minutes long. Start wrapping up per your TIME BUDGET rule: at most one more essential question, then close.' + (lastAddressSaved === null && !movementReported ? ' You have NOT taken their address yet: ask the delivery address now, before anything else.' : '') + (dangerReported && !emailAsked ? ' Before the goodbye, ask for the email for the case report (covert: the order receipt) and confirm it.' : '') + ' If they are being chased or hiding right now, keep helping them instead. Say only the words meant for the caller.)',
+        turns: '(System note, not the caller — time: the call is 2 minutes long. Start wrapping up per your TIME BUDGET rule: at most one more essential question, then close.' + (lastAddressSaved === null && !movementReported ? ` You have NOT taken their address yet: ask the ${cover.address} now, before anything else.` : '') + (dangerReported && !emailAsked ? ` Before the goodbye, ask for the email for the case report (covert: the ${cover.orderReceipt}) and confirm it.` : '') + ' If they are being chased or hiding right now, keep helping them instead. Say only the words meant for the caller.)',
       })
       return
     }
@@ -980,7 +1074,7 @@ export async function startLiveCall(
     if (!next || injectedMessages.has(next.id)) return
     injectedMessages.add(next.id)
     session.sendClientContent({
-      turns: `(System note, not the caller — responder message ${next.id}: "${next.text}". Pass it on to the caller on this turn as ordinary delivery chat, per your RESPONDER MESSAGES rule, then call confirm_message_delivered with this id and exactly what you said. Say only the words meant for the caller.)`,
+      turns: `(System note, not the caller — responder message ${next.id}: "${next.text}". Pass it on to the caller on this turn as ordinary ${cover.talk} chat, per your RESPONDER MESSAGES rule, then call confirm_message_delivered with this id and exactly what you said. Say only the words meant for the caller.)`,
     })
   }, 1_000)
 
@@ -999,7 +1093,7 @@ export async function startLiveCall(
     missedNudgedFor = lastVoiceAt
     missedNudges++
     console.info('[QuickBite call] caller voice heard but no transcript: asking Mia to check')
-    nudge('(System note, not the caller: the caller just said something short that did not come through. Ask them once, briefly and warmly, to say it again, e.g. "sorry, the line broke for a second — was that talk or order?" adapted to your last question, in their language. Say only the words meant for the caller.)')
+    nudge(`(System note, not the caller: the caller just said something short that did not come through. Ask them once, briefly and warmly, to say it again, e.g. "sorry, the line broke for a second — was that talk or ${cover.covertWord}?" adapted to your last question, in their language. Say only the words meant for the caller.)`)
   }, 1_000)
 
   const mic = await startMicCapture((base64Pcm, level) => {
@@ -1081,7 +1175,7 @@ export async function startLiveCall(
     if (callerSafe && !emailAsked && spokeSinceCaller && routesPending === 0 && !player.isPlaying() && Date.now() - modelActiveAt > 600) {
       emailAsked = true
       console.info('[QuickBite call] caller safe: asking for the case report email')
-      nudge("(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address, spelled letter by letter, to send their full case report to, with a reference number they can show the police (covert mode: offer to email the order receipt). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)")
+      nudge(`(System note, not the caller: the caller is safe now. Before the call ends, ask them ONCE for an email address, spelled letter by letter, to send their full case report to, with a reference number they can show the police (covert mode: offer to email the ${cover.orderReceipt}). Read it back, then call send_case_report. If they decline, don't ask again. Say only the words meant for the caller.)`)
       return
     }
     if (!callerSpokeAt || spokeSinceCaller || nudgedForTurn || routesPending > 0 || player.isPlaying()) return
@@ -1204,7 +1298,7 @@ export async function startLiveCall(
     noteMotion: (kind) => {
       // Running from the sensors counts as "on the move", so route guidance is allowed even if not said yet.
       if (kind === 'running') markMoving()
-      const note = MOTION_NOTES[kind]
+      const note = motionNotes(cover)[kind]
       // Rides on the next silent tool response (takeFacts): a turnComplete=false message would hold the turn open.
       if (note) extraNotes.push(note)
     },

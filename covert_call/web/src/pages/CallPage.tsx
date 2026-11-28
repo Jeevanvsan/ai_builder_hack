@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { useCart } from '../state/cart'
-import { INCIDENTS, recordMotionEvent, setDemoMode, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
+import { INCIDENTS, recordMotionEvent, setCover, setDemoMode, startIncident, recordLeakageCheck, consolidateIncident, recordGroundedContext, recordCorrelatedIncidents, markHasRecording, upsertVideoRecording, setAudioRecording, updateLiveFields } from '../../../shared/incidents/client.ts'
 import type { Incident } from '../../../shared/incidents/types.ts'
+import { coverPack, isCoverId, type CoverId } from '../../../shared/covers/index.ts'
 import { startVideoPublisher } from '../../../shared/video/publisher.ts'
 import { db } from '../lib/firebase'
-import { APP_NAME } from '../lib/brand'
+import { APP_INITIALS, APP_NAME } from '../lib/brand'
 import { consolidateCall } from '../lib/gemini/consolidate'
 import { groundedLocationContext } from '../lib/gemini/groundedContext'
 import { findCorrelatedIncidents } from '../lib/gemini/correlate'
@@ -48,6 +49,15 @@ export function CallPage() {
   const [params] = useSearchParams()
   const isDemo = params.get('demo') === '1'
   const [demoBlocked] = useState(() => isDemo && demoCallsLeft() === 0)
+  // QuickOne (Epic 33): the service called. `?service=pharmacy` (food, grocery, pharmacy, home, other) starts Mia in
+  // that service; `?service=any` is the neutral line where the caller names it; no parameter is the food call as before.
+  const serviceParam = params.get('service')
+  const entry: 'service' | 'any' = serviceParam === 'any' ? 'any' : 'service'
+  const startCover: CoverId = isCoverId(serviceParam) ? serviceParam : entry === 'any' ? 'other' : 'food'
+  // Follows set_service mid-call. On the neutral line the header stays generic until the caller picks a service.
+  const [callCover, setCallCover] = useState<{ id: CoverId; chosen: boolean }>({ id: startCover, chosen: entry === 'service' })
+  const deskPack = coverPack(callCover.id)
+  const deskTitle = callCover.chosen ? `${APP_NAME}${deskPack.deskSuffix} ${deskPack.order === 'booking' ? 'Booking' : 'Order'} Desk` : `${APP_NAME} Order Desk`
   const incidentIdRef = useRef<string | null>(null)
   const callRef = useRef<LiveCallHandle | null>(null)
   // Back-camera video (Epic 9): the shared mic+camera stream, the live-feed publisher's stop fn, and the Drive
@@ -117,6 +127,9 @@ export function CallPage() {
       setMicIssue(null)
       const { id } = await startIncident(db, { channel: 'live-call' })
       incidentIdRef.current = id
+      // QuickOne (Epic 33): which service's code words this call uses, for the dashboard. Best-effort: a rejected
+      // write (rules not yet allowing the field) never affects the call.
+      void setCover(db, id, startCover).catch(() => {})
       setUsageIncident(db, id) // AI requests from here on are counted against this incident (staging /ai-usage)
       watchDemoControl(db, id) // demo recording only (?demoInject=1); no-op otherwise
       // Epic 32: email trusted contacts once if this call turns high severity.
@@ -130,10 +143,20 @@ export function CallPage() {
         const handle = await startLiveCall(
           db,
           id,
-          { onStatusChange: setStatus, onCallEnd: () => finishCallRef.current(), onCallDropped: () => finishCallRef.current({ dropped: true }) },
+          {
+            onStatusChange: setStatus,
+            onCallEnd: () => finishCallRef.current(),
+            onCallDropped: () => finishCallRef.current({ dropped: true }),
+            onCover: (coverId) => {
+              setCallCover({ id: coverId, chosen: true })
+              void setCover(db, id, coverId).catch(() => {})
+            },
+          },
           {
             micStream: media ? new MediaStream(media.stream.getAudioTracks()) : undefined,
             videoStream: media?.hasVideo ? videoOnly(media.stream) : undefined,
+            cover: startCover,
+            entry,
           },
         )
         callRef.current = handle
@@ -377,7 +400,7 @@ export function CallPage() {
     return (
       <div className="page call-page">
         <div className="call-top">
-          <div className="call-avatar" aria-hidden="true">QB</div>
+          <div className="call-avatar" aria-hidden="true">{APP_INITIALS}</div>
           <h1>Demo limit reached</h1>
           <p className="call-status">Try another demo call in about {minutesUntilNextDemo()} min.</p>
           <Link to="/" className="link-btn" replace>Back to menu</Link>
@@ -399,7 +422,7 @@ export function CallPage() {
     return (
       <div className="page call-page">
         <div className="call-top mic-help">
-          <div className="call-avatar" aria-hidden="true">QB</div>
+          <div className="call-avatar" aria-hidden="true">{APP_INITIALS}</div>
           <h1>{help.title}</h1>
           <p className="mic-help-intro">{help.intro}</p>
           <ol className="mic-help-steps">
@@ -427,8 +450,8 @@ export function CallPage() {
   return (
     <div className="page call-page">
       <div className="call-top">
-        <div className="call-avatar" aria-hidden="true">QB</div>
-        <h1>{APP_NAME} Order Desk</h1>
+        <div className="call-avatar" aria-hidden="true">{APP_INITIALS}</div>
+        <h1>{deskTitle}</h1>
         {isDemo && <p className="demo-badge">Demo call · not sent to responders</p>}
         <p className="call-status">
           {status === 'live' ? `${minutes}:${secs}` : STATUS_LABEL[status]}

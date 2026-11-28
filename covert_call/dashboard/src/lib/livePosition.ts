@@ -1,7 +1,16 @@
-import type { Incident } from '../../../shared/incidents/types'
+import type { Incident, TrackPoint } from '../../../shared/incidents/types'
 import { distanceM, type SafeRoute } from '../../../shared/nav/route.ts'
 
-export type LivePosition = { lat: number; lng: number; at: string | null; source: 'track' | 'address' | 'rough' }
+export type LivePosition = {
+  lat: number
+  lng: number
+  at: string | null
+  source: 'track' | 'address' | 'rough'
+  // How far off the phone said this fix could be, in metres; null when unknown or not a phone fix.
+  accuracyM: number | null
+  // What the position rests on: a phone fix, the demo GPS simulator, a place the caller named, or an IP lookup.
+  basis: 'gps' | 'sim' | 'landmark' | 'ip' | 'address'
+}
 
 // The caller's best current position: whichever of the live track and the confirmed address is newer, then the
 // rough fix. The map, the location tile and the route tile all read this, so they can't disagree about where the
@@ -16,20 +25,33 @@ export function livePosition(loc: Incident['location']): LivePosition | null {
   const track = loc.track ?? []
   const last = track.at(-1) ?? null
   const c = loc.confirmed
-  const pinned = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng, at: c.confirmedAt } : null
+  const pinned = c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng, at: c.confirmedAt, accuracyM: null, basis: 'address' as const } : null
+  const fromTrack = (t: TrackPoint): LivePosition => ({ lat: t.lat, lng: t.lng, at: t.at, source: 'track', accuracyM: t.accuracyM ?? null, basis: t.source ?? 'gps' })
   if (last && pinned && Date.parse(last.at) >= Date.parse(pinned.at)) {
     const pinnedAt = Date.parse(pinned.at)
     // Where the track was when the address was confirmed (or its first point after, if it started later).
     const base = [...track].reverse().find((t) => Date.parse(t.at) <= pinnedAt) ?? track.find((t) => Date.parse(t.at) >= pinnedAt)
-    if (base && distanceM(base, last) >= MOVED_SINCE_ADDRESS_M) return { lat: last.lat, lng: last.lng, at: last.at, source: 'track' }
+    if (base && distanceM(base, last) >= MOVED_SINCE_ADDRESS_M) return fromTrack(last)
     return { ...pinned, source: 'address' }
   }
-  if (last && !pinned) return { lat: last.lat, lng: last.lng, at: last.at, source: 'track' }
+  if (last && !pinned) return fromTrack(last)
   if (pinned) return { ...pinned, source: 'address' }
   // The caller gave an address but it couldn't be placed ("MiG showroom" with no area): show the rough fix rather
   // than an empty map. It's marked 'rough' (approximate area), and the location card says the address couldn't be
   // pinned, so a responder isn't misled by an IP fix that can be tens of km off.
-  return loc.rough ? { lat: loc.rough.lat, lng: loc.rough.lng, at: null, source: 'rough' } : null
+  const r = loc.rough
+  return r ? { lat: r.lat, lng: r.lng, at: null, source: 'rough', accuracyM: r.accuracyM ?? null, basis: r.source === 'gps' ? 'gps' : 'ip' } : null
+}
+
+// How sure a responder can be of a position, in a few words: "GPS ±40 m", "a landmark the caller named", "IP
+// estimate, can be km off". Null for a confirmed address (its own confidence says that).
+export function precisionLabel(p: LivePosition | null): string | null {
+  if (!p) return null
+  if (p.basis === 'landmark') return 'placed from a landmark the caller named'
+  if (p.basis === 'ip') return 'IP estimate, can be km off'
+  if (p.basis === 'sim') return 'simulated GPS (demo)'
+  if (p.basis === 'gps') return p.accuracyM != null ? `GPS ±${p.accuracyM >= 1000 ? `${(p.accuracyM / 1000).toFixed(1)} km` : `${p.accuracyM} m`}` : 'GPS'
+  return null
 }
 
 export type RouteProgress = { stepIndex: number; remainingM: number; remainingS: number; arrived: boolean }

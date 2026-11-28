@@ -15,6 +15,7 @@ import {
   reportSceneObservation,
   endIncident,
 } from '../../../shared/incidents/client'
+import { startLocationTrail, type LocationTrail } from '../../../shared/incidents/trail'
 import type { Severity } from '../../../shared/incidents/types'
 import { colors, radius, shadowBar, shadowCard } from '../theme'
 
@@ -71,13 +72,21 @@ export function SilentTapScreen() {
   const [photoState, setPhotoState] = useState<'idle' | 'analysing' | 'attached' | 'failed'>('idle')
   const startedRef = useRef(false)
 
+  const trailRef = useRef<LocationTrail | null>(null)
+  const leftRef = useRef(false)
   useEffect(() => {
     if (startedRef.current) return
     startedRef.current = true
     void startIncident(db, { channel: 'silent-tap' }).then(({ id }) => {
       incidentIdRef.current = id
       setReady(true)
+      // Keep the position current while the form is open: the caller may be moving while they fill it in.
+      if (!leftRef.current) trailRef.current = startLocationTrail(db, id)
     })
+  }, [])
+  useEffect(() => () => {
+    leftRef.current = true
+    trailRef.current?.stop()
   }, [])
 
   // Attach a photo (Epic 6.1): Gemini reads it into structured signal and merges it into the incident. Styled as

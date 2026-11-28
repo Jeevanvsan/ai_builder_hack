@@ -1,7 +1,8 @@
 import { doc, onSnapshot, type Firestore } from 'firebase/firestore'
 import { appendTrackPoint, INCIDENTS, setSafeRoute } from '../../../../shared/incidents/client.ts'
-import type { Incident } from '../../../../shared/incidents/types.ts'
-import { bestSafeRoute, distanceM, kindForSituation, progressOnRoute, type LatLng, type SafeRoute } from '../../../../shared/nav/route.ts'
+import { accuracyOf } from '../../../../shared/incidents/location.ts'
+import type { Incident, TrackPoint } from '../../../../shared/incidents/types.ts'
+import { bestSafeRoute, distanceM, kindForSituation, progressOnRoute, travelModeFor, type LatLng, type SafeRoute } from '../../../../shared/nav/route.ts'
 import { landmarkNear, locateLandmark } from '../../../../shared/nav/nearbyServices.ts'
 import { gpsSimEnabled } from '../gpsSim.ts'
 
@@ -22,13 +23,23 @@ export type LiveTracker = {
 }
 
 const fmtM = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.max(10, Math.round(m / 10) * 10)} m`)
+// Said after the travel time when the route isn't a car route ("about 6 min on foot"). Car routes say nothing extra,
+// as before (and every route is a car route when there's no Google Maps key).
+const byMode = (r: SafeRoute) => (r.travelMode === 'WALK' ? ' on foot' : r.travelMode === 'TWO_WHEELER' ? ' by two-wheeler' : '')
+// How long the caller's recent fixes are kept for working out their speed, and how recent a "running" motion is.
+const SPEED_WINDOW_MS = 30_000
+const RUNNING_RECENT_MS = 90_000
 
 // Keeps the caller's live GPS flowing to the incident while the call is open, and keeps a route to safety current
 // as they move: tracks progress, re-routes when they leave the route, and nudges Mia before each upcoming turn.
 const PRECISE_M = 100
+// What a phone fix is recorded as: the demo GPS simulator's fixes are marked so the dashboard can tell them apart.
+const FIX_SOURCE: 'gps' | 'sim' = gpsSimEnabled ? 'sim' : 'gps'
 
 export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote: (note: string) => void): LiveTracker {
   let pos: LatLng | null = null
+  // Where `pos` came from: a phone fix, or a place the caller named / the address they confirmed ('landmark').
+  let posSource: NonNullable<TrackPoint['source']> = FIX_SOURCE
   let lastWrite: { at: number; p: LatLng } | null = null
   let route: SafeRoute | null = null
   let lastRouteAt = 0
@@ -54,9 +65,29 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     console.info('[QuickBite call] working out the route from', pos)
     void reroute(wantRoute).then((r) => {
       if (!r) { lastFailAt = Date.now(); console.warn('[QuickBite call] no route found (retrying in 15 s)') }
-      if (r) onTurnNote(`Route to safety is ready: ${r.destination.name} (${r.destination.kind}), ${fmtM(r.distanceM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min. First: ${r.steps[0]?.instruction ?? 'continue ahead'}${r.steps[1] ? `, then ${r.steps[1].instruction}` : ''}. Tell the caller where you are taking them, the first direction and the distance.`)
+      if (r) onTurnNote(`Route to safety is ready: ${r.destination.name} (${r.destination.kind}), ${fmtM(r.distanceM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min${byMode(r)}. First: ${r.steps[0]?.instruction ?? 'continue ahead'}${r.steps[1] ? `, then ${r.steps[1].instruction}` : ''}. Tell the caller where you are taking them, the first direction and the distance.`)
     })
   }
+
+  // The caller's recent precise fixes, for their speed: walking, riding or in a vehicle picks the route's mode.
+  const recentFixes: { at: number; p: LatLng; speed: number | null }[] = []
+  // The last situation Mia described when asking for directions ("followed on foot", "I'm in an auto"), kept for
+  // re-routes that have no words of their own (the caller left the route, the route went stale).
+  let lastSituation: string | null = null
+  const currentSpeed = (): number | null => {
+    const since = Date.now() - SPEED_WINDOW_MS
+    const fixes = recentFixes.filter((f) => f.at >= since)
+    const reported = fixes.map((f) => f.speed).filter((s): s is number => s != null && Number.isFinite(s) && s >= 0).sort((a, b) => a - b)
+    if (reported.length) return reported[Math.floor(reported.length / 2)]
+    // Some phones report no speed: work it out from the first and last fix, if they are far enough apart in time.
+    const first = fixes[0], last = fixes.at(-1)
+    return first && last && last.at - first.at >= 10_000 ? distanceM(first.p, last.p) / ((last.at - first.at) / 1000) : null
+  }
+  const travelMode = () => travelModeFor({
+    speedMps: currentSpeed(),
+    running: (latestIncident?.motionEvents ?? []).some((e) => e.kind === 'running' && Date.now() - Date.parse(e.at) < RUNNING_RECENT_MS),
+    situation: lastSituation,
+  })
 
   const adopt = (r: SafeRoute) => {
     route = r
@@ -70,9 +101,14 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     const from = pos
     inflight = (async () => {
       try {
-        const kind = route?.destination.kind ?? kindForSituation([reason])
-        const target = route && requestedBy === 'responder' ? { ...route.destination, distanceKm: 0 } : undefined
-        const next = await bestSafeRoute(from, kind, reason, route?.requestedBy ?? requestedBy, target)
+        const current = route
+        const kind = current?.destination.kind ?? kindForSituation([reason])
+        // A station the dispatcher picked stays the destination when the route is re-planned (the caller moved or
+        // left the route). This used to check only this call's own argument, which no re-plan ever set, so the
+        // periodic re-route quietly swapped the dispatcher's choice for the nearest station of the same kind.
+        const keepDestination = current && (requestedBy === 'responder' || current.requestedBy === 'responder')
+        const target = keepDestination ? { ...current.destination, distanceKm: 0 } : undefined
+        const next = await bestSafeRoute(from, kind, reason, current?.requestedBy ?? requestedBy, target, travelMode())
         if (next) {
           adopt(next)
           // Not awaited: Mia's directions don't wait on the dashboard write.
@@ -103,11 +139,14 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     }
     gpsFix = true
     pos = { lat: p.coords.latitude, lng: p.coords.longitude }
-    routeIfWanted()
+    posSource = FIX_SOURCE
     const now = Date.now()
+    recentFixes.push({ at: now, p: pos, speed: p.coords.speed })
+    while (recentFixes.length && recentFixes[0].at < now - SPEED_WINDOW_MS) recentFixes.shift()
+    routeIfWanted()
     if (!lastWrite || now - lastWrite.at > WRITE_EVERY_MS || distanceM(lastWrite.p, pos) > WRITE_EVERY_M) {
       lastWrite = { at: now, p: pos }
-      void appendTrackPoint(db, incidentId, { ...pos, speed: p.coords.speed })
+      void appendTrackPoint(db, incidentId, { ...pos, speed: p.coords.speed, accuracyM: accuracyOf(p), source: FIX_SOURCE })
     }
     if (!route) return
     const prog = progressOnRoute(pos, route)
@@ -149,6 +188,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
     const c = latestIncident?.location.confirmed
     if (!gpsFix && c && c.lat != null && c.lng != null && (!pos || distanceM(pos, { lat: c.lat, lng: c.lng }) > 150)) {
       pos = { lat: c.lat, lng: c.lng }
+      posSource = 'landmark'
       routeIfWanted()
       if (route) void reroute(route.reason).then((r) => r && onTurnNote(`Route updated from the confirmed address: ${fmtM(r.distanceM)} to ${r.destination.name}. Next: ${r.steps[0]?.instruction ?? 'continue'}.`))
     }
@@ -179,15 +219,21 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
 
   return {
     guidance: async (situation, landmark) => {
+      if (situation) lastSituation = situation
       // No GPS fix yet (desktop, denied, indoors): fall back to the incident's latest known location (IP or a
       // confirmed address) so guidance still works instead of looping on "ask for a landmark".
-      if (!pos) pos = await knownLocation()
+      if (!pos) {
+        pos = await knownLocation()
+        if (pos) posSource = 'landmark'
+      }
       if (!gpsFix && !latestIncident?.location.confirmed) pos = null
       // Everything the caller reports from here should stay near where they said they were, not wherever GPS
       // happens to be (a device's GPS/IP fix can be tens of km off — this exact mismatch put a caller who said
       // "Alappuzha Vazhicherry" on the map near Muvattupuzha). Once an address is confirmed, it — not GPS — is
       // the anchor every subsequent landmark search is bounded to.
-      const anchor = (await knownLocation()) ?? pos
+      const known = await knownLocation()
+      const anchor = known ?? pos
+      const anchorSource = known ? 'landmark' : posSource
       // A named landmark is searched every time the caller reports one, GPS or not — GPS/IP fixes have already
       // proven unreliable enough this session (tens of km off in testing) that a real, named place the caller can
       // see is often better evidence of where they are than the device fix. Without GPS, the landmark simply
@@ -200,15 +246,20 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       if (landmark && anchor) {
         // Capped: a slow lookup (Photon took 7 s once) made the whole answer miss its 6 s budget.
         const hit = await Promise.race([locateLandmark(landmark, anchor).catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 2_500))])
-        // The simulated GPS (demo recording) is exact: a landmark the caller names never moves it.
-        if (hit && !gpsSimEnabled && (!gpsFix || !pos || distanceM(pos, hit) > GPS_OVERRIDE_M) && distanceM(anchor, hit) > 30) {
+        // The simulated GPS (demo recording) is exact: a landmark the caller names never moves it. Nor does a loose
+        // match (one word, or far out in the search box) move a precise GPS fix: "MG Road, Kochi" matched a business
+        // named after the city 3 km away, and the route was planned from there (INC-MWPCLSVB, INC-MWP4OUPB).
+        // Without GPS a loose match still moves the caller, and Mia reads it back to confirm (uncertainMatch).
+        const overridesGps = !gpsFix || !pos || (hit?.confidence === 'high' && distanceM(pos, hit) > GPS_OVERRIDE_M)
+        if (hit && !gpsSimEnabled && overridesGps && distanceM(anchor, hit) > 30) {
           // The dashboard follows a trail of 2+ points, so the first reported landmark also records where they
           // started — from the anchor (what the caller confirmed), not a possibly-wrong GPS/rough fix.
-          if (!latestIncident?.location.track?.length) void appendTrackPoint(db, incidentId, { ...anchor, speed: null })
+          if (!latestIncident?.location.track?.length) void appendTrackPoint(db, incidentId, { ...anchor, speed: null, source: anchorSource })
           pos = { lat: hit.lat, lng: hit.lng }
+          posSource = 'landmark'
           movedTo = hit.name
           if (hit.confidence === 'low') uncertainMatch = hit.name
-          void appendTrackPoint(db, incidentId, { ...pos, speed: null })
+          void appendTrackPoint(db, incidentId, { ...pos, speed: null, source: 'landmark' })
           if (route) await reroute(route.reason)
         }
       }
@@ -222,7 +273,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       const within = <T,>(pr: Promise<T>, ms: number) => Promise.race([pr, new Promise<null>((r) => setTimeout(() => r(null), ms))])
       const [lm, here] = await Promise.all([within(landmarkAt(prog.next), 1_500), within(landmarkNear(pos).catch(() => null), 1_500)])
       return [
-        `Destination: ${r.destination.name} (${r.destination.kind}), ${fmtM(prog.toDestinationM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min.`,
+        `Destination: ${r.destination.name} (${r.destination.kind}), ${fmtM(prog.toDestinationM)} away, about ${Math.max(1, Math.round(r.durationS / 60))} min${byMode(r)}.`,
         prog.next ? `Next: ${prog.next.instruction}${lm ? ` at ${lm}` : ''} in about ${fmtM(prog.toNextM)}.` : '',
         after ? `Then: ${after.instruction}.` : '',
         here ? `Reference landmark near the caller's GPS position (the caller has NOT mentioned it — say "you should see ${here} nearby", never "that ${here}"): ${here}.` : '',
@@ -236,6 +287,7 @@ export function startLiveTracking(db: Firestore, incidentId: string, onTurnNote:
       ].filter(Boolean).join(' ')
     },
     prefetch: (situation) => {
+      if (situation) lastSituation = situation
       wantRoute ??= situation ?? 'caller needs to reach safety'
       routeIfWanted()
     },

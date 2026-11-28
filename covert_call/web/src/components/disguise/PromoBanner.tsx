@@ -1,33 +1,33 @@
-import banner from '../../assets/food/banner.jpg'
-import { FREE_DELIVERY_THRESHOLD } from '../../state/cart'
-import { OUTLET } from '../../data/menu'
+import type { Service } from '../../data/services'
 import { ClockIcon, StarIcon } from './icons'
 
-export function PromoBanner() {
+// The open service's banner and outlet (QuickOne, Epic 33). Food shows the original QuickBite banner and wording.
+export function PromoBanner({ service }: { service: Service }) {
+  const { outlet, promo } = service
   return (
     <section className="promo">
-      <div className="promo-card" style={{ backgroundImage: `url(${banner})` }}>
-        <span className="promo-badge">TODAY ONLY</span>
+      <div className="promo-card" style={{ backgroundImage: `url(${service.banner})` }}>
+        <span className="promo-badge">{promo.badge}</span>
         <div className="promo-copy">
-          <strong>Free delivery over ₹{FREE_DELIVERY_THRESHOLD}</strong>
+          <strong>{promo.title}</strong>
           <span>
-            Hot &amp; fresh at your door in <b className="nowrap">{OUTLET.eta}</b>
+            {promo.line} <b className="nowrap">{outlet.eta}</b>
           </span>
         </div>
       </div>
       <div className="outlet">
         <div className="outlet-main">
-          <h1 className="outlet-name">{OUTLET.name}</h1>
+          <h1 className="outlet-name">{outlet.name}</h1>
           <p className="outlet-sub">
-            {OUTLET.cuisines} · {OUTLET.area}
+            {outlet.tagline} · {outlet.area}
           </p>
         </div>
         <div className="outlet-meta">
           <span className="rating-chip">
-            <StarIcon size={12} /> {OUTLET.rating}
+            <StarIcon size={12} /> {outlet.rating}
           </span>
           <span className="outlet-eta">
-            <ClockIcon size={13} /> {OUTLET.eta}
+            <ClockIcon size={13} /> {outlet.eta}
           </span>
         </div>
       </div>

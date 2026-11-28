@@ -1,9 +1,10 @@
-import { CATEGORIES, type CategoryId } from '../../data/menu'
+import type { CategoryId } from '../../data/menu'
 
 export type CategoryFilter = CategoryId | 'all'
 
-export function CategoryChips({ value, onChange }: { value: CategoryFilter; onChange: (c: CategoryFilter) => void }) {
-  const chips: { id: CategoryFilter; label: string }[] = [{ id: 'all', label: 'All' }, ...CATEGORIES]
+// The open service's categories (data/services.ts), after "All".
+export function CategoryChips({ categories, value, onChange }: { categories: { id: CategoryId; label: string }[]; value: CategoryFilter; onChange: (c: CategoryFilter) => void }) {
+  const chips: { id: CategoryFilter; label: string }[] = [{ id: 'all', label: 'All' }, ...categories]
   return (
     <nav className="chips" aria-label="Menu categories">
       {chips.map((c) => (

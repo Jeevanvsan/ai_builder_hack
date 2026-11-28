@@ -9,8 +9,16 @@ import { SORTS, sortIncidents } from '../../lib/sortIncidents'
 import { useIncidents } from '../../lib/incidentsStore'
 import { isUnviewed, rankOpenIncidents } from '../../lib/ranking'
 import { usePagination } from '../../lib/usePagination'
-import { channelLabel, formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
+import { channelLabel, coverLabel, formatElapsed, formatTime, statusLabel, timeAgo } from '../../lib/format'
 import { useNow } from '../../lib/useNow'
+import { livePosition } from '../../lib/livePosition'
+import type { Incident } from '../../../../shared/incidents/types'
+
+// No address yet: where the caller is now (the live trail if they're moving, else the start fix).
+const approxSpot = (loc: Incident['location']) => {
+  const p = livePosition(loc)
+  return p ? `≈ ${p.lat.toFixed(3)}, ${p.lng.toFixed(3)}` : 'Locating…'
+}
 
 // Epic: live queue as a card feed, not a table — severity/live/new state read visually (color, size, position)
 // at a glance, matching how a responder actually scans a live board rather than reading table cells row by row.
@@ -104,6 +112,7 @@ export default function QueuePage() {
                       {channelLabel(i.channel)}
                       {i.isDemo && <span className="demo-badge">DEMO</span>}
                       {i.incidentType === 'sos' && <span className="sos-badge">SOS{i.scenario ? ` · ${i.scenario}` : ''}</span>}
+                      {coverLabel(i.cover) && <span className="cover-badge">{coverLabel(i.cover)}</span>}
                     </span>
                     {search.reasons.get(i.id) && <span className="search-reason">AI: {search.reasons.get(i.id)}</span>}
                   </div>
@@ -119,8 +128,7 @@ export default function QueuePage() {
                   <div className="row-cell row-people"><span className="incident-card-label">People</span>{f.peopleCount ?? '—'}</div>
                   <div className="row-cell row-stress"><StressMeter score={i.voiceStressScore} /></div>
                   <div className="row-cell row-location sub">
-                    {i.location.confirmed ? i.location.confirmed.address
-                      : i.location.rough ? `≈ ${i.location.rough.lat.toFixed(3)}, ${i.location.rough.lng.toFixed(3)}` : 'Locating…'}
+                    {i.location.confirmed ? i.location.confirmed.address : approxSpot(i.location)}
                   </div>
                   <div className="row-cell row-time">
                     <span className="mono">{formatElapsed(i.sessionStartedAt, now)}</span>

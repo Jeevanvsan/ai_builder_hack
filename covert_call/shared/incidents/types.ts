@@ -13,6 +13,21 @@ export interface RoughLocation {
   lng: number
   source: 'gps' | 'ip-fallback'
   capturedAt: string
+  // How far off the phone says this fix may be, in metres (the Geolocation API's coords.accuracy). A laptop or
+  // Wi-Fi fix can be kilometres off and still say 'gps'. Absent on IP fixes and on incidents before 2026-11-21.
+  accuracyM?: number | null
+}
+
+// One point of the caller's live trail. 'gps' is a phone fix; 'landmark' is a place the caller named (or the
+// address they confirmed), found on the map rather than measured; 'sim' is the demo GPS simulator. Points from
+// before 2026-11-21 have no source or accuracy.
+export interface TrackPoint {
+  lat: number
+  lng: number
+  at: string
+  speed?: number | null
+  accuracyM?: number | null
+  source?: 'gps' | 'landmark' | 'sim'
 }
 
 export interface Incident {
@@ -24,6 +39,9 @@ export interface Incident {
   incidentType?: 'report' | 'sos'
   // Free-form scenario tag for an SOS, e.g. 'hostage' (Epic 11).
   scenario?: string
+  // QuickOne (Epic 33): the service whose words a call or coded order used (shared/covers/). It follows a mid-call
+  // switch. Missing means food: incidents from before QuickOne, and the native app, which is food only.
+  cover?: 'food' | 'grocery' | 'pharmacy' | 'home' | 'other'
   // Which cameras the SOS captured: both at once, alternating, or back only (Epic 11.2).
   cameraMode?: 'dual' | 'alternating' | 'back-only'
   callState: CallState
@@ -39,8 +57,9 @@ export interface Incident {
       confidence: FieldConfidence
       confirmedAt: string
     } | null
-    // Live GPS trail while the call is open (route-to-safety): lets the dashboard follow a moving caller.
-    track?: { lat: number; lng: number; at: string; speed?: number | null }[]
+    // Live trail while the caller's screen is open (a live call, a silent SOS, the silent-tap form, the order-placed
+    // screen): lets the dashboard follow a moving caller. `rough` stays the fix from when the session started.
+    track?: TrackPoint[]
   }
   // Route to the best-fit station (police/hospital/fire), kept current as the caller moves. Set by the AI during the
   // call or by a responder picking a station on the dashboard.

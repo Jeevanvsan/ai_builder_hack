@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import type { Service } from '../../data/services'
 import { primeMic } from '../../lib/micAccess'
 import { requestMotionPermission } from '../../lib/motion'
 import { formatRupees, useCart } from '../../state/cart'
@@ -7,7 +8,8 @@ import { ChevronRightIcon, PhoneIcon } from './icons'
 // Home is the only fork point: calling, silent reporting, and checkout are three separate forks, never a
 // sequence — offered only while the cart is empty so none of them can ever belong to the same order.
 // "Delivery instructions" is the silent-tap mode's disguise: an ordinary, unremarkable thing to tap on a food app.
-export function BottomBar() {
+// QuickOne (Epic 33): the call button calls the open service, so Mia answers in its words (/call?service=<id>).
+export function BottomBar({ service }: { service: Service }) {
   const cart = useCart()
 
   if (cart.count > 0) {
@@ -35,8 +37,8 @@ export function BottomBar() {
           <strong>Ordering as guest</strong>
           <Link to="/delivery-instructions" className="guest-subtle-link">Delivery instructions</Link>
         </span>
-        <Link to="/call" className="call-cta" onClick={() => { primeMic(); void requestMotionPermission() }}>
-          <PhoneIcon size={16} /> Call to order
+        <Link to={`/call?service=${service.id}`} className="call-cta" onClick={() => { primeMic(); void requestMotionPermission() }}>
+          <PhoneIcon size={16} /> {service.callLabel}
         </Link>
       </div>
     </div>

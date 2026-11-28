@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { doc, onSnapshot } from 'firebase/firestore'
-import { OUTLET } from '../data/menu'
+import { SERVICES, isServiceId } from '../data/services'
+import { APP_INITIALS } from '../lib/brand'
 import { db } from '../lib/firebase'
 import { INCIDENTS } from '../../../shared/incidents/client.ts'
+import { startLocationTrail } from '../../../shared/incidents/trail.ts'
 import type { ResponseStatus } from '../../../shared/incidents/types.ts'
+import { gpsSimEnabled } from '../lib/gpsSim'
 import { CheckIcon } from '../components/disguise/icons'
 
 // The confirmation shown after "Place order" (Epic 8, Story 8.3). Deliberately an ordinary order-tracking screen:
@@ -12,11 +15,14 @@ import { CheckIcon } from '../components/disguise/icons'
 //
 // When it arrived from a coded order, it also mirrors the responder's progress on the incident as ordinary
 // delivery status (Epic 8.3): acknowledged -> "Rider assigned", in progress -> "On the way", resolved -> delivered.
+// QuickOne (Epic 33): worded for the order's service (a home repair says "Technician assigned", "Job done").
 export function OrderPlacedPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const incidentId = (location.state as { incidentId?: string } | null)?.incidentId ?? null
-  const [orderId] = useState(() => `QB${100000 + (Date.now() % 900000)}`)
+  const state = location.state as { incidentId?: string; service?: string } | null
+  const incidentId = state?.incidentId ?? null
+  const service = SERVICES[isServiceId(state?.service) ? state.service : 'food']
+  const [orderId] = useState(() => `${APP_INITIALS}${100000 + (Date.now() % 900000)}`)
   const [status, setStatus] = useState<ResponseStatus | null>(null)
 
   useEffect(() => {
@@ -28,14 +34,16 @@ export function OrderPlacedPage() {
     })
   }, [incidentId])
 
+  // After a coded order, keep sending the caller's position while this screen is open (like a delivery app
+  // tracking the drop-off point), so responders can follow them if they move. A real order has no incident.
+  useEffect(() => {
+    if (!incidentId) return
+    const trail = startLocationTrail(db, incidentId, { source: gpsSimEnabled ? 'sim' : 'gps' })
+    return () => trail.stop()
+  }, [incidentId])
+
   // Map the responder's real status onto believable delivery milestones.
   const stage = status === 'resolved' ? 3 : status === 'in_progress' ? 2 : status === 'acknowledged' ? 1 : 0
-  const steps = [
-    { label: 'Order confirmed' },
-    { label: 'Rider assigned' },
-    { label: 'On the way' },
-    { label: 'Delivered' },
-  ]
 
   return (
     <div className="page page-sub order-placed">
@@ -43,8 +51,8 @@ export function OrderPlacedPage() {
         <div className="order-check" aria-hidden="true">
           <CheckIcon size={34} />
         </div>
-        <h1>Order placed!</h1>
-        <p className="muted">Thanks for ordering from {OUTLET.name}.</p>
+        <h1>{service.placed}</h1>
+        <p className="muted">{service.thanks} {service.outlet.name}.</p>
       </div>
 
       <section className="card">
@@ -55,7 +63,7 @@ export function OrderPlacedPage() {
           </div>
           <div>
             <span className="order-meta-label">Estimated arrival</span>
-            <strong>{OUTLET.eta}</strong>
+            <strong>{service.outlet.eta}</strong>
           </div>
         </div>
       </section>
@@ -63,10 +71,10 @@ export function OrderPlacedPage() {
       <section className="card">
         <h2 className="card-title">Order status</h2>
         <ol className="order-steps">
-          {steps.map((s, idx) => (
-            <li key={s.label} className={idx <= stage ? 'is-done' : ''}>
+          {service.steps.map((label, idx) => (
+            <li key={label} className={idx <= stage ? 'is-done' : ''}>
               <span className="order-step-dot" aria-hidden="true">{idx <= stage ? '✓' : ''}</span>
-              <span>{s.label}</span>
+              <span>{label}</span>
             </li>
           ))}
         </ol>
