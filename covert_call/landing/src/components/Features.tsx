@@ -248,7 +248,7 @@ const DIVES: Dive[] = [
     visual: (
       <div style={{ display: 'grid', gap: 18 }}>
         <Browser url="dashboard · incident"><Shot name="extraction" alt="Live extracted fields" fallback={<MockExtraction />} /></Browser>
-        <Browser url="dashboard · live route"><Shot name="google-maps" alt="Live route to the nearest police post on Google Maps, beside Street View near the caller" fallback={<MockExtraction />} /></Browser>
+        <div className="shot-full"><Browser url="dashboard · live route"><Shot name="google-maps" alt="Live route to the nearest police post on Google Maps, beside Street View near the caller" fallback={<MockExtraction />} /></Browser></div>
       </div>
     ),
   },
