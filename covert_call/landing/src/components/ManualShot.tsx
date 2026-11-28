@@ -77,7 +77,7 @@ export function ManualShot({ name, caption }: { name: ShotName; caption?: ReactN
   return (
     <figure className={`manual-shot ${s.phone ? 'is-phone' : 'is-desk'}`}>
       <button type="button" className="manual-shot-zoom" onClick={() => setOpen(true)} aria-label={`Enlarge: ${s.alt}`}>
-        {s.phone ? img : <Browser url="quickbite-5cde0-dashboard.web.app">{img}</Browser>}
+        {s.phone ? img : <Browser url="quickbite-5cde0-dashboard-staging.web.app">{img}</Browser>}
       </button>
       {(caption || s.legend) && (
         <figcaption>

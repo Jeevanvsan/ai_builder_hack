@@ -9,7 +9,7 @@ import { ManualShot, ShotRow } from './ManualShot'
 
 type LinkProps = (href: string) => { href: string; onClick: (e: ReactMouseEvent) => void }
 
-export const DASHBOARD_URL = 'https://quickbite-5cde0-dashboard.web.app'
+export const DASHBOARD_URL = 'https://quickbite-5cde0-dashboard-staging.web.app'
 // A shared public inbox for the emailed case report, so nobody has to give a personal address.
 const INBOX = 'qbtour@yopmail.com'
 const INBOX_URL = 'https://yopmail.com/?qbtour'
