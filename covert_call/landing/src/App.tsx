@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Bento, DeepDives } from './components/Features'
 import { Gallery } from './components/Gallery'
 import Hero from './components/Hero'
+import Blog from './components/Blog'
 import Manual from './components/Manual'
 import Privacy from './components/Privacy'
 import { Compare, DemoSlider, Disguise, Download, Footer, HowItWorks, Marquee, Nav, Problem, Recognition, SplitView } from './components/Sections'
@@ -42,6 +43,15 @@ export default function App() {
         <Footer />
         <ApkModal open={apkOpen} onClose={() => setApkOpen(false)} />
       </MotionConfig>
+    )
+  }
+  if (window.location.pathname.replace(/\/$/, '') === '/blog') {
+    document.title = 'Blog & news · QuickOne'
+    return (
+      <>
+        <Blog />
+        <Footer />
+      </>
     )
   }
   if (window.location.pathname.replace(/\/$/, '') === '/privacy') {

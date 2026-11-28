@@ -21,9 +21,22 @@
       {
         "source": "/manual/**",
         "destination": "/index.html"
+      },
+      {
+        "source": "/blog",
+        "destination": "/index.html"
       }
     ],
     "headers": [
+      {
+        "source": "/blog",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
       {
         "source": "/",
         "headers": [
