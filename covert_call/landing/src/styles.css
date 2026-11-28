@@ -796,3 +796,4 @@ h2 { font-size: clamp(32px, 4.4vw, 52px); line-height: 1.08; margin: 14px 0 16px
 .qb-brand-mark { width: 15px; height: 15px; }
 /* show the whole screenshot (no crop) */
 .shot-full .shot-img { aspect-ratio: auto; object-fit: contain; }
+.logo-full { height: 38px; width: auto; display: block; }

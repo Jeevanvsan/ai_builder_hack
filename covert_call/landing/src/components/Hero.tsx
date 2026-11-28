@@ -35,7 +35,7 @@ export default function Hero() {
       <div className="blob" style={{ width: 380, height: 380, background: 'var(--high-glow)', bottom: -120, left: -140, opacity: 0.25 }} />
       <div className="container hero-grid">
         <div>
-          <motion.span className="eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Safety, disguised as dinner</motion.span>
+          <motion.span className="eyebrow" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>Safety, disguised as an order</motion.span>
           <h1>
             {words.map((w, i) => (
               <motion.span key={i} style={{ display: 'inline-block', marginRight: '0.25em' }} initial={{ opacity: 0, y: 40, rotate: 4 }} animate={{ opacity: 1, y: 0, rotate: 0 }} transition={{ delay: 0.1 + i * 0.08, type: 'spring', stiffness: 200, damping: 20 }}>{w}</motion.span>

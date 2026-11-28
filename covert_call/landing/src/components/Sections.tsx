@@ -10,7 +10,7 @@ export function Nav() {
     <nav className={`nav${scrolled ? ' scrolled' : ''}`}>
       <motion.div style={{ scaleX: scrollYProgress, transformOrigin: 'left', height: 3, background: 'linear-gradient(90deg,var(--accent),var(--accent-glow))', position: 'absolute', top: 0, left: 0, right: 0 }} />
       <div className="container nav-inner">
-        <a href="/#top" className="logo"><img className="logo-mark" src="/brand/quickone-icon.svg" alt="" />QuickOne</a>
+        <a href="/#top" className="logo"><img className="logo-full" src="/brand/quickone-logo.svg" alt="QuickOne" /></a>
         <div className="nav-links">
           <a href="/#disguise">Disguise</a>
           <a href="/#how">How it works</a>
@@ -440,7 +440,7 @@ export function Footer() {
       <div className="container">
         <div className="footer-grid">
           <div>
-            <div className="logo"><img className="logo-mark" src="/brand/quickone-icon.svg" alt="" />QuickOne</div>
+            <div className="logo"><img className="logo-full" src="/brand/quickone-logo-dark.svg" alt="QuickOne" /></div>
             <p style={{ lineHeight: 1.6, maxWidth: 340, margin: 0 }}>A call for help that looks like an ordinary order. Powered by Gemini on Google Cloud.</p>
             <div className="safety">In an emergency, call your local emergency number if it's safe to do so. QuickOne supports, and does not replace, emergency services.</div>
           </div>

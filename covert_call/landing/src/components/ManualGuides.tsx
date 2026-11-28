@@ -10,7 +10,6 @@ import { ManualShot, ShotRow } from './ManualShot'
 type LinkProps = (href: string) => { href: string; onClick: (e: ReactMouseEvent) => void }
 
 export const DASHBOARD_URL = 'https://quickbite-5cde0-dashboard.web.app'
-const TEST_LOGIN = { email: 'judge@quickbite.com', password: 'judge@Quickbite123' }
 // A shared public inbox for the emailed case report, so nobody has to give a personal address.
 const INBOX = 'qbtour@yopmail.com'
 const INBOX_URL = 'https://yopmail.com/?qbtour'
@@ -102,10 +101,8 @@ export function TourPage({ link }: { link: LinkProps }) {
           <div>
             <h3>On the laptop: the responder dashboard</h3>
             <CopyField label="Dashboard" value={DASHBOARD_URL} />
-            <CopyField label="Email" value={TEST_LOGIN.email} />
-            <CopyField label="Password" value={TEST_LOGIN.password} />
             <p>
-              Sign in and stay on <b>Live queue</b>. Click anywhere on the page once so the alert sound can play.
+              Sign in with the responder login you were given, then stay on <b>Live queue</b>. Click anywhere on the page once so the alert sound can play.
               Please don't change the responder list.
             </p>
             <a className="btn btn-primary" href={DASHBOARD_URL} target="_blank" rel="noreferrer">Open the dashboard →</a>
